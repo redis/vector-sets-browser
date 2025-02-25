@@ -1,27 +1,300 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Mono&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
-body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
-}
-
 @layer utilities {
   .text-balance {
     text-wrap: balance;
+  }
+
+  .redis-mono {
+    font-family: "Space Mono", monospace;
+  }
+    
+  .redis-grotesk {
+    font-family: "Space Grotesk", sans-serif;
+  }
+
+  .text-column {
+    @apply flex max-w-3xl flex-[0.6] flex-col justify-center mx-auto;
+  }
+
+  .visually-hidden {
+    @apply border-0 h-auto m-0 overflow-hidden p-0 absolute w-px whitespace-nowrap;
+    clip: rect(0 0 0 0);
+  }
+}
+
+@layer base {
+  :root {
+    --font-body: 'Space Grotesk', sans-serif;
+    --font-mono: 'Space Mono', monospace;
+    --background: 0 0% 100%;
+    --foreground: 0 0% 3.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 3.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 3.9%;
+    --primary: 0 0% 9%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 0 0% 96.1%;
+    --secondary-foreground: 0 0% 9%;
+    --muted: 0 0% 96.1%;
+    --muted-foreground: 0 0% 45.1%;
+    --accent: 0 0% 96.1%;
+    --accent-foreground: 0 0% 9%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 89.8%;
+    --input: 0 0% 89.8%;
+    --ring: 0 0% 3.9%;
+    --chart-1: 12 76% 61%;
+    --chart-2: 173 58% 39%;
+    --chart-3: 197 37% 24%;
+    --chart-4: 43 74% 66%;
+    --chart-5: 27 87% 67%;
+    --radius: 0.5rem;
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 240 5.3% 26.1%;
+    --sidebar-primary: 240 5.9% 10%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 240 4.8% 95.9%;
+    --sidebar-accent-foreground: 240 5.9% 10%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+
+  .dark {
+    --background: 0 0% 3.9%;
+    --foreground: 0 0% 98%;
+    --card: 0 0% 3.9%;
+    --card-foreground: 0 0% 98%;
+    --popover: 0 0% 3.9%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 0 0% 98%;
+    --primary-foreground: 0 0% 9%;
+    --secondary: 0 0% 14.9%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 0 0% 14.9%;
+    --muted-foreground: 0 0% 63.9%;
+    --accent: 0 0% 14.9%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 14.9%;
+    --input: 0 0% 14.9%;
+    --ring: 0 0% 83.1%;
+    --chart-1: 220 70% 50%;
+    --chart-2: 160 60% 45%;
+    --chart-3: 30 80% 55%;
+    --chart-4: 280 65% 60%;
+    --chart-5: 340 75% 55%;
+    --sidebar-background: 240 5.9% 10%;
+    --sidebar-foreground: 240 4.8% 95.9%;
+    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 3.7% 15.9%;
+    --sidebar-accent-foreground: 240 4.8% 95.9%;
+    --sidebar-border: 240 3.7% 15.9%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--font-body);
+    min-height: 100vh;
+    margin: 0;
+  }
+
+  h1 { 
+    @apply text-left font-mono font-bold text-black redis-grotesk dark:text-white text-2xl md:text-[2.4rem];
+  }
+
+  h2 {
+    @apply text-black font-mono font-semibold redis-grotesk dark:text-white text-base md:text-lg;
+  }
+
+  p {
+    @apply font-normal leading-relaxed;
+  }
+
+  pre {
+    @apply text-base font-mono bg-white/45 rounded p-2 overflow-x-auto shadow-md;
+  }
+}
+
+@layer components {
+  /* Base button styles that all buttons share */
+  .btn {
+    @apply font-mono
+      p-2
+      flex
+      items-center
+      justify-center
+      gap-2
+      rounded-md
+      border
+      transition-colors
+      duration-200
+      text-sm
+      font-medium;
+  }
+
+  /* Action buttons (primary actions) */
+  .btn-primary {
+    @apply btn
+      bg-lime-300 
+      text-black  
+      border-black 
+      hover:bg-lime-500
+      hover:text-black
+      dark:bg-lime-500
+      dark:text-black
+      dark:hover:bg-lime-600;
+  }
+
+  /* Navigation/secondary buttons */
+  .btn-nav {
+    @apply btn
+      px-1
+      text-customSlate-400
+      hover:text-customSlate-700
+      border-transparent
+      bg-transparent
+      dark:text-customSlate-300
+      dark:hover:text-customSlate-100;
+  }
+
+  /* Utility buttons (search, add, etc.) */
+  .btn-utility {
+    @apply btn
+      bg-customSlate-500
+      text-white
+      border-black
+      hover:bg-customSlate-700
+      hover:text-white
+      dark:bg-customSlate-600
+      dark:hover:bg-customSlate-700;
+  }
+
+  /* Danger/destructive actions */
+  .btn-danger {
+    @apply btn
+      bg-customRed-500
+      text-white  
+      border-black 
+      hover:bg-customRed-600
+      dark:bg-customRed-700
+      dark:hover:bg-customRed-800;
+  }
+
+  /* Ghost buttons (minimal style) */
+  .btn-ghost {
+    @apply btn
+      bg-transparent
+      text-black
+      border-transparent
+      hover:bg-lime-500
+      hover:text-black
+      dark:text-white
+      dark:hover:text-black;
+  }
+
+  /* Outline variants */
+  .btn-outline {
+    @apply btn
+      bg-transparent
+      text-black
+      border-black
+      hover:bg-lime-500
+      hover:text-black
+      dark:border-white
+      dark:text-white
+      dark:hover:text-black;
+  }
+
+  .btn-outline-primary {
+    @apply btn
+      bg-transparent
+      text-lime-500
+      border-lime-500
+      hover:bg-lime-500
+      hover:text-black;
+  }
+
+  /* Icon-only buttons */
+  .btn-icon {
+    @apply btn
+      p-1
+      text-customSlate-400
+      hover:text-customSlate-700
+      border-transparent
+      dark:text-customSlate-300
+      dark:hover:text-customSlate-100;
+  }
+
+  /* Size variants */
+  .btn-sm {
+    @apply px-2 py-1 text-xs;
+  }
+
+  .btn-lg {
+    @apply px-4 py-3 text-base;
+  }
+
+  /* Disabled state */
+  .btn:disabled {
+    @apply opacity-50 cursor-not-allowed hover:bg-inherit;
+  }
+
+  /* Loading state */
+  .btn-loading {
+    @apply opacity-75 cursor-wait;
+  }
+
+  .card {
+    @apply 
+      bg-white 
+      rounded-none 
+      shadow-none 
+      dark:bg-slate-700 
+      dark:border-slate-300 
+      dark:text-lime-500;
+  }
+
+  /* List Item Styles */
+  .list-container {
+    @apply list-none p-0 m-0;
+  }
+
+  .list-item {
+    @apply w-full items-center p-3 transition-all duration-200 cursor-pointer border-b border-gray-200;
+  }
+
+  .list-item-selected {
+    @apply bg-gray-200 text-black border-l-4 border-l-customRed-500 !important;
+  }
+
+  .list-item-alt {
+    @apply bg-white text-black hover:bg-gray-50;
+  }
+
+  .list-item-default {
+    @apply bg-gray-50 text-black hover:bg-gray-50;
+  }
+
+  .list-item-content {
+    @apply hover:text-black group-hover:text-black bg-transparent hover:bg-transparent w-full items-start space-y-1 text-left min-w-0 h-auto;
+  }
+
+  .list-item-action {
+    @apply flex-none;
   }
 }
