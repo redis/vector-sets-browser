@@ -1,204 +1,82 @@
-# Vector Sets for Redis
+# Redis Vector Sets Browser
 
-This module implements Vector Sets for Redis, a new Redis data type similar to Sorted Sets but having string elements associated to a vector instead of a score. The fundamental goal of Vector Sets is to make possible adding items, and later get a subset of the added items that are the most similar to a specified vector (often a learned embedding) or most similar to the vector of an element that is already part of the Vector Set.
+A Next.js web application for browsing and interacting with Redis Vector Sets.
+
+## Overview
+
+This browser application provides a user-friendly interface for exploring and managing vector sets in Redis. It allows you to visualize, search, and manipulate vector data through an intuitive web interface.
+
+## Features
+
+- Browse and search vector sets stored in Redis
+- Visualize vector data and relationships
+- Perform vector similarity searches
+- Create, update, and delete vector sets
+- Interactive query builder for complex vector operations (Coming soon)
+- Native embedding engine support
+
+## Prerequisites
+
+- Node.js (v16 or later)
+- npm or yarn
+- Redis server with Vector Sets capability
 
 ## Installation
 
-Build with:
+Clone the repository and install dependencies:
 
 ```bash
-make
+git clone https://github.com/rowantrollope/vector-sets-browser.git
+cd vector-sets-browser
+npm install
 ```
 
-Then load the module with the following command line, or by inserting the needed directives in the `redis.conf` file:
+## Configuration
 
-```bash
-./redis-server --loadmodule vset.so
-```
+If you want to use Ollama embedding models, be sure to download and run ollama and the models you want.  Otherwise you can use OpanAI embedding models
 
-For testing, it's recommended to use:
+## Development
 
-```bash
-./redis-server --save "" --enable-debug-command yes
-```
+To run the development server:
 
-Then execute the tests with:
+npm run dev
 
-```bash
-./test.py
-```
 
-## Command Reference
+Open [http://localhost:3000](http://localhost:3000) in your browser to access the application.
 
-### VADD: Add Items into a Vector Set
+## Building for Production
 
-```
-VADD key [REDUCE dim] FP32|VALUES vector element [CAS] [NOQUANT] [BIN] [Q8]
-         [EF build-exploration-factor]
-```
+Build the application for production:
 
-Add a new element into the vector set specified by the key. The vector can be provided as FP32 blob of values, or as floating point numbers as strings, prefixed by the number of elements:
+npm run build
 
-```
-VADD mykey VALUES 3 0.1 1.2 0.5 my-element
-```
+Start the production server:
 
-Options:
-- `REDUCE`: Implements random projection to reduce vector dimensionality. The projection matrix is saved and reloaded with the vector set.
-- `CAS`: Performs operation partially using threads in check-and-set style. Neighbor candidates collection runs in background.
-- `NOQUANT`: Forces vector creation without integer 8 quantization (which is default).
-- `BIN`: Uses binary quantization instead of int8. Faster and uses less memory, but impacts recall quality.
-- `Q8`: Forces signed 8 bit quantization (default). Used to verify vector set format at insertion.
-- `EF`: Sets build exploration factor for finding candidates when connecting new nodes (default: 200).
+npm start
 
-### VSIM: Return Elements by Vector Similarity
+## Usage
 
-```
-VSIM key [ELE|FP32|VALUES] <vector or element> [WITHSCORES] [COUNT num] [EF search-exploration-factor]
-```
+1. Connect to your Redis instance using the connection form on the home page
+2. Navigate through your vector sets using the sidebar
+3. Use the search functionality to find specific vector data
+4. Click on a vector set to visualize its contents and metadata
+5. Use the built-in tools to perform vector operations and searches
 
-Returns similar vectors. Example using an existing element as reference:
+## Contributing
 
-```
-> VSIM word_embeddings ELE apple
- 1) "apple"
- 2) "apples"
- 3) "pear"
- 4) "fruit"
- 5) "berry"
- 6) "pears"
- 7) "strawberry"
- 8) "peach"
- 9) "potato"
-10) "grape"
-```
+Contributions are welcome! Please feel free to submit a Pull Request.
 
-With scores and count limit:
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
-```
-> VSIM word_embeddings ELE apple WITHSCORES COUNT 3
-1) "apple"
-2) "0.9998867657923256"
-3) "apples"
-4) "0.8598527610301971"
-5) "pear"
-6) "0.8226882219314575"
-```
+## License
 
-The `EF` parameter (50-1000) controls search exploration factor: higher values give better results but slower performance.
+This project is licensed under the MIT License - see the LICENSE file for details.
 
-### VDIM: Get Vector Dimension
+## Acknowledgments
 
-```
-VDIM keyname
-```
-
-Returns the dimension of vectors in the set:
-
-```
-> VDIM word_embeddings
-(integer) 300
-```
-
-Note: For reduced vectors (via `REDUCE`), returns the projected dimension. Queries should still use full-size vectors.
-
-### VCARD: Get Element Count
-
-```
-VCARD key
-```
-
-Returns the number of elements in the vector set:
-
-```
-> VCARD word_embeddings
-(integer) 3000000
-```
-
-### VREM: Remove Elements
-
-```
-VREM key element
-```
-
-Example:
-
-```
-> VADD vset VALUES 3 1 0 1 bar
-(integer) 1
-> VREM vset bar
-(integer) 1
-> VREM vset bar
-(integer) 0
-```
-
-VREM performs actual memory reclamation, not logical deletion, making it safe for long-running applications.
-
-### VEMB: Get Approximated Vector
-
-```
-VEMB key element [RAW]
-```
-
-Returns the vector for an element:
-
-```
-> VEMB word_embeddings SQL
-  1) "0.18208661675453186"
-  2) "0.08535309880971909"
-  3) "0.1365649551153183"
-  4) "-0.16501599550247192"
-  5) "0.14225517213344574"
-  ... 295 more elements ...
-```
-
-The `RAW` option returns internal representation data:
-1. Quantization type ("fp32", "bin", "q8")
-2. Raw data blob
-3. Pre-normalization L2 norm
-4. Quantization range (for q8 only)
-
-### VLINKS: Show Node Neighbors
-
-```
-VLINKS key element [WITHSCORES]
-```
-
-Shows neighbors for each level in the HNSW graph.
-
-### VINFO: Show Vector Set Information
-
-```
-VINFO key
-```
-
-Example:
-
-```
-> VINFO word_embeddings
- 1) quant-type
- 2) int8
- 3) vector-dim
- 4) (integer) 300
- 5) size
- 6) (integer) 3000000
- 7) max-level
- 8) (integer) 12
- 9) vset-uid
-10) (integer) 1
-11) hnsw-max-node-uid
-12) (integer) 3000000
-```
-
-## Known Issues
-
-* VADD with REDUCE replication should send random matrix to replicas for consistent VEMB readings
-* Replication code needs more testing (currently uses verbatim command replication)
-
-## Implementation Details
-
-Vector sets use the `hnsw.c` implementation of the HNSW data structure with extensions for:
-
-* Proper nodes deletion with relinking
-* 8 bits quantization
-* Threaded queries
+- @Antirez for his powerful vector sets implementation
+- @RauchG and Next.js team for the fantastic React framework
