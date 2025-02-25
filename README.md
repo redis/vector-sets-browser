@@ -25,11 +25,9 @@ This browser application provides a user-friendly interface for exploring and ma
 
 Clone the repository and install dependencies:
 
-```bash
 git clone https://github.com/rowantrollope/vector-sets-browser.git
 cd vector-sets-browser
 npm install
-```
 
 ## Configuration
 
