@@ -180,6 +180,14 @@ export function useVectorSearch({
                     // Set status message to the search term
                     onStatusChange(`Results for "${searchState.searchQuery}"`);
                     
+                    // Determine if we're using an image embedding model
+                    const isImageEmbedding = metadata.embedding.provider === 'image';
+                    
+                    // If this is an image embedding model, check if the query is a base64 image
+                    const isBase64Image = isImageEmbedding && 
+                        (searchState.searchQuery.startsWith('data:image') || 
+                         /^[A-Za-z0-9+/=]+$/.test(searchState.searchQuery));
+                    
                     const response = await fetch("/api/embedding", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
@@ -191,8 +199,13 @@ export function useVectorSearch({
                     if (!response.ok) {
                         throw new Error("Failed to get embedding for search text")
                     }
-                    searchVector = await response.json()
-                    
+
+                    const data = await response.json()
+                    if (!data.success) {
+                        throw new Error(data.error || "Failed to get embedding for search text")
+                    }
+
+                    searchVector = data.embedding
                 } else {
                     throw new Error(
                         "Please enter valid vector data (comma-separated numbers) or configure an embedding engine"

@@ -1,234 +1,439 @@
-import { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { useState, useEffect } from "react"
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { EmbeddingConfig, EmbeddingProvider, OpenAIModel } from '@/app/types/embedding';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select"
+import {
+    EmbeddingConfig,
+    EmbeddingProvider,
+    OpenAIModel,
+    TensorFlowModel,
+    ImageModel,
+} from "@/app/types/embedding"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import OllamaModelSelector from './OllamaModelSelector';
+import OllamaModelSelector from "./OllamaModelSelector"
+import TensorFlowModelSelector from "./TensorFlowModelSelector"
+import ImageModelSelector from "./ImageModelSelector"
+import { Switch } from "@/components/ui/switch"
 
 const DEFAULT_CONFIG: EmbeddingConfig = {
-  provider: 'openai',
-  openai: {
-    apiKey: '',
-    model: 'text-embedding-3-small',
-    cacheTTL: 86400,
-    batchSize: 100
-  }
-};
-
-interface EditEmbeddingConfigModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  config?: EmbeddingConfig;
-  onSave: (config: EmbeddingConfig) => void;
+    provider: "openai",
+    openai: {
+        apiKey: "",
+        model: "text-embedding-3-small",
+        batchSize: 100,
+    },
 }
 
-export default function EditEmbeddingConfigModal({ 
-  isOpen, 
-  onClose, 
-  config = DEFAULT_CONFIG,
-  onSave 
+interface EditEmbeddingConfigModalProps {
+    isOpen: boolean
+    onClose: () => void
+    config?: EmbeddingConfig
+    onSave: (config: EmbeddingConfig) => void
+}
+
+export default function EditEmbeddingConfigModal({
+    isOpen,
+    onClose,
+    config = DEFAULT_CONFIG,
+    onSave,
 }: EditEmbeddingConfigModalProps) {
-  const [error, setError] = useState<string | null>(null);
-  const [provider, setProvider] = useState<EmbeddingProvider>(config.provider);
-  
-  // OpenAI specific state
-  const [openaiConfig, setOpenaiConfig] = useState({
-    apiKey: config.openai?.apiKey ?? '',
-    model: config.openai?.model ?? 'text-embedding-3-small' as OpenAIModel,
-    cacheTTL: config.openai?.cacheTTL ?? 86400,
-    batchSize: config.openai?.batchSize ?? 100
-  });
+    const [error, setError] = useState<string | null>(null)
+    const [provider, setProvider] = useState<EmbeddingProvider>(
+        config.provider || "openai"
+    )
 
-  // Ollama specific state
-  const [ollamaConfig, setOllamaConfig] = useState({
-    apiUrl: config.ollama?.apiUrl ?? 'http://localhost:11434/api/embeddings',
-    modelName: config.ollama?.modelName ?? 'llama2',
-    promptTemplate: config.ollama?.promptTemplate ?? ''
-  });
+    // OpenAI specific state
+    const [openaiConfig, setOpenaiConfig] = useState({
+        apiKey: config.openai?.apiKey ?? "",
+        model:
+            config.openai?.model ?? ("text-embedding-3-small" as OpenAIModel),
+        batchSize: config.openai?.batchSize ?? 100,
+    })
 
-  // Update state when config changes
-  useEffect(() => {
-    if (config) {
-      setProvider(config.provider);
-      if (config.provider === 'openai' && config.openai) {
-        setOpenaiConfig({
-          apiKey: config.openai.apiKey ?? '',
-          model: config.openai.model ?? 'text-embedding-3-small',
-          cacheTTL: config.openai.cacheTTL ?? 86400,
-          batchSize: config.openai.batchSize ?? 100
-        });
-      } else if (config.provider === 'ollama' && config.ollama) {
-        setOllamaConfig({
-          apiUrl: config.ollama.apiUrl ?? 'http://localhost:11434/api/embeddings',
-          modelName: config.ollama.modelName ?? 'llama2',
-          promptTemplate: config.ollama.promptTemplate ?? ''
-        });
-      }
+    // Ollama specific state
+    const [ollamaConfig, setOllamaConfig] = useState({
+        apiUrl:
+            config.ollama?.apiUrl ?? "http://localhost:11434/api/embeddings",
+        modelName: config.ollama?.modelName ?? "llama2",
+        promptTemplate: config.ollama?.promptTemplate ?? "",
+    })
+
+    // TensorFlow specific state
+    const [tensorflowConfig, setTensorflowConfig] = useState({
+        model: config.tensorflow?.model || "universal-sentence-encoder",
+    })
+
+    // Image specific state
+    const [imageConfig, setImageConfig] = useState({
+        model: config.image?.model || ("mobilenet" as ImageModel),
+        inputSize: config.image?.inputSize || 224,
+    })
+
+    // Update state when config changes
+    useEffect(() => {
+        if (config) {
+            setProvider(config.provider || "openai")
+            if (config.provider === "openai" && config.openai) {
+                setOpenaiConfig({
+                    apiKey: config.openai.apiKey ?? "",
+                    model: config.openai.model ?? "text-embedding-3-small",
+                    batchSize: config.openai.batchSize ?? 100,
+                })
+            } else if (config.provider === "ollama" && config.ollama) {
+                setOllamaConfig({
+                    apiUrl:
+                        config.ollama.apiUrl ??
+                        "http://localhost:11434/api/embeddings",
+                    modelName: config.ollama.modelName ?? "llama2",
+                    promptTemplate: config.ollama.promptTemplate ?? "",
+                })
+            } else if (config.provider === "tensorflow" && config.tensorflow) {
+                setTensorflowConfig({
+                    model:
+                        config.tensorflow.model || "universal-sentence-encoder",
+                })
+            } else if (config.provider === "image" && config.image) {
+                setImageConfig({
+                    model: config.image.model || "mobilenet",
+                    inputSize: config.image.inputSize || 224,
+                })
+            }
+        }
+    }, [config])
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault()
+        setError(null)
+
+        try {
+            const newConfig: EmbeddingConfig = {
+                provider,
+            }
+
+            if (provider === "openai") {
+                if (!openaiConfig.apiKey) {
+                    setError("Please enter an OpenAI API key")
+                    return
+                }
+                newConfig.openai = openaiConfig
+            } else if (provider === "ollama") {
+                if (!ollamaConfig.apiUrl) {
+                    setError("Please enter an Ollama API URL")
+                    return
+                }
+                newConfig.ollama = ollamaConfig
+            } else if (provider === "tensorflow") {
+                newConfig.tensorflow = {
+                    model: tensorflowConfig.model as TensorFlowModel,
+                }
+            } else if (provider === "image") {
+                newConfig.image = {
+                    model: imageConfig.model as ImageModel,
+                    inputSize: imageConfig.inputSize,
+                }
+            }
+
+            onSave(newConfig)
+            onClose()
+        } catch (err) {
+            setError(err instanceof Error ? err.message : "An error occurred")
+        }
     }
-  }, [config]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
+    if (!isOpen) return null
 
-    let newConfig: EmbeddingConfig;
+    return (
+        <Dialog open={isOpen} onOpenChange={onClose}>
+            <DialogContent className="sm:max-w-4xl">
+                <DialogHeader>
+                    <DialogTitle className="text-2xl font-bold">Embedding Provider</DialogTitle>
+                    <DialogDescription>
+                        The Vector Set Browser will auto-encode new vectors when
+                        you add them to a set, and use the encoder to encode search queries.
+                    </DialogDescription>
+                </DialogHeader>
+                <form onSubmit={handleSubmit} className="space-y-4">
+                    <div className="flex flex-col gap-2">
+                        <Label htmlFor="provider" className="text-lg font-medium">Choose a Provider</Label>
+                        <Select
+                            value={provider}
+                            onValueChange={(value: EmbeddingProvider) =>
+                                setProvider(value)
+                            }
+                        >
+                            <SelectTrigger className="w-full h-18">
+                                <SelectValue placeholder="Select provider" />
+                            </SelectTrigger>
+                            <SelectContent className="w-full">
+                                <SelectItem key="tensorflow" value="tensorflow">
+                                    <div className="flex flex-col items-start">
+                                        <div className="font-medium text-lg">
+                                            TensorFlow - Text Embeddings
+                                            (built-in)
+                                        </div>
+                                        <div className="  text-gray-500">
+                                            Built in model for text embeddings -
+                                            uses Tensorflow.js
+                                        </div>
+                                    </div>
+                                </SelectItem>
+                                <SelectItem key="image" value="image">
+                                    <div className="flex flex-col items-start">
+                                        <div className="font-medium text-lg">
+                                            TensorFlow - Image Embeddings
+                                            (built-in)
+                                        </div>
+                                        <div className=" text-gray-500">
+                                            Built in model for image embeddings
+                                            - uses Tensorflow.js
+                                        </div>
+                                    </div>
+                                </SelectItem>
+                                <SelectItem key="ollama" value="ollama">
+                                    <div className="flex flex-col items-start">
+                                        <div className="font-medium text-lg">
+                                            Ollama
+                                        </div>
+                                        <div className="text-gray-500">
+                                            Ollama provider - uses Ollama API
+                                        </div>
+                                    </div>
+                                </SelectItem>
+                                <SelectItem key="openai" value="openai">
+                                    <div className="flex flex-col items-start">
+                                        <div className="font-medium text-lg">
+                                            OpenAI
+                                        </div>
+                                        <div className="text-gray-500">
+                                            OpenAI provider - uses OpenAI API
+                                        </div>
+                                    </div>
+                                </SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <div className="space-y-2 p-4 border rounded-md">
+                        {provider === "openai" ? (
+                            <>
+                                <div className="space-y-2">
+                                    <Label htmlFor="apiKey">
+                                        OpenAI API Key
+                                    </Label>
+                                    <Input
+                                        id="apiKey"
+                                        type="password"
+                                        value={openaiConfig.apiKey}
+                                        onChange={(e) =>
+                                            setOpenaiConfig({
+                                                ...openaiConfig,
+                                                apiKey: e.target.value,
+                                            })
+                                        }
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="model" className="font-medium">Choose a Model</Label>
+                                    <Select
+                                        value={openaiConfig.model}
+                                        onValueChange={(value: OpenAIModel) =>
+                                            setOpenaiConfig({
+                                                ...openaiConfig,
+                                                model: value,
+                                            })
+                                        }
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Select model" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="text-embedding-3-small">
+                                                text-embedding-3-small
+                                            </SelectItem>
+                                            <SelectItem value="text-embedding-3-large">
+                                                text-embedding-3-large
+                                            </SelectItem>
+                                            <SelectItem value="text-embedding-ada-002">
+                                                text-embedding-ada-002 (Legacy)
+                                            </SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="batchSize">
+                                        Batch Size
+                                    </Label>
+                                    <Input
+                                        id="batchSize"
+                                        type="number"
+                                        value={openaiConfig.batchSize}
+                                        onChange={(e) =>
+                                            setOpenaiConfig({
+                                                ...openaiConfig,
+                                                batchSize: parseInt(
+                                                    e.target.value
+                                                ),
+                                            })
+                                        }
+                                    />
+                                </div>
+                            </>
+                        ) : provider === "ollama" ? (
+                            <>
+                                <div className="space-y-2">
+                                    <Label htmlFor="apiUrl" className="font-medium">
+                                        API URL
+                                    </Label>
+                                    <Input
+                                        id="apiUrl"
+                                        type="text"
+                                        value={ollamaConfig.apiUrl}
+                                        onChange={(e) =>
+                                            setOllamaConfig({
+                                                ...ollamaConfig,
+                                                apiUrl: e.target.value,
+                                            })
+                                        }
+                                        placeholder="http://localhost:11434/api/embeddings"
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="modelName" className="font-medium">Choose a Model</Label>
+                                    <OllamaModelSelector
+                                        value={ollamaConfig.modelName}
+                                        onChange={(value) =>
+                                            setOllamaConfig({
+                                                ...ollamaConfig,
+                                                modelName: value,
+                                            })
+                                        }
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="promptTemplate">
+                                        Prompt Template (optional)
+                                    </Label>
+                                    <Input
+                                        id="promptTemplate"
+                                        type="text"
+                                        value={ollamaConfig.promptTemplate}
+                                        onChange={(e) =>
+                                            setOllamaConfig({
+                                                ...ollamaConfig,
+                                                promptTemplate: e.target.value,
+                                            })
+                                        }
+                                        placeholder="Use {text} as placeholder for input text"
+                                    />
+                                </div>
+                            </>
+                        ) : provider === "tensorflow" ? (
+                            <>
+                                <div className="space-y-2">
+                                    <Label htmlFor="model" className="font-medium">Choose a Model</Label>
+                                    <TensorFlowModelSelector
+                                        value={tensorflowConfig.model}
+                                        onChange={(value) =>
+                                            setTensorflowConfig({
+                                                ...tensorflowConfig,
+                                                model: value,
+                                            })
+                                        }
+                                    />
+                                </div>
+                                <div className="text-gray-500 mt-4 p-4 bg-gray-50 rounded-md">
+                                    <p>
+                                        TensorFlow.js models run directly in the
+                                        browser. The first use may take a moment
+                                        to download the model.
+                                    </p>
+                                </div>
+                            </>
+                        ) : provider === "image" ? (
+                            <>
+                                <div className="space-y-2">
+                                    <Label htmlFor="model">Image Model</Label>
+                                    <ImageModelSelector
+                                        value={imageConfig.model}
+                                        onChange={(value) =>
+                                            setImageConfig({
+                                                ...imageConfig,
+                                                model: value,
+                                            })
+                                        }
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="inputSize">
+                                        Input Size (px)
+                                    </Label>
+                                    <Input
+                                        id="inputSize"
+                                        type="number"
+                                        value={imageConfig.inputSize}
+                                        onChange={(e) =>
+                                            setImageConfig({
+                                                ...imageConfig,
+                                                inputSize: parseInt(
+                                                    e.target.value
+                                                ),
+                                            })
+                                        }
+                                        placeholder="224"
+                                    />
+                                    <p className="text-xs text-gray-500">
+                                        Images will be resized to this size
+                                        before processing. Default is 224px.
+                                    </p>
+                                </div>
+                                <div className="text-sm text-gray-500 mt-4 p-4 bg-gray-50 rounded-md">
+                                    <p>
+                                        Image embedding models run directly in
+                                        the browser using TensorFlow.js. The
+                                        first use may take a moment to download
+                                        the model.
+                                    </p>
+                                </div>
+                            </>
+                        ) : (
+                            <div className="text-sm text-gray-500 mt-4 p-4 bg-gray-50 rounded-md">
+                                No additional configuration needed. This
+                                provider will not generate embeddings.
+                            </div>
+                        )}
+                    </div>
 
-    if (provider === 'openai') {
-      if (!openaiConfig.apiKey) {
-        setError('Please enter an OpenAI API key');
-        return;
-      }
-      newConfig = {
-        provider: 'openai',
-        openai: openaiConfig
-      };
-    } else if (provider === 'ollama') {
-      if (!ollamaConfig.apiUrl) {
-        setError('Please enter an Ollama API URL');
-        return;
-      }
-      newConfig = {
-        provider: 'ollama',
-        ollama: ollamaConfig
-      };
-    } else {
-      // Handle 'none' provider case
-      newConfig = {
-        provider: 'none'
-      };
-    }
+                    {error && (
+                        <Alert variant="destructive">
+                            <AlertDescription>{error}</AlertDescription>
+                        </Alert>
+                    )}
 
-    onSave(newConfig);
-    onClose();
-  };
-
-  if (!isOpen) return null;
-
-  return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[700px]">
-        <DialogHeader>
-          <DialogTitle>Edit Embedding Configuration</DialogTitle>
-        </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="provider">Provider</Label>
-            <Select
-              value={provider}
-              onValueChange={(value: EmbeddingProvider) => setProvider(value)}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select provider" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="openai">OpenAI</SelectItem>
-                <SelectItem value="ollama">Ollama</SelectItem>
-                <SelectItem value="none">None</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {provider === 'openai' ? (
-            <>
-              <div className="space-y-2">
-                <Label htmlFor="apiKey">OpenAI API Key</Label>
-                <Input
-                  id="apiKey"
-                  type="password"
-                  value={openaiConfig.apiKey}
-                  onChange={(e) => setOpenaiConfig({ ...openaiConfig, apiKey: e.target.value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="model">Model</Label>
-                <Select
-                  value={openaiConfig.model}
-                  onValueChange={(value: OpenAIModel) => setOpenaiConfig({ ...openaiConfig, model: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select model" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="text-embedding-3-small">text-embedding-3-small</SelectItem>
-                    <SelectItem value="text-embedding-3-large">text-embedding-3-large</SelectItem>
-                    <SelectItem value="text-embedding-ada-002">text-embedding-ada-002 (Legacy)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="cacheTTL">Cache TTL (seconds)</Label>
-                <Input
-                  id="cacheTTL"
-                  type="number"
-                  value={openaiConfig.cacheTTL}
-                  onChange={(e) => setOpenaiConfig({ ...openaiConfig, cacheTTL: parseInt(e.target.value) })}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="batchSize">Batch Size</Label>
-                <Input
-                  id="batchSize"
-                  type="number"
-                  value={openaiConfig.batchSize}
-                  onChange={(e) => setOpenaiConfig({ ...openaiConfig, batchSize: parseInt(e.target.value) })}
-                />
-              </div>
-            </>
-          ) : provider === 'ollama' ? (
-            <>
-              <div className="space-y-2">
-                <Label htmlFor="apiUrl">Ollama API URL</Label>
-                <Input
-                  id="apiUrl"
-                  type="text"
-                  value={ollamaConfig.apiUrl}
-                  onChange={(e) => setOllamaConfig({ ...ollamaConfig, apiUrl: e.target.value })}
-                  placeholder="http://localhost:11434/api/embeddings"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="modelName">Model</Label>
-                <OllamaModelSelector
-                  value={ollamaConfig.modelName}
-                  onChange={(value) => setOllamaConfig({ ...ollamaConfig, modelName: value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="promptTemplate">Prompt Template (optional)</Label>
-                <Input
-                  id="promptTemplate"
-                  type="text"
-                  value={ollamaConfig.promptTemplate}
-                  onChange={(e) => setOllamaConfig({ ...ollamaConfig, promptTemplate: e.target.value })}
-                  placeholder="Use {text} as placeholder for input text"
-                />
-              </div>
-            </>
-          ) : (
-            <div className="text-sm text-gray-500 mt-4 p-4 bg-gray-50 rounded-md">
-              No additional configuration needed. This provider will not generate embeddings.
-            </div>
-          )}
-
-          {error && (
-            <Alert variant="destructive">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
-
-          <div className="flex justify-end space-x-2">
-            <Button type="button" variant="outline" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button type="submit">
-              Save
-            </Button>
-          </div>
-        </form>
-      </DialogContent>
-    </Dialog>
-  );
-} 
+                    <div className="flex justify-end space-x-2">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={onClose}
+                        >
+                            Cancel
+                        </Button>
+                        <Button type="submit">Save</Button>
+                    </div>
+                </form>
+            </DialogContent>
+        </Dialog>
+    )
+}

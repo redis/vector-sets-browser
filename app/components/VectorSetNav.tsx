@@ -269,7 +269,7 @@ export default function VectorSetNav({
         name: string,
         dimensions: number,
         metadata: VectorSetMetadata,
-        customData?: { elementId: string; vector: number[] }
+        customData?: { element: string; vector: number[] }
     ) => {
         setStatusMessage("Creating vector set...")
         try {

@@ -361,7 +361,7 @@ export default function VectorViz3D({
     data,
     onVectorSelect,
 }: VectorViz3DProps & {
-    onVectorSelect?: (elementId: string) => void
+    onVectorSelect?: (element: string) => void
 }) {
     console.log("[DEBUG] Component rendering with data length:", data?.length);
 

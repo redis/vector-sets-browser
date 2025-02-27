@@ -1,0 +1,10 @@
+---
+description: do not run npm run dev
+globs: 
+alwaysApply: false
+---
+
+# rules for agent
+
+- do not run npm run dev
+

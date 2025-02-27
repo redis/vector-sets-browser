@@ -36,14 +36,19 @@ export class JobProcessor {
             throw new Error(`Failed to get embedding: ${response.statusText} - ${errorText}`);
         }
 
-        const result = await response.json();
-        if (!Array.isArray(result)) {
-            console.error('[JobProcessor] Invalid embedding response:', result);
+        const data = await response.json();
+        if (!data.success) {
+            console.error('[JobProcessor] Failed to get embedding:', data.error);
+            throw new Error(`Failed to get embedding: ${data.error}`);
+        }
+
+        if (!Array.isArray(data.embedding)) {
+            console.error('[JobProcessor] Invalid embedding response:', data);
             throw new Error('Invalid response from embedding API: expected array');
         }
 
-        console.log(`[JobProcessor] Got embedding of length ${result.length}`);
-        return result;
+        console.log(`[JobProcessor] Got embedding of length ${data.embedding.length}`);
+        return data.embedding;
     }
 
     private async updateProgress(progress: Partial<JobProgress>): Promise<void> {
@@ -72,12 +77,12 @@ export class JobProcessor {
         });
     }
 
-    private async addToRedis(elementId: string, embedding: number[]): Promise<void> {
+    private async addToRedis(element: string, embedding: number[]): Promise<void> {
         if (!this.metadata) {
             throw new Error('Job metadata not loaded');
         }
 
-        console.log(`[JobProcessor] Adding vector for element "${elementId}" to Redis (vector length: ${embedding.length})`);
+        console.log(`[JobProcessor] Adding vector for element "${element}" to Redis (vector length: ${embedding.length})`);
         const result = await RedisClient.withConnection(this.url, async (client) => {
             await client.sendCommand([
                 "VADD",
@@ -85,7 +90,7 @@ export class JobProcessor {
                 "VALUES",
                 String(embedding.length),
                 ...embedding.map(String),
-                elementId
+                element
             ]);
             return true;
         });
@@ -94,7 +99,7 @@ export class JobProcessor {
             console.error(`[JobProcessor] Failed to add vector to Redis:`, result.error);
             throw new Error(`Failed to add vector to Redis: ${result.error}`);
         }
-        console.log(`[JobProcessor] Successfully added vector for element "${elementId}"`);
+        console.log(`[JobProcessor] Successfully added vector for element "${element}"`);
     }
 
     public async start(): Promise<void> {

@@ -154,11 +154,11 @@ export default function VectorSetPage() {
         },
     })
 
-    const handleVectorSelect = (elementId: string) => {
-        console.log("[VectorSetPage] handleVectorSelect:", elementId)
+    const handleVectorSelect = (element: string) => {
+        console.log("[VectorSetPage] handleVectorSelect:", element)
 
         setSearchType("Element")        
-        setSearchQuery(elementId)
+        setSearchQuery(element)
 
     }
 
@@ -224,19 +224,19 @@ export default function VectorSetPage() {
     })
 
     // Event handler wrappers for vector operations
-    const handleDeleteClick = (e: React.MouseEvent, elementId: string) => {
+    const handleDeleteClick = (e: React.MouseEvent, element: string) => {
         e.stopPropagation()
-        handleDeleteVector(elementId)
+        handleDeleteVector(element)
     }
 
-    const handleShowVectorClick = (e: React.MouseEvent, elementId: string) => {
+    const handleShowVectorClick = (e: React.MouseEvent, element: string) => {
         e.stopPropagation()
-        handleShowVector(elementId)
+        handleShowVector(element)
     }
 
     // Wrapper for handleRowClick to store the search time
-    const handleRowClickWrapper = async (elementId: string) => {
-        const duration = await handleRowClick(elementId)
+    const handleRowClickWrapper = async (element: string) => {
+        const duration = await handleRowClick(element)
         if (vectorSetName && duration) {
             // Store the search time in the state
             setVectorSetStates((prev) => ({
@@ -362,7 +362,7 @@ export default function VectorSetPage() {
     }
 
     return (
-        <div className="flex flex-1">
+        <div className="flex flex-1 h-screen">
             <VectorSetNav
                 redisUrl={redisUrl}
                 selectedVectorSet={vectorSetName}
@@ -373,7 +373,7 @@ export default function VectorSetPage() {
                 onBack={handleDisconnect}
             />
 
-            <div className="flex-1 p-4">
+            <div className="flex-1 p-4 overflow-y-auto">
                 {vectorSetName ? (
                     <div className="mb-4 border-b border-gray-500">
                         <VectorSetHeader

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react"
 import { vdim, vcard, vsim, vemb, vrem, vadd } from "../services/redis"
 import { VectorSetMetadata } from "../types/embedding"
+import { validateAndNormalizeVector } from "../utils/vectorValidation"
 
 interface UseVectorSetReturn {
     vectorSetName: string | null
@@ -12,10 +13,10 @@ interface UseVectorSetReturn {
     results: [string, number, number[]][]
     setResults: (results: [string, number, number[]][]) => void
     loadVectorSet: () => Promise<void>
-    handleAddVector: (elementId: string, elementData: string | number[]) => Promise<void>
-    handleDeleteVector: (elementId: string) => Promise<void>
-    handleShowVector: (elementId: string) => Promise<void>
-    handleRowClick: (elementId: string) => Promise<string>
+    handleAddVector: (element: string, elementData: string | number[]) => Promise<void>
+    handleDeleteVector: (element: string) => Promise<void>
+    handleShowVector: (element: string) => Promise<void>
+    handleRowClick: (element: string) => Promise<string | undefined>
 }
 
 export function useVectorSet(): UseVectorSetReturn {
@@ -75,7 +76,7 @@ export function useVectorSet(): UseVectorSetReturn {
     };
 
     // Handle adding a new vector
-    const handleAddVector = async (elementId: string, elementData: string | number[]) => {
+    const handleAddVector = async (element: string, elementData: string | number[]) => {
         if (!vectorSetName) {
             setStatusMessage("Please select a vector set first")
             return
@@ -83,78 +84,100 @@ export function useVectorSet(): UseVectorSetReturn {
 
         try {
             let vector: number[] = []
+            let validationResult: any = null;
+            
             if (Array.isArray(elementData)) {
-                vector = elementData
+                // Validate and normalize the raw vector data
+                validationResult = validateAndNormalizeVector(elementData, 'unknown', dim || undefined);
+                if (!validationResult.isValid) {
+                    throw new Error(`Invalid vector data: ${validationResult.error}`);
+                }
+                vector = validationResult.vector;
             } else if (metadata?.embedding && metadata.embedding.provider !== 'none') {
+                // Determine if we're using an image embedding model
+                const isImageEmbedding = metadata.embedding.provider === 'image';
+                
+                // For image embeddings, we'll use the API endpoint which will handle
+                // both server-side and client-side processing as needed
                 const response = await fetch("/api/embedding", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
-                        text: elementData,
+                        // Send as imageData if using image embedding, otherwise as text
+                        ...(isImageEmbedding ? { imageData: elementData } : { text: elementData }),
                         config: metadata.embedding,
                     }),
                 })
+                
                 if (!response.ok) {
-                    throw new Error("Failed to get embedding")
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || "Failed to get embedding");
                 }
-                vector = await response.json()
+                
+                vector = await response.json();
             } else {
                 throw new Error("No embedding provider configured. Please provide vector data directly.")
             }
 
-            const result = await vadd(vectorSetName, elementId, vector)
+            // Log validation details for debugging
+            if (validationResult) {
+                console.log('Vector validation result:', validationResult);
+            }
+
+            const result = await vadd(vectorSetName, element, vector)
             console.log("Created vector result:", result)
             setStatusMessage(`Vector created successfully: ${JSON.stringify(result)}`)
 
             // Add the new vector to the results list
-            setResults(prevResults => [...prevResults, [elementId, 1.0, vector]])
+            setResults(prevResults => [...prevResults, [element, 1.0, vector]])
 
             // Update the record count
             const count = await vcard(vectorSetName)
             setRecordCount(count)
         } catch (error) {
             console.error("Error creating vector:", error)
-            throw new Error("Failed to create vector")
+            setStatusMessage(error instanceof Error ? error.message : "Failed to create vector")
+            throw error
         }
     }
 
     // Handle deleting a vector
-    const handleDeleteVector = async (elementId: string) => {
+    const handleDeleteVector = async (element: string) => {
         if (!vectorSetName) return
 
         try {
-            await vrem(vectorSetName, elementId)
-            setStatusMessage(`Successfully deleted vector for element "${elementId}"`)
+            await vrem(vectorSetName, element)
+            setStatusMessage(`Successfully deleted vector for element "${element}"`)
             // Remove the deleted item from results
-            setResults(results.filter((row) => row[0] !== elementId))
+            setResults(results.filter((row) => row[0] !== element))
             // Update the record count
             const count = await vcard(vectorSetName)
             setRecordCount(count)
         } catch (error) {
             console.error("Error deleting vector:", error)
-            setStatusMessage(`Failed to delete vector for element "${elementId}"`)
+            setStatusMessage(`Failed to delete vector for element "${element}"`)
         }
     }
 
     // Handle showing a vector
-    const handleShowVector = async (elementId: string) => {
+    const handleShowVector = async (element: string) => {
         if (!vectorSetName) return
         try {
-            const vector = await vemb(vectorSetName, elementId)
+            const vector = await vemb(vectorSetName, element)
             console.log("Vector:", vector)
             navigator.clipboard.writeText(vector.join(", "))
-            setStatusMessage(`Vector for element "${elementId}" copied to clipboard`)
+            setStatusMessage(`Vector for element "${element}" copied to clipboard`)
         } catch (error) {
             console.error("Error showing vector:", error)
-            setStatusMessage(`Failed to load vector for element "${elementId}"`)
+            setStatusMessage(`Failed to load vector for element "${element}"`)
         }
     }
 
     // Handle row click for similarity search
-    const handleRowClick = async (elementId: string) => {
+    const handleRowClick = async (element: string) => {
         if (!vectorSetName) return
         try {
-            const vector = await vemb(vectorSetName, elementId)
+            const vector = await vemb(vectorSetName, element)
             const startTime = performance.now()
             const searchResult = await vsim(vectorSetName, vector, 10)
             const endTime = performance.now()

@@ -33,7 +33,13 @@ async function getEmbedding(text: string, config: EmbeddingConfig): Promise<numb
         throw new Error(`Failed to get embedding: ${response.statusText}`);
     }
 
-    return response.json();
+    const data = await response.json();
+    if (!data.success) {
+        throw new Error(data.error || 'Failed to get embedding');
+    }
+
+    const embedding = data.embedding;
+    return embedding;
 }
 
 export async function POST(req: NextRequest) {

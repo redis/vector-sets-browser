@@ -13,7 +13,10 @@ This browser application provides a user-friendly interface for exploring and ma
 - Perform vector similarity searches
 - Create, update, and delete vector sets
 - Interactive query builder for complex vector operations (Coming soon)
-- Native embedding engine support
+- Native embedding engine support:
+  - OpenAI Embeddings API
+  - Ollama local embedding models
+  - TensorFlow.js in-browser embeddings
 
 ## Prerequisites
 
@@ -31,7 +34,23 @@ npm install
 
 ## Configuration
 
-If you want to use Ollama embedding models, be sure to download and run ollama and the models you want.  Otherwise you can use OpanAI embedding models
+### Embedding Models
+
+The application supports multiple embedding providers:
+
+1. **OpenAI**: Requires an API key from OpenAI. Supports models:
+   - text-embedding-3-small
+   - text-embedding-3-large
+   - text-embedding-ada-002 (Legacy)
+
+2. **Ollama**: For local embedding models. Requires Ollama to be installed and running.
+   - Download from [Ollama's website](https://ollama.ai/)
+   - Supports various models like nomic-embed-text, mxbai-embed-large, etc.
+
+3. **TensorFlow.js**: Runs directly in the browser without any external dependencies.
+   - Universal Sentence Encoder
+   - Universal Sentence Encoder Lite
+   - Universal Sentence Encoder Multilingual
 
 ## Development
 
@@ -60,6 +79,21 @@ npm start
 4. Click on a vector set to visualize its contents and metadata
 5. Use the built-in tools to perform vector operations and searches
 
+### Using TensorFlow.js Embeddings
+
+TensorFlow.js embeddings run directly in your browser:
+
+1. When creating or editing a vector set, select "TensorFlow.js" as the embedding provider
+2. Choose from available models (Universal Sentence Encoder variants)
+3. Enable caching if desired to improve performance
+4. The first use may take a moment as the model is downloaded to your browser
+
+Benefits of TensorFlow.js embeddings:
+- No API key required
+- Works offline after initial model download
+- No data sent to external services
+- Consistent embedding results across sessions
+
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
@@ -78,3 +112,4 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 - @Antirez for his powerful vector sets implementation
 - @RauchG and Next.js team for the fantastic React framework
+- TensorFlow.js team for the browser-based embedding models

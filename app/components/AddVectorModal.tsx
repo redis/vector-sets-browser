@@ -5,11 +5,13 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { VectorSetMetadata } from "../types/embedding"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import ImageUploader from "./ImageUploader"
 
 interface AddVectorModalProps {
     isOpen: boolean
     onClose: () => void
-    onAdd: (elementId: string, elementData: string | number[]) => Promise<void>
+    onAdd: (element: string, elementData: string | number[]) => Promise<void>
     metadata: VectorSetMetadata | null
     dim: number | null
     vectorSetName?: string | null
@@ -23,140 +25,180 @@ export default function AddVectorModal({
     dim,
     vectorSetName = null,
 }: AddVectorModalProps) {
-    const [elementId, setElementId] = useState("")
+    const [element, setElement] = useState("")
     const [elementData, setElementData] = useState("")
+    const [imageData, setImageData] = useState("")
+    const [imageEmbedding, setImageEmbedding] = useState<number[] | null>(null)
+    const [activeTab, setActiveTab] = useState<string>("text")
     const [error, setError] = useState<string | null>(null)
     const [isAdding, setIsAdding] = useState(false)
+    const [status, setStatus] = useState("")
+
+    // Determine if we're using an image embedding model
+    const isImageEmbedding = metadata?.embedding?.provider === 'image';
+
+    // Set the default active tab based on the embedding provider
+    useState(() => {
+        if (isImageEmbedding) {
+            setActiveTab("image");
+        }
+    });
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
         setError(null)
 
-        if (!elementId.trim()) {
+        if (!element.trim()) {
             setError("Please enter an element ID")
             return
         }
 
-        if (!elementData.trim()) {
+        if (activeTab === "text" && !elementData.trim()) {
             setError("Please enter element data")
+            return
+        }
+
+        if (activeTab === "image" && !imageData) {
+            setError("Please upload an image")
             return
         }
 
         try {
             setIsAdding(true)
-            // Try to parse as raw vector first
-            const vectorData = elementData
-                .split(",")
-                .map((n) => parseFloat(n.trim()))
-            if (!vectorData.some(isNaN)) {
-                // Valid vector data
-                if (dim && vectorData.length !== dim) {
-                    setError(`Vector must have ${dim} dimensions`)
-                    return
-                }
-                await onAdd(elementId.trim(), vectorData)
-            } else if (metadata?.embedding) {
-                // Not a valid vector, but we have an embedding engine - use text data
-                await onAdd(elementId.trim(), elementData)
+            setStatus("Adding vector...")
+            
+            // Use the pre-generated embedding if available for images
+            if (activeTab === "image" && imageEmbedding) {
+                await onAdd(element, imageEmbedding)
+                setStatus("Vector added successfully!")
+            } else if (activeTab === "image") {
+                await onAdd(element, imageData)
+                setStatus("Vector added successfully!")
             } else {
-                setError(
-                    "Please enter valid vector data (comma-separated numbers) or configure an embedding engine"
-                )
-                return
+                await onAdd(element, elementData)
+                setStatus("Vector added successfully!")
             }
-
-            setElementId("")
+            
+            // Reset form
+            setElement("")
             setElementData("")
+            setImageData("")
+            setImageEmbedding(null)
+            
+            // Close modal
             onClose()
         } catch (err) {
-            setError(
-                err instanceof Error ? err.message : "Failed to add vector"
-            )
+            console.error("Error adding vector:", err)
+            setError(err instanceof Error ? err.message : "Failed to add vector")
+            setStatus("Error adding vector")
         } finally {
             setIsAdding(false)
         }
     }
 
+    const handleImageSelect = (base64Data: string) => {
+        setImageData(base64Data)
+        // Reset embedding when a new image is selected
+        setImageEmbedding(null)
+    }
+    
+    const handleEmbeddingGenerated = (embedding: number[]) => {
+        console.log("Embedding generated:", embedding.length, "dimensions")
+        console.log("Sample values:", embedding.slice(0, 5))
+        setImageEmbedding(embedding)
+        setStatus(`Embedding generated: ${embedding.length} dimensions`)
+    }
+
     if (!isOpen) return null
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg p-6 w-full max-w-3xl">
-                <h2 className="text-xl font-semibold mb-4">Add Vector</h2>
-                <form onSubmit={handleSubmit} className="flex flex-col flex-1 h-full">
-                    <div>
-                        <div className="text-lg">Element ID</div>
-                        <Input
-                            id="element-id"
-                            value={elementId}
-                            onChange={(e) => setElementId(e.target.value)}
-                            className="w-full"
-                            placeholder="Enter a unique element ID - e.g. 'user_123'"
-                        />
-                    </div>
-
-                    <div className="flex-1">
-                        <div className="text-lg">Data</div>
-                        <div className="relative flex-1">
-                            <Textarea
-                                id="element-data"
-                                value={elementData}
-                                onChange={(e) => setElementData(e.target.value)}
-                                placeholder={
-                                    metadata?.embedding
-                                        ? "Enter text data or raw vector data (0.1, 0.2, ...)"
-                                        : "Enter vector data (0.1, 0.2, ...)"
-                                }
-                                className="pr-24 min-h-[200px]"
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+                <div className="p-6">
+                    <h2 className="text-2xl font-bold mb-4">
+                        Add Vector to {vectorSetName || "Vector Set"}
+                    </h2>
+                    
+                    <form onSubmit={handleSubmit}>
+                        <div className="mb-4">
+                            <label htmlFor="element" className="block text-sm font-medium mb-1">
+                                Element ID
+                            </label>
+                            <Input
+                                id="element"
+                                value={element}
+                                onChange={(e) => setElement(e.target.value)}
+                                placeholder="Enter a unique identifier for this vector"
                             />
+                        </div>
+
+                        <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-4">
+                            <TabsList className="mb-2">
+                                <TabsTrigger value="text" disabled={isImageEmbedding}>Text</TabsTrigger>
+                                <TabsTrigger value="image">Image</TabsTrigger>
+                            </TabsList>
+                            
+                            <TabsContent value="text">
+                                <div>
+                                    <label htmlFor="elementData" className="block text-sm font-medium mb-1">
+                                        Text Content
+                                    </label>
+                                    <Textarea
+                                        id="elementData"
+                                        value={elementData}
+                                        onChange={(e) => setElementData(e.target.value)}
+                                        placeholder="Enter the text to embed"
+                                        rows={5}
+                                    />
+                                </div>
+                            </TabsContent>
+                            
+                            <TabsContent value="image">
+                                <div>
+                                    <label className="block text-sm font-medium mb-1">
+                                        Image Upload
+                                    </label>
+                                    <ImageUploader 
+                                        onImageSelect={handleImageSelect} 
+                                        onEmbeddingGenerated={handleEmbeddingGenerated}
+                                        config={metadata?.embedding?.image || { model: 'mobilenet' }}
+                                    />
+                                    {imageEmbedding && (
+                                        <div className="mt-2 text-sm text-green-600">
+                                            ✓ Embedding generated ({imageEmbedding.length} dimensions)
+                                        </div>
+                                    )}
+                                </div>
+                            </TabsContent>
+                        </Tabs>
+
+                        {error && (
+                            <div className="mb-4 p-2 bg-red-100 border border-red-400 text-red-700 rounded">
+                                {error}
+                            </div>
+                        )}
+                        
+                        {status && !error && (
+                            <div className="mb-4 p-2 bg-blue-100 border border-blue-400 text-blue-700 rounded">
+                                {status}
+                            </div>
+                        )}
+
+                        <div className="flex justify-end space-x-2">
                             <Button
                                 type="button"
                                 variant="outline"
-                                size="sm"
-                                className="absolute right-1 top-2"
-                                onClick={() => {
-                                    if (dim) {
-                                        const randomVector = Array.from(
-                                            { length: dim },
-                                            () => Math.random()
-                                        ).map((n) => n.toFixed(4))
-                                        setElementData(randomVector.join(", "))
-                                    }
-                                }}
+                                onClick={onClose}
+                                disabled={isAdding}
                             >
-                                Random
+                                Cancel
+                            </Button>
+                            <Button type="submit" disabled={isAdding}>
+                                {isAdding ? "Adding..." : "Add Vector"}
                             </Button>
                         </div>
-                        <div className="text-sm text-muted-foreground mt-1">
-                            {metadata?.embedding
-                                ? "Enter text data to be encoded using the embedding engine, or raw vector data as comma-separated numbers"
-                                : "Enter vector data as comma-separated numbers"}
-                        </div>
-                    </div>
-
-                    {error && (
-                        <div className="text-red-500 text-sm">
-                            {error}
-                        </div>
-                    )}
-
-                    <div className="flex justify-end gap-2 mt-4">
-                        <Button
-                            type="button"
-                            variant="ghost"
-                            onClick={onClose}
-                        >
-                            Cancel
-                        </Button>
-                        <Button
-                            type="submit"
-                            variant="default"
-                            disabled={isAdding}
-                        >
-                            {isAdding ? "Adding..." : "Add Vector"}
-                        </Button>
-                    </div>
-                </form>
+                    </form>
+                </div>
             </div>
         </div>
     )

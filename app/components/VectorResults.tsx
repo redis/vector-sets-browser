@@ -2,9 +2,9 @@ import { Button } from "@/components/ui/button"
 
 interface VectorResultsProps {
     results: [string, number, number[]][]
-    onRowClick: (elementId: string) => void
-    onDeleteClick: (e: React.MouseEvent, elementId: string) => void
-    onShowVectorClick: (e: React.MouseEvent, elementId: string) => void
+    onRowClick: (element: string) => void
+    onDeleteClick: (e: React.MouseEvent, element: string) => void
+    onShowVectorClick: (e: React.MouseEvent, element: string) => void
     searchTime?: string
 }
 

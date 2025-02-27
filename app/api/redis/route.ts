@@ -135,7 +135,7 @@ export async function POST(request: Request) {
         return handleRedisOperation((url) => redis.deleteVectorSet(url, params.keyName))
 
       case "vadd":
-        return handleRedisOperation((url) => redis.vadd(url, params.keyName, params.elementId, params.vector))
+        return handleRedisOperation((url) => redis.vadd(url, params.keyName, params.element, params.vector))
 
       case "vsim":
         return handleRedisOperation((url) =>
@@ -153,7 +153,7 @@ export async function POST(request: Request) {
         return handleRedisOperation((url) => redis.vcard(url, params.keyName))
 
       case "vrem":
-        return handleRedisOperation((url) => redis.vrem(url, params.keyName, params.elementId))
+        return handleRedisOperation((url) => redis.vrem(url, params.keyName, params.element))
 
       case "vemb":
         return handleRedisOperation((url) => redis.vemb(url, params.keyName, params.element))

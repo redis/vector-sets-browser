@@ -22,7 +22,7 @@ export interface CSVRow {
 }
 
 export interface JobQueueItem {
-    elementId: string;
+    element: string;
     data: string;
 }
 
