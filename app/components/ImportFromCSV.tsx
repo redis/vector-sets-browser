@@ -117,13 +117,7 @@ export default function ImportFromCSV({
                 formData.append("file", file)
                 formData.append("vectorSetName", vectorSetName)
 
-                console.log('Sending import request:', {
-                    fileName: file.name,
-                    vectorSetName,
-                    fileSize: file.size
-                })
-
-                const response = await fetch("/api/importData", {
+                const response = await fetch(`/api/vectorset/${vectorSetName}/importData`, {
                     method: "POST",
                     body: formData,
                     duplex: 'half'
@@ -141,7 +135,6 @@ export default function ImportFromCSV({
                     throw new Error("Invalid response from server")
                 }
 
-                console.log('Import started successfully:', data)
                 setImportStarted(true)
                 setShowSuccessDialog(true)
             } else {

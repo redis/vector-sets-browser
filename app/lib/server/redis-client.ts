@@ -57,68 +57,22 @@ export async function scanVectorSets(
     url: string
 ): Promise<VectorOperationResult> {
     return RedisClient.withConnection(url, async (client) => {
-        console.log("Starting scanVectorSets operation")
         let cursor = "0"
         const vectorSets = new Set<string>()
 
         do {
-            console.log("Scanning with cursor:", cursor)
-            // First try FT._LIST to get all vector indexes
-            try {
-                const indexes = (await client.sendCommand([
-                    "FT._LIST",
-                ])) as string[]
-                console.log("Found indexes:", indexes)
+            const [nextCursor, keys] = (await client.sendCommand([
+                "SCAN",
+                cursor,
+                "TYPE",
+                "vectorset",
+            ])) as [string, string[]]
 
-                // For each index, get its key prefix
-                for (const index of indexes) {
-                    try {
-                        const info = (await client.sendCommand([
-                            "FT.INFO",
-                            index,
-                        ])) as any[]
-                        // Find the key prefix in the info array
-                        const prefixIndex = info.indexOf("prefix")
-                        if (
-                            prefixIndex !== -1 &&
-                            prefixIndex + 1 < info.length
-                        ) {
-                            const prefix = info[prefixIndex + 1]
-                            console.log(
-                                "Found prefix for index:",
-                                index,
-                                "prefix:",
-                                prefix
-                            )
-                            vectorSets.add(prefix.replace(/[{}]/g, "")) // Remove Redis prefix/suffix markers
-                        }
-                    } catch (error) {
-                        console.error(
-                            "Error getting info for index:",
-                            index,
-                            error
-                        )
-                    }
-                }
-                break // Exit the do-while loop as we've found all indexes
-            } catch (error) {
-                console.log("FT._LIST not available, falling back to SCAN")
-                // Fall back to SCAN if FT._LIST is not available
-                const [nextCursor, keys] = (await client.sendCommand([
-                    "SCAN",
-                    cursor,
-                    "TYPE",
-                    "vectorset",
-                ])) as [string, string[]]
-
-                console.log("SCAN results:", { nextCursor, keys })
-                keys.forEach((key) => vectorSets.add(key))
-                cursor = nextCursor
-            }
+            keys.forEach((key) => vectorSets.add(key))
+            cursor = nextCursor
         } while (cursor !== "0")
 
         const result = Array.from(vectorSets)
-        console.log("Final vector sets found:", result)
         return result
     })
 }
@@ -130,15 +84,6 @@ export async function vadd(
     vector: number[]
 ): Promise<VectorOperationResult> {
     return RedisClient.withConnection(url, async (client) => {
-        // Debug vector data
-        console.log("VADD - Vector data type:", typeof vector)
-        console.log("VADD - Vector is array:", Array.isArray(vector))
-        console.log("VADD - Vector length:", vector.length)
-        console.log("VADD - Sample vector values:", vector.slice(0, 5))
-        console.log(
-            "VADD - Vector contains non-numbers:",
-            vector.some((v) => typeof v !== "number" || isNaN(v))
-        )
 
         // Ensure vector is an array of numbers
         if (!Array.isArray(vector)) {
@@ -157,20 +102,6 @@ export async function vadd(
             ...vector.map((v) => v.toString()),
             element,
         ]
-        // TODO DEBUG
-        if (true) {
-            console.log("VADD command:")
-            console.log(command[0])
-            console.log(command[1])
-            console.log(command[2])
-            console.log(command[3])
-            console.log(command[4])
-            console.log(command[5])
-            console.log(command[6])
-            console.log(command[7])
-            console.log(`... (${command.length - 5} more)`)
-            console.log(command[command.length - 1])
-        }
 
         try {
             return await client.sendCommand(command)
@@ -190,7 +121,7 @@ export async function vsim(
     keyName: string,
     params: { searchVector?: number[]; searchElement?: string; count: number }
 ): Promise<VectorOperationResult> {
-    console.log("VSIM", url, keyName, params)
+    console.log("VSIM", url, keyName)
     if (!params.searchVector && !params.searchElement) {
         return {
             success: false,
@@ -213,7 +144,6 @@ export async function vsim(
             }
 
             baseCommand.push("WITHSCORES", "COUNT", String(params.count))
-            //console.log('VSIM command:', baseCommand);
 
             const result = (await client.sendCommand(baseCommand)) as string[]
 
@@ -265,8 +195,39 @@ export async function vcard(
     url: string,
     keyName: string
 ): Promise<VectorOperationResult> {
+    if (!keyName) {
+        console.error("Invalid VCARD parameters:", { keyName })
+        return {
+            success: false,
+            error: `Invalid parameters: keyName=${keyName}`,
+        }
+    }
+
     return RedisClient.withConnection(url, async (client) => {
-        return client.sendCommand(["VCARD", keyName])
+        try {
+            const result = await client.sendCommand(["VCARD", String(keyName)])
+            
+            if (result === null || result === undefined) {
+                console.error("Invalid VCARD result:", result)
+                throw new Error(`Failed to get cardinality for key ${keyName}`)
+            }
+            
+            // Convert to number if it's not already
+            const count = typeof result === 'number' ? result : Number(result)
+            
+            if (isNaN(count)) {
+                console.error("Invalid VCARD result (not a number):", result)
+                throw new Error(`Invalid cardinality result for key ${keyName}`)
+            }
+            
+            // Return the count directly, not wrapped in another object
+            return count
+        } catch (error) {
+            console.error("VCARD operation error:", error)
+            throw new Error(
+                `Failed to get cardinality for key ${keyName}: ${error instanceof Error ? error.message : String(error)}`
+            )
+        }
     })
 }
 
@@ -342,7 +303,6 @@ export async function getMetadata(
     return RedisClient.withConnection(url, async (client) => {
         const metadataKey = `${keyName}_metadata`
         const storedData = await client.hGetAll(metadataKey)
-        console.log("Stored data:", storedData)
         const metadata = storedData.data ? JSON.parse(storedData.data) : null
         return metadata // Return metadata directly without wrapping
     })
@@ -391,12 +351,6 @@ export async function createVectorSet(
 ): Promise<VectorOperationResult> {
     return RedisClient.withConnection(url, async (client) => {
         // Check if key already exists
-        console.log("Creating vector set:", {
-            keyName,
-            dimensions,
-            metadata,
-            customData,
-        })
         const exists = await client.sendCommand(["EXISTS", keyName])
         if (exists) {
             throw new Error("Vector set already exists")
@@ -406,18 +360,12 @@ export async function createVectorSet(
 
         // If dimensions is 0 and we have Ollama config, get dimensions from a test embedding
         if (
-            dimensions === 0 &&
             metadata?.embedding?.provider === "ollama" &&
             metadata.embedding.ollama
         ) {
             try {
                 const ollama = metadata.embedding.ollama
                 // Get a test embedding to determine dimensions
-                console.log(
-                    "Getting test embedding from Ollama",
-                    ollama.apiUrl,
-                    ollama.modelName
-                )
                 const response = await fetch(ollama.apiUrl, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
@@ -426,7 +374,6 @@ export async function createVectorSet(
                         prompt: "test", // Simple test prompt
                     }),
                 })
-                console.log("Ollama response:", response)
                 if (!response.ok) {
                     throw new Error(`Ollama API error: ${response.statusText}`)
                 }
@@ -443,17 +390,13 @@ export async function createVectorSet(
         }
         // If dimensions is 0 and we have TensorFlow config, get dimensions from metadata
         else if (
-            dimensions === 0 &&
             metadata?.embedding?.provider === "tensorflow"
         ) {
             try {
                 // Get dimensions from metadata
                 if (metadata.dimensions) {
                     effectiveDimensions = metadata.dimensions
-                    console.log(
-                        "Using TensorFlow dimensions from metadata:",
-                        effectiveDimensions
-                    )
+
                 } else {
                     throw new Error(
                         "TensorFlow dimensions not found in metadata"
@@ -472,17 +415,7 @@ export async function createVectorSet(
 
         // Create the vector set with either the custom vector or a dummy vector
         const vector = customData?.vector || Array(effectiveDimensions).fill(0)
-        const element = customData?.element || "dummy"
-
-        // Debug vector data
-        console.log("Vector data type:", typeof vector)
-        console.log("Vector is array:", Array.isArray(vector))
-        console.log("Vector length:", vector.length)
-        console.log("Sample vector values:", vector.slice(0, 5))
-        console.log(
-            "Vector contains non-numbers:",
-            vector.some((v) => typeof v !== "number" || isNaN(v))
-        )
+        const element = customData?.element || "First Vector (Default)"
 
         // Ensure vector is an array of numbers
         if (!Array.isArray(vector)) {
@@ -538,6 +471,13 @@ export async function createVectorSet(
 
         try {
             await client.sendCommand(command)
+            
+            // Store metadata if provided
+            if (metadata) {
+                const metadataKey = `${keyName}_metadata`
+                await client.hSet(metadataKey, { data: JSON.stringify(metadata) })
+            }
+            
             return "created"
         } catch (error) {
             console.error("Error executing VADD command:", error)
@@ -570,6 +510,131 @@ export async function deleteVectorSet(
         await client.del(metadataKey)
 
         return "deleted"
+    })
+}
+
+export async function vlink(
+    url: string,
+    keyName: string,
+    element: string,
+    count: number = 10
+): Promise<VectorOperationResult> {
+    if (!keyName || !element) {
+        console.error("Invalid VLINK parameters:", { keyName, element })
+        return {
+            success: false,
+            error: `Invalid parameters: keyName=${keyName}, element=${element}`,
+        }
+    }
+
+    return RedisClient.withConnection(url, async (client) => {
+        try {
+            // Ensure arguments are strings for Redis command
+            const args = ["VLINKS", String(keyName), String(element), "WITHSCORES"]
+            console.log("VLINKS command args:", args)
+            const result = await client.sendCommand(args)
+
+            if (!result || !Array.isArray(result)) {
+                console.error("Invalid VLINKS result:", result)
+                throw new Error(`Failed to get links for element ${element}`)
+            }
+
+            // Process the result - it's an array of arrays, where each sub-array
+            // represents the neighbors at one level
+            const processedResult: [string, number][][] = []
+            
+            for (let i = 0; i < result.length; i++) {
+                const levelLinks = result[i]
+                if (!Array.isArray(levelLinks)) {
+                    console.warn(`Invalid level links at index ${i}:`, levelLinks)
+                    continue
+                }
+                
+                // Each level is a map of element -> score
+                const levelPairs: [string, number][] = []
+                for (let j = 0; j < levelLinks.length; j += 2) {
+                    const neighbor = levelLinks[j]
+                    const score = levelLinks[j + 1]
+                    
+                    if (!neighbor || !score) {
+                        console.warn(`Invalid neighbor/score pair at level ${i}, index ${j}:`, { neighbor, score })
+                        continue
+                    }
+                    
+                    const numScore = parseFloat(score)
+                    if (isNaN(numScore)) {
+                        console.warn(`Invalid score for neighbor ${neighbor}:`, score)
+                        continue
+                    }
+                    
+                    levelPairs.push([neighbor, numScore])
+                }
+                
+                processedResult.push(levelPairs)
+            }
+
+            return processedResult
+        } catch (error) {
+            console.error("VLINKS operation error:", error)
+            throw new Error(
+                `Failed to get links for element ${element}: ${error.message}`
+            )
+        }
+    })
+}
+
+export async function vinfo(
+    url: string,
+    keyName: string
+): Promise<VectorOperationResult> {
+    if (!keyName) {
+        console.error("Invalid VINFO parameters:", { keyName })
+        return {
+            success: false,
+            error: `Invalid parameters: keyName=${keyName}`,
+        }
+    }
+
+    return RedisClient.withConnection(url, async (client) => {
+        try {
+            // Ensure arguments are strings for Redis command
+            const args = ["VINFO", String(keyName)]
+            console.log("VINFO command args:", args)
+            const result = await client.sendCommand(args)
+
+            if (!result) {
+                console.error("Invalid VINFO result:", result)
+                throw new Error(`Failed to get vector info for key ${keyName}`)
+            }
+
+            // Process the result - it's a map of key-value pairs
+            const info: Record<string, any> = {}
+            
+            // Redis returns this as an array of alternating keys and values
+            if (Array.isArray(result)) {
+                for (let i = 0; i < result.length; i += 2) {
+                    const key = result[i]
+                    const value = result[i + 1]
+                    
+                    if (key && value !== undefined) {
+                        // Convert numeric strings to numbers
+                        if (typeof value === 'string' && !isNaN(Number(value))) {
+                            info[key] = Number(value)
+                        } else {
+                            info[key] = value
+                        }
+                    }
+                }
+            }
+            console.log("VINFO result:", info) 
+            
+            return info
+        } catch (error) {
+            console.error("VINFO operation error:", error)
+            throw new Error(
+                `Failed to get vector info for key ${keyName}: ${error instanceof Error ? error.message : String(error)}`
+            )
+        }
     })
 }
 

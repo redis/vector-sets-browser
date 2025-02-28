@@ -1,7 +1,7 @@
 import { useState } from "react"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Label } from "@/components/ui/label"
-import { TensorFlowModel } from "@/app/types/embedding"
+import { TensorFlowModelName, TENSORFLOW_MODELS } from "@/app/types/embedding"
 
 interface TensorFlowModelSelectorProps {
     value: string
@@ -9,33 +9,34 @@ interface TensorFlowModelSelectorProps {
 }
 
 interface ModelInfo {
-    id: TensorFlowModel
+    id: TensorFlowModelName
     name: string
     description: string
     dimensions: number
 }
 
+// Create model info from TENSORFLOW_MODELS
 const tensorflowModels: ModelInfo[] = [
     {
         id: "universal-sentence-encoder",
         name: "Universal Sentence Encoder",
         description:
             "Encodes text into 512-dimensional embeddings. Good for semantic similarity and text classification.",
-        dimensions: 512,
+        dimensions: TENSORFLOW_MODELS["universal-sentence-encoder"].dimensions,
     },
     {
         id: "universal-sentence-encoder-lite",
         name: "Universal Sentence Encoder Lite",
         description:
             "Lightweight version with the same dimensions but smaller model size for faster loading.",
-        dimensions: 512,
+        dimensions: TENSORFLOW_MODELS["universal-sentence-encoder-lite"].dimensions,
     },
     {
         id: "universal-sentence-encoder-multilingual",
         name: "Universal Sentence Encoder Multilingual",
         description:
             "Supports 16 languages while maintaining the same vector dimensions.",
-        dimensions: 512,
+        dimensions: TENSORFLOW_MODELS["universal-sentence-encoder-multilingual"].dimensions,
     },
 ]
 

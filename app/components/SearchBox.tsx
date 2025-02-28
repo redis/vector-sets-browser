@@ -1,23 +1,15 @@
-import { VectorSetMetadata } from "../types/embedding"
+import { useMemo, useEffect } from "react"
+import { getEmbeddingDataFormat, VectorSetMetadata } from "../types/embedding"
 import * as React from "react"
-import { Check, ChevronsUpDown } from "lucide-react"
 import { Input } from "@/components/ui/input"
 
-import { cn } from "@/lib/utils"
-import { Button } from "@/components/ui/button"
 import {
-    Command,
-    CommandEmpty,
-    CommandGroup,
-    CommandInput,
-    CommandItem,
-    CommandList,
-} from "@/components/ui/command"
-import {
-    Popover,
-    PopoverContent,
-    PopoverTrigger,
-} from "@/components/ui/popover"
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select"
 
 const searchTypes = [
     {
@@ -28,11 +20,15 @@ const searchTypes = [
         value: "Element",
         label: "Element",
     },
-]
+    {
+        value: "Image",
+        label: "Image",
+    },
+] as const
 
 interface SearchBoxProps {
-    searchType: "Vector" | "Element"
-    setSearchType: (type: "Vector" | "Element") => void
+    searchType: "Vector" | "Element" | "Image"
+    setSearchType: (type: "Vector" | "Element" | "Image") => void
     searchQuery: string
     setSearchQuery: (query: string) => void
     dim: number | null
@@ -47,8 +43,49 @@ export default function SearchBox({
     dim,
     metadata,
 }: SearchBoxProps) {
-    const [open, setOpen] = React.useState(false)
+    const isImageEmbedding = metadata && getEmbeddingDataFormat(metadata?.embedding) === "image"
+    const isTextEmbedding = metadata && getEmbeddingDataFormat(metadata?.embedding) === "text"
+    const supportsEmbeddings = metadata?.embedding.provider && metadata?.embedding.provider !== "none"
+    
+    const filteredSearchTypes = searchTypes.filter((type) => {
+        if (type.value === "Image" && !isImageEmbedding) {
+            return false
+        }
+        return true
+    })
+    
+    // Compute the placeholder text based on current searchType
+    const searchBoxPlaceholder = useMemo(() => {
+        switch (searchType) {
+            case "Element":
+                return "Enter Element"
+            case "Image":
+                return "Enter image data"
+            case "Vector":
+                return supportsEmbeddings && isTextEmbedding
+                    ? "Enter search text OR Enter raw vector data (0.1, 0.2, ...)"
+                    : "Enter vector data (0.1, 0.2, ...)"
+            default:
+                return ""
+        }
+    }, [searchType, supportsEmbeddings, isTextEmbedding])
+    
+    // set default searchType only when metadata changes
+    useEffect(() => {
+        if (!metadata) return; // Don't set defaults if no metadata
 
+        if (supportsEmbeddings) {
+            const newSearchType = isTextEmbedding 
+                ? "Vector" 
+                : "Element";
+                
+            // Only update if the current searchType doesn't match what it should be
+            if (searchType !== newSearchType) {
+                setSearchType(newSearchType);
+            }
+        }
+    }, [metadata]); // Only run when metadata changes
+    
     return (
         <section className="mb-6">
             <div className="bg-white p-4 rounded shadow-md flex flex-col gap-2 items-start">
@@ -56,61 +93,37 @@ export default function SearchBox({
                     <label className="text-sm font-medium text-gray-700">
                         Search by
                     </label>
-                    <Popover open={open} onOpenChange={setOpen}>
-                        <PopoverTrigger asChild>
-                            <Button
-                                variant="outline"
-                                role="combobox"
-                                aria-expanded={open}
-                                className="w-[120px] justify-between"
-                            >
-                                {searchType || "Select type..."}
-                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                            </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-[120px] p-0">
-                            <Command>
-                                <CommandInput placeholder="Search type..." />
-                                <CommandList>
-                                    <CommandEmpty>No type found.</CommandEmpty>
-                                    <CommandGroup>
-                                        {searchTypes.map((type) => (
-                                            <CommandItem
-                                                key={type.value}
-                                                value={type.value}
-                                                onSelect={(currentValue) => {
-                                                    setSearchType(currentValue as "Vector" | "Element")
-                                                    setOpen(false)
-                                                }}
-                                            >
-                                                <Check
-                                                    className={cn(
-                                                        "mr-2 h-4 w-4",
-                                                        searchType === type.value ? "opacity-100" : "opacity-0"
-                                                    )}
-                                                />
-                                                {type.label}
-                                            </CommandItem>
-                                        ))}
-                                    </CommandGroup>
-                                </CommandList>
-                            </Command>
-                        </PopoverContent>
-                    </Popover>
+                    <Select 
+                        defaultValue={searchType} 
+                        value={searchType} 
+                        onValueChange={setSearchType}
+                    >
+                        <SelectTrigger className="w-[120px]">
+                            <SelectValue placeholder="Select type..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {filteredSearchTypes.map((type) => (
+                                <SelectItem 
+                                    key={type.value} 
+                                    value={type.value}
+                                    className="flex items-center justify-between cursor-pointer"
+                                >
+                                    <div className="flex items-center gap-2">
+                                        {type.label}
+                                    </div>
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
                 </div>
                 <div className="flex flex-col gap-2 grow w-full">
                     <div className="relative">
+                        {/* If Metadata method is image, then we need to change to element search */}
                         <Input
                             type="text"
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            placeholder={
-                                searchType === "Element"
-                                    ? "Enter Element"
-                                    : metadata?.embedding?.provider && metadata?.embedding?.provider !== "none"
-                                    ? "Enter search text OR Enter raw vector data (0.1, 0.2, ...)"
-                                    : "Enter vector data (0.1, 0.2, ...)"
-                            }
+                            placeholder={searchBoxPlaceholder}
                             className="border rounded p-3 w-full pr-24"
                         />
                         {searchType === "Vector" && (

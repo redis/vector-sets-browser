@@ -46,7 +46,6 @@ export default function ImportTab({ vectorSetName, metadata }: ImportTabProps) {
                 throw new Error("Failed to fetch jobs")
             }
             const data = await response.json()
-            console.log("Fetched jobs:", data)
             setJobs(data)
         } catch (error) {
             console.error("Error fetching jobs:", error)

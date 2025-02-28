@@ -3,7 +3,7 @@ import { vsim, vdim, vemb } from "../services/redis"
 import { VectorSetMetadata } from "../types/embedding"
 
 export interface VectorSetSearchState {
-    searchType: "Vector" | "Element"
+    searchType: "Vector" | "Element" | "Image"
     searchQuery: string
     searchCount: string
     resultsTitle: string
@@ -21,8 +21,8 @@ interface UseVectorSearchProps {
 }
 
 interface UseVectorSearchReturn {
-    searchType: "Vector" | "Element"
-    setSearchType: (type: "Vector" | "Element") => void
+    searchType: "Vector" | "Element" | "Image"
+    setSearchType: (type: "Vector" | "Element" | "Image") => void
     searchQuery: string
     setSearchQuery: (query: string) => void
     searchCount: string
@@ -45,12 +45,12 @@ export function useVectorSearch({
     const initialSearchDone = useRef(false)
     const lastSearchRef = useRef<{
         query: string,
-        type: "Vector" | "Element",
+        type: "Vector" | "Element" | "Image",
         count: string
     }>({ query: "", type: "Vector", count: "10" });
 
     // Wrapper functions to update both local and parent state
-    const setSearchType = (type: "Vector" | "Element") => {
+    const setSearchType = (type: "Vector" | "Element" | "Image") => {
         onSearchStateChange({ searchType: type })
     }
 

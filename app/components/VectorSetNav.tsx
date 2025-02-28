@@ -82,51 +82,34 @@ export default function VectorSetNav({
         }
     }
 
-    const fetchVectorSets = async () => {
-        console.log('Fetching vector sets...');
-        if (!redisUrl || !isConnected) {
-            console.log('No URL or not connected, skipping fetch');
+    const loadVectorSets = async () => {
+        if (!isConnected) {
+            console.error("Not connected, can't load vector sets")
             return
         }
 
         setLoading(true)
         setError(null)
         try {
-            let response = await fetch("/api/redis", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                    action: "scanVectorSets",
-                    params: {},
-                }),
+            let response = await fetch("/api/vectorset", {
+                method: "GET",
             })
             
             // Handle 401 specifically
             if (response.status === 401) {
-                console.log('Not authorized, connection might not be ready');
+                console.error('Not authorized, connection might not be ready');
                 // Retry after a delay
                 await new Promise(resolve => setTimeout(resolve, 1000));
-                response = await fetch("/api/redis", {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                    },
-                    body: JSON.stringify({
-                        action: "scanVectorSets",
-                        params: {},
-                    }),
+                response = await fetch("/api/vectorset", {
+                    method: "GET",
                 })
-                if (!response.ok) {
-                    throw new Error("Failed to fetch vector sets after retry")
-                }
-            } else if (!response.ok) {
-                throw new Error("Failed to fetch vector sets")
             }
-            
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`)
+            }
+
             const data = await response.json()
-            
             if (!data.success) {
                 throw new Error(data.error || "Failed to fetch vector sets")
             }
@@ -140,20 +123,18 @@ export default function VectorSetNav({
             const fetchVectorSetInfo = async (set: string, retryCount = 0): Promise<void> => {
                 try {
                     const [dimResponse, cardResponse] = await Promise.all([
-                        fetch("/api/redis", {
+                        fetch("/api/redis/command/vdim", {
                             method: "POST",
                             headers: { "Content-Type": "application/json" },
                             body: JSON.stringify({
-                                action: "vdim",
-                                params: { keyName: set },
+                                keyName: set,
                             }),
                         }),
-                        fetch("/api/redis", {
+                        fetch("/api/redis/command/vcard", {
                             method: "POST",
                             headers: { "Content-Type": "application/json" },
                             body: JSON.stringify({
-                                action: "vcard",
-                                params: { keyName: set },
+                                keyName: set,
                             }),
                         }),
                     ])
@@ -200,7 +181,6 @@ export default function VectorSetNav({
                 } catch (error) {
                     console.error(`Error fetching info for vector set ${set}:`, error);
                     if (retryCount < 2) { // Retry up to 2 times
-                        console.log(`Retrying fetch for ${set}...`);
                         await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second before retrying
                         return fetchVectorSetInfo(set, retryCount + 1);
                     }
@@ -231,16 +211,14 @@ export default function VectorSetNav({
 
     useEffect(() => {
         if (isConnected && redisUrl) {
-            console.log('Connected and have URL, waiting before fetching vector sets...');
             // Add a small delay to ensure cookie is set
             const timer = setTimeout(() => {
-                fetchVectorSets()
+                loadVectorSets()
                 setIsInitialLoad(true)
             }, 500)
             
             return () => clearTimeout(timer)
         } else {
-            console.log('Not connected or no URL, clearing vector sets...');
             setVectorSets([])
             setVectorSetInfo({})
             setIsInitialLoad(true)
@@ -273,19 +251,15 @@ export default function VectorSetNav({
     ) => {
         setStatusMessage("Creating vector set...")
         try {
-            const response = await fetch("/api/redis", {
+            const response = await fetch(`/api/vectorset/${name}`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
                 },
                 body: JSON.stringify({
-                    action: "createVectorSet",
-                    params: {
-                        keyName: name,
-                        dimensions,
-                        metadata,
-                        customData,
-                    },
+                    dimensions,
+                    metadata,
+                    customData,
                 }),
             })
 
@@ -298,33 +272,9 @@ export default function VectorSetNav({
                 throw new Error(data.error || "Failed to create vector set")
             }
 
-            // Set metadata
-            const metadataResponse = await fetch("/api/redis", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                    action: "setMetadata",
-                    params: {
-                        keyName: name,
-                        metadata,
-                    },
-                }),
-            })
-
-            if (!metadataResponse.ok) {
-                throw new Error("Failed to set vector set metadata")
-            }
-
-            const metadataData = await metadataResponse.json()
-            if (!metadataData.success) {
-                throw new Error(metadataData.error || "Failed to set vector set metadata")
-            }
-
             setStatusMessage("Vector set created successfully")
             setIsCreateModalOpen(false)
-            fetchVectorSets()
+            loadVectorSets()
         } catch (error) {
             console.error("Error creating vector set:", error)
             setStatusMessage(error instanceof Error ? error.message : "Failed to create vector set")
@@ -332,25 +282,14 @@ export default function VectorSetNav({
     }
 
     const handleDeleteVectorSet = async (name: string) => {
-        // Add confirmation dialog
-        const confirmed = window.confirm(`Are you sure you want to delete the vector set "${name}"?`)
-        if (!confirmed) {
+        if (!confirm(`Are you sure you want to delete the vector set "${name}"?`)) {
             return
         }
 
         setStatusMessage("Deleting vector set...")
         try {
-            const response = await fetch("/api/redis", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                    action: "deleteVectorSet",
-                    params: {
-                        keyName: name,
-                    },
-                }),
+            const response = await fetch(`/api/vectorset/${name}`, {
+                method: "DELETE",
             })
 
             if (!response.ok) {
@@ -366,49 +305,45 @@ export default function VectorSetNav({
             if (selectedVectorSet === name) {
                 onVectorSetSelect(null)
             }
-            fetchVectorSets()
+            loadVectorSets()
         } catch (error) {
             console.error("Error deleting vector set:", error)
             setStatusMessage(error instanceof Error ? error.message : "Failed to delete vector set")
         }
     }
 
-    const handleSaveConfig = async (
-        vectorSetName: string,
+    const handleSaveMetadata = async (
+        name: string,
         metadata: VectorSetMetadata
     ) => {
-        setStatusMessage("Saving configuration...")
+        setStatusMessage("Saving metadata...")
         try {
-            const response = await fetch("/api/redis", {
-                method: "POST",
+            const metadataResponse = await fetch(`/api/vectorset/${name}/metadata`, {
+                method: "PUT",
                 headers: {
                     "Content-Type": "application/json",
                 },
                 body: JSON.stringify({
-                    action: "setMetadata",
-                    params: {
-                        keyName: vectorSetName,
-                        metadata,
-                    },
+                    metadata,
                 }),
             })
 
-            if (!response.ok) {
-                throw new Error("Failed to save configuration")
+            if (!metadataResponse.ok) {
+                throw new Error("Failed to save metadata")
             }
 
-            const data = await response.json()
+            const data = await metadataResponse.json()
             if (!data.success) {
-                throw new Error(data.error || "Failed to save configuration")
+                throw new Error(data.error || "Failed to save metadata")
             }
 
-            setStatusMessage("Configuration saved successfully")
+            setStatusMessage("Metadata saved successfully")
             setIsEditConfigModalOpen(false)
             setEditingVectorSet(null)
-            fetchVectorSets()
+            loadVectorSets()
         } catch (error) {
-            console.error("Error saving configuration:", error)
-            setStatusMessage(error instanceof Error ? error.message : "Failed to save configuration")
+            console.error("Error saving metadata:", error)
+            setStatusMessage(error instanceof Error ? error.message : "Failed to save metadata")
         }
     }
 
@@ -436,7 +371,7 @@ export default function VectorSetNav({
             </SidebarHeader>
 
             <SidebarContent>
-                <div className="list-container">
+                <div className="list-container flex flex-col h-full space-y-0">
                     <div className="flex items-center justify-between mb-4">
                         <h2 className="text-sm font-semibold uppercase text-gray-600">
                             Vector Sets
@@ -464,17 +399,9 @@ export default function VectorSetNav({
                             </Button>
                         </div>
                     </div>
-                    {loading && (
-                        <div className="text-sm text-gray-500">Loading...</div>
-                    )}
                     {error && (
                         <div className="text-sm text-red-500 mb-4 p-2 bg-red-50 rounded border border-red-200">
                             {error}
-                        </div>
-                    )}
-                    {statusMessage && (
-                        <div className="text-sm text-green-600 mb-4 p-2 bg-green-50 rounded border border-green-200">
-                            {statusMessage}
                         </div>
                     )}
                     {!loading && !error && vectorSets.length === 0 && (
@@ -553,6 +480,15 @@ export default function VectorSetNav({
                             </div>
                         )
                     })}
+                    <div className="grow"></div>
+                    {loading && (
+                        <div className="text-sm text-gray-500">Loading...</div>
+                    )}
+                    {statusMessage && (
+                        <div className="text-sm text-green-600 mb-4 p-2 bg-green-50 rounded border border-green-200">
+                            {statusMessage}
+                        </div>
+                    )}
                 </div>
             </SidebarContent>
 
@@ -569,7 +505,7 @@ export default function VectorSetNav({
                     setEditingVectorSet(null)
                 }}
                 vectorSetName={editingVectorSet || ""}
-                onSave={handleSaveConfig}
+                onSave={handleSaveMetadata}
             />
         </Sidebar>
     )

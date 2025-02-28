@@ -19,9 +19,9 @@ import {
 import {
     EmbeddingConfig,
     EmbeddingProvider,
-    OpenAIModel,
-    TensorFlowModel,
-    ImageModel,
+    OpenAIModelName,
+    TensorFlowModelName,
+    ImageModelName,
 } from "@/app/types/embedding"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import OllamaModelSelector from "./OllamaModelSelector"
@@ -60,7 +60,7 @@ export default function EditEmbeddingConfigModal({
     const [openaiConfig, setOpenaiConfig] = useState({
         apiKey: config.openai?.apiKey ?? "",
         model:
-            config.openai?.model ?? ("text-embedding-3-small" as OpenAIModel),
+            config.openai?.model ?? ("text-embedding-3-small" as OpenAIModelName),
         batchSize: config.openai?.batchSize ?? 100,
     })
 
@@ -79,7 +79,7 @@ export default function EditEmbeddingConfigModal({
 
     // Image specific state
     const [imageConfig, setImageConfig] = useState({
-        model: config.image?.model || ("mobilenet" as ImageModel),
+        model: config.image?.model || ("mobilenet" as ImageModelName),
         inputSize: config.image?.inputSize || 224,
     })
 
@@ -138,11 +138,11 @@ export default function EditEmbeddingConfigModal({
                 newConfig.ollama = ollamaConfig
             } else if (provider === "tensorflow") {
                 newConfig.tensorflow = {
-                    model: tensorflowConfig.model as TensorFlowModel,
+                    model: tensorflowConfig.model as TensorFlowModelName,
                 }
             } else if (provider === "image") {
                 newConfig.image = {
-                    model: imageConfig.model as ImageModel,
+                    model: imageConfig.model as ImageModelName,
                     inputSize: imageConfig.inputSize,
                 }
             }
@@ -249,7 +249,7 @@ export default function EditEmbeddingConfigModal({
                                     <Label htmlFor="model" className="font-medium">Choose a Model</Label>
                                     <Select
                                         value={openaiConfig.model}
-                                        onValueChange={(value: OpenAIModel) =>
+                                        onValueChange={(value: OpenAIModelName) =>
                                             setOpenaiConfig({
                                                 ...openaiConfig,
                                                 model: value,

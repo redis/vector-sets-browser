@@ -1,6 +1,12 @@
-import * as tf from '@tensorflow/tfjs';
-import * as use from '@tensorflow-models/universal-sentence-encoder';
+// Remove static imports
+// import * as tf from '@tensorflow/tfjs';
+// import * as use from '@tensorflow-models/universal-sentence-encoder';
 import { TensorFlowConfig } from '@/app/types/embedding';
+
+// Module references for lazy loading
+let tf: any = null;
+let use: any = null;
+let tfInitialized = false;
 
 // Cache for models to avoid reloading
 const modelCache: Record<string, any> = {};
@@ -31,8 +37,23 @@ export async function loadModel(config: TensorFlowConfig): Promise<any> {
     isModelLoading = true;
     console.log(`[TensorFlow.js] Loading model: ${modelName}`);
     
+    // Lazy load TensorFlow.js and Universal Sentence Encoder
+    if (!tf) {
+      console.log('[TensorFlow.js] Dynamically importing TensorFlow.js');
+      tf = await import('@tensorflow/tfjs');
+    }
+    
+    if (!use) {
+      console.log('[TensorFlow.js] Dynamically importing Universal Sentence Encoder');
+      use = await import('@tensorflow-models/universal-sentence-encoder');
+    }
+    
     // Initialize TensorFlow.js
-    await tf.ready();
+    if (!tfInitialized) {
+      console.log('[TensorFlow.js] Initializing TensorFlow.js');
+      await tf.ready();
+      tfInitialized = true;
+    }
     
     // Load the Universal Sentence Encoder model
     // Note: In a more complex implementation, we would load different models based on the config

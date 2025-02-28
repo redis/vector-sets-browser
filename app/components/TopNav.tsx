@@ -29,11 +29,13 @@ export default function TopNav({
         <header className="bg-white border-b">
             <div className="flex items-center p-2 space-x-2 pr-4">
                 <div className="flex items-center">
+                    {/* Set height to auto */}
                     <Image
+                        priority
                         src="/Redis_logo.png"
                         alt="Redis Logo"
                         width={100}
-                        height={40}
+                        height={100}
                         className="mr-2"
                     />
                     <div>

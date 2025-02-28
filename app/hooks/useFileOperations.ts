@@ -45,7 +45,7 @@ export function useFileOperations({
 
             const textToEmbed = `${firstRow["title"]} ${firstRow["plot_synopsis"]} ${firstRow["tags"]}`
 
-            const response = await fetch("/api/importData/validate", {
+            const response = await fetch(`/api/vectorset/${vectorSetName}/importData/validate`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -146,13 +146,13 @@ export function useFileOperations({
             if (fileInputRef.current?.files?.[0]) {
                 formData.append("file", fileInputRef.current.files[0])
 
-                const response = await fetch("/api/importData", {
+                const response = await fetch(`/api/vectorset/${vectorSetName}/importData`, {
                     method: "POST",
                     body: formData,
                 })
 
                 // Set up event source for progress updates
-                const eventSource = new EventSource("/api/importData/progress")
+                const eventSource = new EventSource(`/api/vectorset/${vectorSetName}/importData/progress`)
 
                 eventSource.onmessage = (event) => {
                     const data = JSON.parse(event.data)
@@ -187,12 +187,11 @@ export function useFileOperations({
     ) => {
         console.log("[useFileOperations] Saving metadata:", metadata);
         try {
-            const response = await fetch("/api/redis", {
-                method: "POST",
+            const response = await fetch(`/api/vectorset/${vectorSetName}/metadata`, {
+                method: "PUT",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    action: "setMetadata",
-                    params: { keyName: vectorSetName, metadata },
+                    metadata,
                 }),
             });
             if (!response.ok) {

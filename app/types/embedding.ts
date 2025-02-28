@@ -5,15 +5,109 @@ export type EmbeddingProvider =
     | "image"
     | "none"
 
-export type OpenAIModel =
-    | "text-embedding-3-small"
-    | "text-embedding-3-large"
-    | "text-embedding-ada-002"
+export type EmbeddingDataFormat = "text" | "image"
+
+// Define a ModelData interface to replace string model types
+export interface ModelData {
+    name: string
+    dimensions: number
+    dataFormat: EmbeddingDataFormat
+}
+
+// Define model data for OpenAI models
+export const OPENAI_MODELS: Record<string, ModelData> = {
+    "text-embedding-3-small": {
+        name: "text-embedding-3-small",
+        dimensions: 1536,
+        dataFormat: "text"
+    },
+    "text-embedding-3-large": {
+        name: "text-embedding-3-large",
+        dimensions: 3072,
+        dataFormat: "text"
+    },
+    "text-embedding-ada-002": {
+        name: "text-embedding-ada-002",
+        dimensions: 1536,
+        dataFormat: "text"
+    }
+}
+
+// Define model data for TensorFlow models
+export const TENSORFLOW_MODELS: Record<string, ModelData> = {
+    "universal-sentence-encoder": {
+        name: "universal-sentence-encoder",
+        dimensions: 512,
+        dataFormat: "text"
+    },
+    "universal-sentence-encoder-lite": {
+        name: "universal-sentence-encoder-lite",
+        dimensions: 512,
+        dataFormat: "text"
+    },
+    "universal-sentence-encoder-multilingual": {
+        name: "universal-sentence-encoder-multilingual",
+        dimensions: 512,
+        dataFormat: "text"
+    }
+}
+
+// Define model data for Image models
+export const IMAGE_MODELS: Record<string, ModelData> = {
+    "mobilenet": {
+        name: "mobilenet",
+        dimensions: 1024,
+        dataFormat: "image"
+    }
+    // Uncomment when supported
+    // "efficientnet": {
+    //     name: "efficientnet",
+    //     dimensions: 1280,
+    //     dataFormat: "image"
+    // },
+    // "resnet50": {
+    //     name: "resnet50",
+    //     dimensions: 2048,
+    //     dataFormat: "image"
+    // }
+}
+
+// Define model data for Ollama models
+export const OLLAMA_MODELS: Record<string, ModelData> = {
+    "mxbai-embed-large": {
+        name: "mxbai-embed-large",
+        dimensions: 1024,
+        dataFormat: "text"
+    },
+    "mxbai-embed-small": {
+        name: "mxbai-embed-small",
+        dimensions: 384,
+        dataFormat: "text"
+    },
+    "nomic-embed-text": {
+        name: "nomic-embed-text",
+        dimensions: 768,
+        dataFormat: "text"
+    },
+    "all-minilm": {
+        name: "all-minilm",
+        dimensions: 384,
+        dataFormat: "text"
+    }
+}
+
+// Type for OpenAI model names
+export type OpenAIModelName = keyof typeof OPENAI_MODELS
+
+// Type for TensorFlow model names
+export type TensorFlowModelName = keyof typeof TENSORFLOW_MODELS
+
+// Type for Image model names
+export type ImageModelName = keyof typeof IMAGE_MODELS
 
 export interface OpenAIConfig {
     apiKey: string
-    model: OpenAIModel
-    dimensions?: number // Optional - will be determined by model if not specified
+    model: OpenAIModelName
     batchSize?: number // For batch processing
 }
 
@@ -23,20 +117,12 @@ export interface OllamaConfig {
     promptTemplate?: string
 }
 
-export type TensorFlowModel =
-    | "universal-sentence-encoder"
-    | "universal-sentence-encoder-lite"
-    | "universal-sentence-encoder-multilingual"
-
 export interface TensorFlowConfig {
-    model: TensorFlowModel
+    model: TensorFlowModelName
 }
 
-// For now, we only support MobileNet due to dependency conflicts
-export type ImageModel = "mobilenet" // | 'efficientnet' | 'resnet50';
-
 export interface ImageConfig {
-    model: ImageModel
+    model: ImageModelName
     inputSize?: number // Optional - size to resize images to before embedding
 }
 
@@ -69,39 +155,67 @@ export interface VectorSetMetadata {
     }
 }
 
-export const MODEL_DIMENSIONS = {
-    "text-embedding-3-small": 1536,
-    "text-embedding-3-large": 3072,
-    "text-embedding-ada-002": 1536,
-    "universal-sentence-encoder": 512,
-    "universal-sentence-encoder-lite": 512,
-    "universal-sentence-encoder-multilingual": 512,
-    mobilenet: 1024,
-    // 'efficientnet': 1280,
-    // 'resnet50': 2048
-} as const
+// Helper function to get model data for any model
+export function getModelData(config: EmbeddingConfig): ModelData | undefined {
+    if (config.provider === "openai" && config.openai?.model) {
+        return OPENAI_MODELS[config.openai.model];
+    } else if (config.provider === "tensorflow" && config.tensorflow?.model) {
+        return TENSORFLOW_MODELS[config.tensorflow.model];
+    } else if (config.provider === "image" && config.image?.model) {
+        return IMAGE_MODELS[config.image.model];
+    } else if (config.provider === "ollama" && config.ollama?.modelName) {
+        return OLLAMA_MODELS[config.ollama.modelName as keyof typeof OLLAMA_MODELS] || {
+            name: config.ollama.modelName,
+            dimensions: 1024, // Default dimensions for unknown Ollama models
+            dataFormat: "text" // Default data format for Ollama models
+        };
+    } else if (config.provider === "none" && config.none?.model) {
+        return {
+            name: config.none.model,
+            dimensions: config.none.dimensions,
+            dataFormat: "text" // Default data format for none provider
+        };
+    }
+    return undefined;
+}
 
 export function createVectorSetMetadata(
     config: EmbeddingConfig,
     description?: string
 ): VectorSetMetadata {
-    let dimensions: number | undefined
-
-    if (config.provider === "openai" && config.openai?.model) {
-        dimensions = MODEL_DIMENSIONS[config.openai.model]
-    } else if (config.provider === "tensorflow" && config.tensorflow?.model) {
-        dimensions = MODEL_DIMENSIONS[config.tensorflow.model]
-    } else if (config.provider === "image" && config.image?.model) {
-        dimensions = MODEL_DIMENSIONS[config.image.model]
-    } else if (config.provider === "none" && config.none?.model) {
-        dimensions = 3 // default dimensions for none
-    }
-
+    const modelData = getModelData(config);
+    
     return {
         embedding: config,
         created: new Date().toISOString(),
         lastUpdated: new Date().toISOString(),
         description,
-        dimensions,
+        dimensions: modelData?.dimensions,
     }
+}
+
+// Helper function to get model name for a given embedding config
+export function getModelName(config: EmbeddingConfig): string {
+    const modelData = getModelData(config);
+    return modelData?.name || "Unknown Model";
+}
+
+export function getProvider(config: EmbeddingConfig): EmbeddingProvider {
+    return config.provider;
+}
+
+// Helper function to get data format for a given embedding config
+export function getEmbeddingDataFormat(config: EmbeddingConfig): EmbeddingDataFormat {
+    const modelData = getModelData(config);
+    return modelData?.dataFormat || "text"; // Default to text if not specified
+}
+
+// Helper function to check if an embedding config is for image data
+export function isImageEmbedding(config: EmbeddingConfig): boolean {
+    return getEmbeddingDataFormat(config) === "image";
+}
+
+// Helper function to check if an embedding config is for text data
+export function isTextEmbedding(config: EmbeddingConfig): boolean {
+    return getEmbeddingDataFormat(config) === "text";
 }

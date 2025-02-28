@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import VectorViz3D from "../components/VectorViz3D"
 import VectorSetNav from "../components/VectorSetNav"
 import AddVectorModal from "../components/AddVectorModal"
 import EditEmbeddingConfigModal from "../components/EditEmbeddingConfigModal"
@@ -22,7 +21,7 @@ import { getConnection, removeConnection } from "../lib/connectionManager"
 import { EmbeddingConfig, VectorSetMetadata } from "../types/embedding"
 import { Input } from "@/components/ui/input"
 import SearchTimeIndicator from "../components/SearchTimeIndicator"
-import { vsim, vemb } from "../services/redis"
+import HNSWVisualizer from "../components/HNSWVisualizer"
 
 /**
  * VectorSetPage handles the display and management of vector sets.
@@ -400,7 +399,7 @@ export default function VectorSetPage() {
                                 Visualize
                             </TabsTrigger>
                             <TabsTrigger className="w-full" value="info">
-                                Embeddings
+                                Information
                             </TabsTrigger>
                             <TabsTrigger className="w-full" value="import">
                                 Import Data
@@ -575,12 +574,11 @@ export default function VectorSetPage() {
                                         </div>
                                     )}
                                     <div style={{ height: "600px" }}>
-                                        <VectorViz3D
-                                            data={results.map((r) => ({
-                                                label: r[0],
-                                                vector: r[2],
-                                            }))}
-                                            onVectorSelect={handleVectorSelect}
+                                        <HNSWVisualizer
+                                            keyName={vectorSetName || ""}
+                                            initialElement={results.length > 0 ? results[0][0] : vectorSetName}
+                                            maxNodes={200}
+                                            initialNodes={50}
                                         />
                                     </div>
                                 </div>

@@ -1,5 +1,11 @@
-import { VectorSetMetadata } from "../types/embedding"
+import {
+    getEmbeddingDataFormat,
+    getModelName,
+    VectorSetMetadata,
+} from "../types/embedding"
 import { Button } from "@/components/ui/button"
+import { useEffect, useState } from "react"
+import { Card, CardHeader, CardContent, CardTitle } from "@/components/ui/card"
 
 interface InfoPanelProps {
     vectorSetName: string
@@ -9,88 +15,207 @@ interface InfoPanelProps {
     onEditConfig: () => void
 }
 
-export default function InfoPanel({ vectorSetName, recordCount, dim, metadata, onEditConfig }: InfoPanelProps) {
-    const getModelName = () => {
-        if (!metadata?.embedding) return null;
-        if (metadata.embedding.provider === 'openai' && metadata.embedding.openai) {
-            return metadata.embedding.openai.model;
+interface VInfo {
+    quantType: string
+    vectorDim: number
+    size: number
+    maxLevel: number
+    vsetUid: number
+    hnswMaxNodeUid: number
+}
+
+export default function InfoPanel({
+    vectorSetName,
+    recordCount,
+    dim,
+    metadata,
+    onEditConfig,
+}: InfoPanelProps) {
+    const [vInfo, setVInfo] = useState<VInfo | null>(null)
+
+    useEffect(() => {
+        async function fetchVInfo() {
+            try {
+                const response = await fetch("/api/redis/command/vinfo", {
+                    method: "POST",
+                    body: JSON.stringify({
+                        keyName: vectorSetName,
+                    }),
+                })
+                const data = await response.json()
+                if (data.success) {
+                    console.log(data)
+                    setVInfo({
+                        quantType: data.result["quant-type"],
+                        vectorDim: data.result["vector-dim"],
+                        size: data.result["size"],
+                        maxLevel: data.result["max-level"],
+                        vsetUid: data.result["vset-uid"],
+                        hnswMaxNodeUid: data.result["hnsw-max-node-uid"],
+                    })
+                }
+            } catch (error) {
+                console.error("Failed to fetch vinfo:", error)
+            }
         }
-        if (metadata.embedding.provider === 'ollama' && metadata.embedding.ollama) {
-            return metadata.embedding.ollama.modelName;
-        }
-        return null;
-    };
+        fetchVInfo()
+    }, [])
 
     return (
-        <div className="p-4 bg-white rounded-lg shadow">
-            <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-semibold">Vector Set Info</h2>
-                <Button variant="outline" size="sm" onClick={onEditConfig}>
-                    Edit Config
-                </Button>
-            </div>
-            <div className="space-y-4">
-                <div>
-                    <h3 className="font-medium mb-2">Basic Information</h3>
-                    <div className="grid grid-cols-2 gap-2 text-sm">
-                        <div className="text-gray-600">Name:</div>
-                        <div>{vectorSetName}</div>
-                        <div className="text-gray-600">Vectors:</div>
-                        <div>{recordCount !== null ? recordCount.toLocaleString() : 'Loading...'}</div>
-                        <div className="text-gray-600">Dimensions:</div>
-                        <div>{dim !== null ? dim.toLocaleString() : 'Loading...'}</div>
+        <div className="flex flex-col gap-4">
+            <Card>
+                <CardHeader>
+                    <div className="flex items-center w-full">
+                        <CardTitle>Vector Set Info (VINFO)</CardTitle>
+                        <div className="grow"></div>
                         <div className="text-gray-600">Created:</div>
-                        <div>{metadata?.created ? new Date(metadata.created).toLocaleString() : 'Unknown'}</div>
+                        <div>
+                            {metadata?.created
+                                ? new Date(metadata.created).toLocaleString()
+                                : "Unknown"}
+                        </div>
                     </div>
-                </div>
-
-                <div>
-                    <h3 className="font-medium mb-2">Embedding Configuration</h3>
-                    <div className="grid grid-cols-2 gap-2 text-sm">
-                        <div className="text-gray-600">Provider:</div>
-                        <div>{metadata?.embedding?.provider || 'None'}</div>
-                        {metadata?.embedding?.provider === 'openai' && metadata?.embedding?.openai && (
-                            <>
-                                <div className="text-gray-600">Model:</div>
-                                <div>{metadata.embedding.openai.model}</div>
-                            </>
-                        )}
-                        {metadata?.embedding?.provider === 'ollama' && metadata?.embedding?.ollama && (
-                            <>
-                                <div className="text-gray-600">Model:</div>
-                                <div>{metadata.embedding.ollama.modelName}</div>
-                            </>
-                        )}
+                </CardHeader>
+                <CardContent>
+                    <p className="text-sm text-gray-600">
+                        This section contains information about the vector set returned from the <strong>VINFO</strong> command
+                    </p>
+                    <div className="grid grid-cols-4 gap-2 p-4">
+                        <div className="text-gray-600">Vectors:</div>
+                        <div>
+                            {recordCount !== null
+                                ? recordCount.toLocaleString()
+                                : "Loading..."}
+                        </div>
                     </div>
-                </div>
+                    {vInfo && (
+                        <div className="grid grid-cols-4 gap-2 p-4">
+                            <div className="text-gray-600">
+                                Vector Dimensions:
+                            </div>
+                            <div>{vInfo.vectorDim}</div>
+                            <div className="text-gray-600">
+                                Quantization Type:
+                            </div>
+                            <div>{vInfo.quantType}</div>
+                            <div className="text-gray-600">Size:</div>
+                            <div>{vInfo.size}</div>
+                            <div className="text-gray-600">Max Level:</div>
+                            <div>{vInfo.maxLevel}</div>
+                            <div className="text-gray-600">VSet UID:</div>
+                            <div>{vInfo.vsetUid}</div>
+                            <div className="text-gray-600">
+                                HNSW Max Node UID:
+                            </div>
+                            <div>{vInfo.hnswMaxNodeUid}</div>
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
 
-                {metadata?.redisConfig && (
-                    <div>
-                        <h3 className="font-medium mb-2">Redis Configuration</h3>
+            <Card>
+                <CardHeader>
+                    <div className="flex items-center w-full space-x-2">
+                        <CardTitle>Embedding Configuration</CardTitle>
+                        <div className="grow"></div>
+                    </div>
+                </CardHeader>
+                <CardContent>
+                    <div className="w-full flex items-center">
+                        <div className="grow"></div>
+                    </div>
+                    <p className="text-sm text-gray-600">
+                        The embedding engine is a convenience feature used by
+                        vector-set-browser for <strong>VSIM</strong> and <strong>VADD</strong> operations. It does
+                        not affect the redis-server or the underlying vector-set
+                        data.
+                    </p>
+                    {metadata?.embedding && (
+                        <div className="flex items-center gap-4 p-4">
+                            <div>
+                                <div className="flex space-x-2">
+                                    <div className="text-gray-600">
+                                        Provider:
+                                    </div>
+                                    <div className="font-bold">
+                                        {metadata?.embedding?.provider ||
+                                            "None"}
+                                    </div>
+                                </div>
+                                <div className="flex space-x-2">
+                                    <div className="text-gray-600">Model:</div>
+                                    <div className="font-bold">
+                                        {getModelName(metadata?.embedding)}
+                                    </div>
+                                </div>
+                                <div className="flex space-x-2">
+                                    <div className="text-gray-600">
+                                        Data Format:
+                                    </div>
+                                    <div className="font-bold">
+                                        {getEmbeddingDataFormat(
+                                            metadata?.embedding
+                                        )}
+                                    </div>
+                                </div>
+
+                            </div>
+                                <Button
+                                    variant="default"
+                                    onClick={onEditConfig}
+                                >
+                                    Edit
+                                </Button>
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
+
+            {metadata?.redisConfig && (
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Redis Configuration</CardTitle>
+                    </CardHeader>
+                    <CardContent>
                         <div className="grid grid-cols-2 gap-2 text-sm">
                             <div className="text-gray-600">Quantization:</div>
                             <div>{metadata.redisConfig.quantization}</div>
-                            
+
                             {metadata.redisConfig.reduceDimensions && (
                                 <>
-                                    <div className="text-gray-600">Reduced Dimensions:</div>
-                                    <div>{metadata.redisConfig.reduceDimensions}</div>
+                                    <div className="text-gray-600">
+                                        Reduced Dimensions:
+                                    </div>
+                                    <div>
+                                        {metadata.redisConfig.reduceDimensions}
+                                    </div>
                                 </>
                             )}
-                            
+
                             <div className="text-gray-600">Default CAS:</div>
-                            <div>{metadata.redisConfig.defaultCAS ? 'Enabled' : 'Disabled'}</div>
-                            
+                            <div>
+                                {metadata.redisConfig.defaultCAS
+                                    ? "Enabled"
+                                    : "Disabled"}
+                            </div>
+
                             {metadata.redisConfig.buildExplorationFactor && (
                                 <>
-                                    <div className="text-gray-600">Build EF:</div>
-                                    <div>{metadata.redisConfig.buildExplorationFactor}</div>
+                                    <div className="text-gray-600">
+                                        Build EF:
+                                    </div>
+                                    <div>
+                                        {
+                                            metadata.redisConfig
+                                                .buildExplorationFactor
+                                        }
+                                    </div>
                                 </>
                             )}
                         </div>
-                    </div>
-                )}
-            </div>
+                    </CardContent>
+                </Card>
+            )}
         </div>
-    );
-} 
+    )
+}

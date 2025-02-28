@@ -1,10 +1,13 @@
-import * as tf from '@tensorflow/tfjs';
-import * as mobilenetModule from '@tensorflow-models/mobilenet';
 import { ImageConfig } from '@/app/types/embedding';
+
+// Module references for lazy loading
+let tf: any = null;
+let mobilenetModule: any = null;
 
 // Cache for models to avoid reloading
 const modelCache: Record<string, any> = {};
 let isModelLoading = false;
+let tfInitialized = false;
 
 // Check if code is running in browser environment
 const isBrowser = typeof window !== 'undefined';
@@ -52,8 +55,23 @@ export async function loadImageModel(config: ImageConfig): Promise<any> {
     isModelLoading = true;
     console.log(`[TensorFlow.js] Loading image model: ${modelName}`);
     
+    // Lazy load TensorFlow.js and MobileNet
+    if (!tf) {
+      console.log('[TensorFlow.js] Dynamically importing TensorFlow.js');
+      tf = await import('@tensorflow/tfjs');
+    }
+    
+    if (!mobilenetModule) {
+      console.log('[TensorFlow.js] Dynamically importing MobileNet');
+      mobilenetModule = await import('@tensorflow-models/mobilenet');
+    }
+    
     // Initialize TensorFlow.js
-    await tf.ready();
+    if (!tfInitialized) {
+      console.log('[TensorFlow.js] Initializing TensorFlow.js');
+      await tf.ready();
+      tfInitialized = true;
+    }
     
     // Set the appropriate backend based on environment
     if (isBrowser) {
@@ -95,8 +113,20 @@ export async function loadImageModel(config: ImageConfig): Promise<any> {
 /**
  * Preprocess an image for the model
  */
-export async function preprocessImage(imageData: string, config: ImageConfig): Promise<tf.Tensor3D> {
+export async function preprocessImage(imageData: string, config: ImageConfig): Promise<any> {
   try {
+    // Ensure TensorFlow.js is loaded
+    if (!tf) {
+      console.log('[TensorFlow.js] Dynamically importing TensorFlow.js for preprocessing');
+      tf = await import('@tensorflow/tfjs');
+      
+      if (!tfInitialized) {
+        console.log('[TensorFlow.js] Initializing TensorFlow.js');
+        await tf.ready();
+        tfInitialized = true;
+      }
+    }
+    
     // MobileNet expects 224x224 images
     const inputSize = 224;
     

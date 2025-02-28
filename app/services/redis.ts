@@ -18,35 +18,7 @@ interface RedisApiParams {
     metadata?: Record<string, unknown>
     dimensions?: number
     url?: string
-}
-
-async function callRedisApi(action: string, params: RedisApiParams) {
-    try {
-        const baseUrl = getBaseUrl()
-        const response = await fetch(`${baseUrl}/api/redis`, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ action, params }),
-        })
-
-        if (!response.ok) {
-            const errorText = await response.text()
-            throw new Error(
-                `HTTP error! status: ${response.status}, message: ${errorText}`
-            )
-        }
-
-        const data = await response.json()
-        if (!data.success) {
-            throw new Error(data.error || `Redis operation ${action} failed`)
-        }
-        return data // Return the entire response since it's no longer double-wrapped
-    } catch (error) {
-        console.error(`Error in Redis API call (${action}):`, error)
-        throw error
-    }
+    withscores?: boolean
 }
 
 export async function connect(url: string): Promise<void> {
@@ -135,21 +107,77 @@ export async function vadd(
             debug: validationResult.debug,
         })
 
-        const response = await callRedisApi("vadd", {
-            keyName,
-            element,
-            vector: normalizedVector,
+        const baseUrl = getBaseUrl()
+        const response = await fetch(`${baseUrl}/api/redis/command/vadd`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ 
+                keyName, 
+                element, 
+                vector: normalizedVector 
+            }),
         })
 
-        if (!response?.success) {
+        if (!response.ok) {
+            const errorText = await response.text()
             throw new Error(
-                `VADD operation failed: ${response?.error || "Unknown error"}`
+                `HTTP error! status: ${response.status}, message: ${errorText}`
             )
         }
 
-        return response.result
+        const data = await response.json()
+        if (!data.success) {
+            throw new Error(
+                `VADD operation failed: ${data.error || "Unknown error"}`
+            )
+        }
+
+        return data.result
     } catch (error) {
         console.error("VADD operation error:", error)
+        throw error
+    }
+}
+
+export async function vlink(
+    keyName: string,
+    element: string,
+    count: number
+): Promise<[string, number][]> {
+    try {
+        const baseUrl = getBaseUrl()
+        const response = await fetch(`${baseUrl}/api/redis/command/vlink`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ keyName, element, count }),
+        })
+
+        if (!response.ok) {
+            const errorText = await response.text()
+            throw new Error(
+                `HTTP error! status: ${response.status}, message: ${errorText}`
+            )
+        }
+
+        const data = await response.json()
+        if (!data.success) {
+            throw new Error(`Failed to get vector links: ${data.error}`)
+        }
+        
+        // Flatten the per-level results into a single array
+        const result: [string, number][] = []
+        for (const level of data.result) {
+            for (const [neighbor, score] of level) {
+                result.push([neighbor, score])
+            }
+        }
+        return result
+    } catch (error) {
+        console.error("VLINK operation error:", error)
         throw error
     }
 }
@@ -159,72 +187,123 @@ export async function vsim(
     searchInput: number[] | string,
     count: number
 ): Promise<[string, number][]> {
-    // Construct params based on searchInput type
-    const params = {
-        keyName,
-        count,
-        ...(Array.isArray(searchInput)
-            ? { vector: searchInput }
-            : { searchElement: searchInput }),
-    }
+    try {
+        const baseUrl = getBaseUrl()
+        const response = await fetch(`${baseUrl}/api/redis/command/vsim`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ keyName, searchInput, count }),
+        })
 
-    const response = await callRedisApi("vsim", params)
+        if (!response.ok) {
+            const errorText = await response.text()
+            throw new Error(
+                `HTTP error! status: ${response.status}, message: ${errorText}`
+            )
+        }
 
-    // Handle the response
-    if (!response?.success) {
-        console.error("VSIM operation failed:", response?.error)
+        const data = await response.json()
+        if (!data.success) {
+            throw new Error(data.error || "VSIM operation failed")
+        }
+
+        return data.result
+    } catch (error) {
+        console.error("VSIM operation error:", error)
         return []
     }
-
-    if (!Array.isArray(response.result)) {
-        console.error("VSIM results not in expected format:", response.result)
-        return []
-    }
-
-    // Filter out any results with invalid IDs
-    const validResults = response.result.filter((result: any) => {
-        if (!Array.isArray(result) || result.length !== 2) {
-            console.warn("Invalid result format:", result)
-            return false
-        }
-        const [id, score] = result
-        if (!id || typeof id !== "string") {
-            console.warn("Invalid ID in result:", id)
-            return false
-        }
-        if (typeof score !== "number" && typeof score !== "string") {
-            console.warn("Invalid score in result:", score)
-            return false
-        }
-        return true
-    })
-
-    // Return just the IDs and scores without fetching vectors
-    return validResults.map(([id, score]) => [id, Number(score)])
 }
 
 export async function vdim(keyName: string): Promise<number> {
-    const response = await callRedisApi("vdim", { keyName })
-    if (!response?.success || typeof response.result !== "number") {
-        throw new Error("Failed to get vector dimensions")
+    try {
+        const baseUrl = getBaseUrl()
+        const response = await fetch(`${baseUrl}/api/redis/command/vdim`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ keyName }),
+        })
+
+        if (!response.ok) {
+            const errorText = await response.text()
+            throw new Error(
+                `HTTP error! status: ${response.status}, message: ${errorText}`
+            )
+        }
+
+        const data = await response.json()
+        if (!data.success || typeof data.result !== "number") {
+            throw new Error(data.error || "Failed to get vector dimensions")
+        }
+
+        return data.result
+    } catch (error) {
+        console.error("VDIM operation error:", error)
+        throw error
     }
-    return response.result
 }
 
 export async function vcard(keyName: string): Promise<number> {
-    const response = await callRedisApi("vcard", { keyName })
-    if (!response?.success || typeof response.result !== "number") {
-        throw new Error("Failed to get vector count")
+    try {
+        const baseUrl = getBaseUrl()
+        const response = await fetch(`${baseUrl}/api/redis/command/vcard`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ keyName }),
+        })
+
+        if (!response.ok) {
+            const errorText = await response.text()
+            throw new Error(
+                `HTTP error! status: ${response.status}, message: ${errorText}`
+            )
+        }
+
+        const data = await response.json()
+        if (!data.success || typeof data.result !== "number") {
+            throw new Error(data.error || "Failed to get vector count")
+        }
+
+        return data.result
+    } catch (error) {
+        console.error("VCARD operation error:", error)
+        throw error
     }
-    return response.result
 }
 
 export async function vrem(keyName: string, element: string): Promise<number> {
-    const response = await callRedisApi("vrem", { keyName, element })
-    if (!response?.success) {
-        throw new Error("Failed to remove vector")
+    try {
+        const baseUrl = getBaseUrl()
+        const response = await fetch(`${baseUrl}/api/redis/command/vrem`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ keyName, element }),
+        })
+
+        if (!response.ok) {
+            const errorText = await response.text()
+            throw new Error(
+                `HTTP error! status: ${response.status}, message: ${errorText}`
+            )
+        }
+
+        const data = await response.json()
+        if (!data.success) {
+            throw new Error(`Failed to remove vector: ${data.error || "Unknown error"}`)
+        }
+
+        return data.result
+    } catch (error) {
+        console.error("VREM operation error:", error)
+        throw error
     }
-    return response.result
 }
 
 export async function vemb(
@@ -239,19 +318,31 @@ export async function vemb(
     }
 
     try {
-        const response = await callRedisApi("vemb", {
-            keyName,
-            element,
+        const baseUrl = getBaseUrl()
+        const response = await fetch(`${baseUrl}/api/redis/command/vemb`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ keyName, element }),
         })
 
-        if (!response?.success) {
+        if (!response.ok) {
+            const errorText = await response.text()
             throw new Error(
-                `VEMB operation failed: ${response?.error || "Unknown error"}`
+                `HTTP error! status: ${response.status}, message: ${errorText}`
+            )
+        }
+
+        const data = await response.json()
+        if (!data.success) {
+            throw new Error(
+                `VEMB operation failed: ${data.error || "Unknown error"}`
             )
         }
 
         // The vector is directly in the result
-        const vector = response.result
+        const vector = data.result
         if (!Array.isArray(vector)) {
             throw new Error(`Invalid vector format for element ${element}`)
         }
@@ -280,18 +371,62 @@ export async function getVectorWithSimilarity(
     }
 }
 
-export async function getRedisInfo(): Promise<Record<string, any>> {
-    const response = await callRedisApi("getRedisInfo", {})
-    if (!response?.success) {
-        throw new Error("Failed to get Redis info")
+export async function getMemoryUsage(keyName: string): Promise<number> {
+    try {
+        const baseUrl = getBaseUrl()
+        const response = await fetch(`${baseUrl}/api/memory-usage`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ keyName }),
+        })
+
+        if (!response.ok) {
+            const errorText = await response.text()
+            throw new Error(
+                `HTTP error! status: ${response.status}, message: ${errorText}`
+            )
+        }
+
+        const data = await response.json()
+        if (!data.success || typeof data.result !== "number") {
+            throw new Error(data.error || "Failed to get memory usage")
+        }
+
+        return data.result
+    } catch (error) {
+        console.error("Memory usage operation error:", error)
+        throw error
     }
-    return response.result
 }
 
-export async function getMemoryUsage(keyName: string): Promise<number> {
-    const response = await callRedisApi("memoryUsage", { keyName })
-    if (!response?.success || typeof response.result !== "number") {
-        throw new Error("Failed to get memory usage")
+export async function getVectorInfo(keyName: string): Promise<Record<string, any>> {
+    try {
+        const baseUrl = getBaseUrl()
+        const response = await fetch(`${baseUrl}/api/redis/command/vinfo`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ keyName }),
+        })
+
+        if (!response.ok) {
+            const errorText = await response.text()
+            throw new Error(
+                `HTTP error! status: ${response.status}, message: ${errorText}`
+            )
+        }
+
+        const data = await response.json()
+        if (!data.success) {
+            throw new Error(data.error || "Failed to get vector info")
+        }
+
+        return data.result
+    } catch (error) {
+        console.error("Vector info operation error:", error)
+        throw error
     }
-    return response.result
 }

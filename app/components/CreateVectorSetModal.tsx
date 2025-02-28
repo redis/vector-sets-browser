@@ -174,17 +174,14 @@ export default function CreateVectorSetModal({
             }
             
             if (values.reduceDimensions) {
-                console.log("reduceDimensions", values.reduceDimensions)
                 redisConfig.reduceDimensions = parseInt(values.reduceDimensions, 10);
             }
             
             if (values.defaultCAS !== undefined) {
-                console.log("defaultCAS", values.defaultCAS)
                 redisConfig.defaultCAS = values.defaultCAS;
             }
             
             if (values.buildExplorationFactor) {
-                console.log("buildExplorationFactor", values.buildExplorationFactor)
                 redisConfig.buildExplorationFactor = parseInt(values.buildExplorationFactor, 10);
             }
 
@@ -220,14 +217,6 @@ export default function CreateVectorSetModal({
                               .map((v) => parseFloat(v.trim())),
                       }
                     : undefined
-
-            console.log("Submitting vector set creation:", {
-                name: values.name.trim(),
-                effectiveDimensions,
-                metadata,
-                customData,
-                embeddingConfig,
-            })
 
             await onCreate(
                 values.name.trim(),

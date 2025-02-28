@@ -17,10 +17,10 @@ export default function SearchTimeIndicator({ searchTime }: SearchTimeIndicatorP
 
     // Determine the background color based on the search time
     const getColorClass = () => {
-        if (searchTime < 100) {
+        if (searchTime < 200) {
             return "text-green-600 bg-transparent";
         } else if (searchTime < 500) {
-            return "text-yellow-100";
+            return "bg-yellow-500 text-black";
         } else {
             return "bg-red-200 text-black";
         }

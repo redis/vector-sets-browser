@@ -30,7 +30,7 @@
 
 @layer base {
   :root {
-    --font-body: 'Space Grotesk', sans-serif;
+    /* --font-body: 'Space Grotesk', sans-serif; */
     --font-mono: 'Space Mono', monospace;
     --background: 0 0% 100%;
     --foreground: 0 0% 3.9%;

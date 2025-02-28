@@ -1,7 +1,7 @@
 import { useState } from "react"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Label } from "@/components/ui/label"
-import { ImageModel } from "@/app/types/embedding"
+import { ImageModelName, IMAGE_MODELS } from "@/app/types/embedding"
 
 interface ImageModelSelectorProps {
     value: string
@@ -9,22 +9,23 @@ interface ImageModelSelectorProps {
 }
 
 interface ModelInfo {
-    id: ImageModel
+    id: ImageModelName
     name: string
     description: string
     dimensions: number
 }
 
-// For now, we only support MobileNet due to dependency conflicts
+// Create model info from IMAGE_MODELS
 const imageModels: ModelInfo[] = [
     {
         id: "mobilenet",
         name: "MobileNet V2",
         description:
             "Lightweight model optimized for mobile and web applications. Good balance of speed and accuracy.",
-        dimensions: 1024,
+        dimensions: IMAGE_MODELS["mobilenet"].dimensions,
     },
     // Other models removed due to dependency conflicts
+    // Uncomment when supported
     // {
     //   id: "efficientnet",
     //   name: "EfficientNet B0",

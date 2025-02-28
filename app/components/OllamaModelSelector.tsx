@@ -8,6 +8,7 @@ import {
 } from "@/components/ui/select"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { OLLAMA_MODELS } from "@/app/types/embedding"
 
 interface OllamaModel {
     id: string
@@ -17,6 +18,7 @@ interface OllamaModel {
     pulls?: string
     tags?: string
     updated?: string
+    dimensions?: number
 }
 
 const ollamaModels: OllamaModel[] = [
@@ -28,6 +30,7 @@ const ollamaModels: OllamaModel[] = [
         size: "17M",
         pulls: "3",
         updated: "12 months ago",
+        dimensions: OLLAMA_MODELS["nomic-embed-text"]?.dimensions,
     },
     {
         id: "mxbai-embed-large",
@@ -37,6 +40,7 @@ const ollamaModels: OllamaModel[] = [
         size: "335m",
         pulls: "1.6M",
         updated: "9 months ago",
+        dimensions: OLLAMA_MODELS["mxbai-embed-large"]?.dimensions,
     },
     {
         id: "snowflake-arctic-embed",
@@ -46,6 +50,7 @@ const ollamaModels: OllamaModel[] = [
         size: "335m",
         pulls: "692.8K",
         updated: "10 months ago",
+        dimensions: 1024,
     },
     {
         id: "bge-m3",
@@ -55,6 +60,7 @@ const ollamaModels: OllamaModel[] = [
         size: "567m",
         pulls: "450.8K",
         updated: "6 months ago",
+        dimensions: 1024,
     },
     {
         id: "all-minilm",
@@ -63,6 +69,7 @@ const ollamaModels: OllamaModel[] = [
         size: "33m",
         pulls: "298K",
         updated: "9 months ago",
+        dimensions: OLLAMA_MODELS["all-minilm"]?.dimensions,
     },
     {
         id: "bge-large",
@@ -71,6 +78,7 @@ const ollamaModels: OllamaModel[] = [
         size: "335m",
         pulls: "82.9K",
         updated: "6 months ago",
+        dimensions: 1024,
     },
     {
         id: "paraphrase-multilingual",
@@ -80,6 +88,7 @@ const ollamaModels: OllamaModel[] = [
         size: "278m",
         pulls: "39.8K",
         updated: "6 months ago",
+        dimensions: 768,
     },
     {
         id: "snowflake-arctic-embed2",
@@ -89,6 +98,7 @@ const ollamaModels: OllamaModel[] = [
         size: "568m",
         pulls: "31.2K",
         updated: "2 months ago",
+        dimensions: 1024,
     },
     {
         id: "granite-embedding",
@@ -98,6 +108,7 @@ const ollamaModels: OllamaModel[] = [
         size: "278M",
         pulls: "N/A",
         updated: "N/A",
+        dimensions: 768,
     },
 ]
 
@@ -149,6 +160,11 @@ export default function OllamaModelSelector({
                                 </div>
                                 <p className="text-xs text-muted-foreground">
                                     {model.description}
+                                    {model.dimensions && (
+                                        <span className="ml-1">
+                                            ({model.dimensions} dimensions)
+                                        </span>
+                                    )}
                                 </p>
                             </div>
                         </SelectItem>

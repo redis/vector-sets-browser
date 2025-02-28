@@ -1,5 +1,4 @@
-import { useState, useEffect } from "react"
-import { vdim, vcard, vsim, vemb, vrem, vadd } from "../services/redis"
+import { useState, useEffect, useRef } from "react"
 import { VectorSetMetadata } from "../types/embedding"
 import { validateAndNormalizeVector } from "../utils/vectorValidation"
 
@@ -19,6 +18,14 @@ interface UseVectorSetReturn {
     handleRowClick: (element: string) => Promise<string | undefined>
 }
 
+// Cache for vector set data to prevent unnecessary reloading
+interface VectorSetCache {
+    dim: number | null
+    recordCount: number | null
+    metadata: VectorSetMetadata | null
+    loaded: boolean
+}
+
 export function useVectorSet(): UseVectorSetReturn {
     const [vectorSetName, setVectorSetName] = useState<string | null>(null)
     const [dim, setDim] = useState<number | null>(null)
@@ -26,48 +33,116 @@ export function useVectorSet(): UseVectorSetReturn {
     const [metadata, setMetadata] = useState<VectorSetMetadata | null>(null)
     const [statusMessage, setStatusMessage] = useState("")
     const [results, setResults] = useState<[string, number, number[]][]>([])
+    
+    // Cache for vector set data
+    const vectorSetCacheRef = useRef<Record<string, VectorSetCache>>({})
 
     // Load metadata when vector set changes
     const loadMetadata = async () => {
-        console.log("[useVectorSet] Loading metadata for vector set:", vectorSetName);
-        if (!vectorSetName) return;
+        if (!vectorSetName) return null;
+        
+        // Check if metadata is already cached
+        const cache = vectorSetCacheRef.current[vectorSetName]
+        if (cache?.metadata) {
+            setMetadata(cache.metadata);
+            return cache.metadata;
+        }
+        
         try {
-            const response = await fetch("/api/redis", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    action: "getMetadata",
-                    params: { keyName: vectorSetName },
-                }),
+            const response = await fetch("/api/vectorset/" + vectorSetName + "/metadata", {
+                method: "GET",
             });
             if (!response.ok) throw new Error("Failed to load metadata");
             const data = await response.json();
-            console.log("[useVectorSet] Loaded metadata:", data.result);
             if (data.success) {
-                setMetadata(data.result);
+                const metadataResult = data.result;
+                setMetadata(metadataResult);
+                
+                // Cache the metadata
+                vectorSetCacheRef.current[vectorSetName] = {
+                    ...vectorSetCacheRef.current[vectorSetName],
+                    metadata: metadataResult,
+                };
+                
+                return metadataResult;
             } else {
                 console.error("[useVectorSet] No metadata found in response:", data);
                 setMetadata(null);
+                return null;
             }
         } catch (error) {
             console.error("[useVectorSet] Error loading metadata:", error);
             setMetadata(null);
+            return null;
         }
     };
 
     // Load vector set data when name changes
     const loadVectorSet = async () => {
-        console.log("[useVectorSet] Loading vector set:", vectorSetName);
         if (!vectorSetName) return;
+        
+        // Check if vector set data is already cached
+        const cache = vectorSetCacheRef.current[vectorSetName]
+        if (cache?.loaded) {
+            setDim(cache.dim);
+            setRecordCount(cache.recordCount);
+            setMetadata(cache.metadata);
+            setStatusMessage("");
+            return;
+        }
+        
         try {
             //setStatusMessage("Loading vector set...");
-            const [dimensions, count] = await Promise.all([
-                vdim(vectorSetName),
-                vcard(vectorSetName),
+            const [dimResponse, cardResponse] = await Promise.all([
+                fetch("/api/redis/command/vdim", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        keyName: vectorSetName,
+                    }),
+                }),
+                fetch("/api/redis/command/vcard", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        keyName: vectorSetName,
+                    }),
+                }),
             ]);
-            setDim(dimensions);
-            setRecordCount(count);
-            await loadMetadata();
+
+            if (!dimResponse.ok || !cardResponse.ok) {
+                throw new Error("Failed to load vector set data");
+            }
+
+            const [dimData, cardData] = await Promise.all([
+                dimResponse.json(),
+                cardResponse.json(),
+            ]);
+
+            if (!dimData.success || !cardData.success) {
+                throw new Error(dimData.error || cardData.error || "Failed to load vector set data");
+            }
+
+            const dimValue = dimData.result;
+            const recordCountValue = cardData.result;
+            
+            setDim(dimValue);
+            setRecordCount(recordCountValue);
+            
+            // Load metadata if not already cached and get the result
+            let metadataValue = cache?.metadata;
+            if (!metadataValue) {
+                metadataValue = await loadMetadata();
+            }
+            
+            // Cache the vector set data with the correct metadata
+            vectorSetCacheRef.current[vectorSetName] = {
+                dim: dimValue,
+                recordCount: recordCountValue,
+                metadata: metadataValue,
+                loaded: true,
+            };
+            
             setStatusMessage("");
         } catch (error) {
             console.error("[useVectorSet] Error loading vector set:", error);
@@ -113,8 +188,8 @@ export function useVectorSet(): UseVectorSetReturn {
                     const errorData = await response.json();
                     throw new Error(errorData.error || "Failed to get embedding");
                 }
-                
-                vector = await response.json();
+                const data = await response.json()
+                vector = data.embedding
             } else {
                 throw new Error("No embedding provider configured. Please provide vector data directly.")
             }
@@ -124,16 +199,54 @@ export function useVectorSet(): UseVectorSetReturn {
                 console.log('Vector validation result:', validationResult);
             }
 
-            const result = await vadd(vectorSetName, element, vector)
-            console.log("Created vector result:", result)
-            setStatusMessage(`Vector created successfully: ${JSON.stringify(result)}`)
+            const addResponse = await fetch("/api/redis/command/vadd", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    keyName: vectorSetName,
+                    element: element,
+                    vector: vector,
+                }),
+            });
+
+            if (!addResponse.ok) {
+                throw new Error(`HTTP error! status: ${addResponse.status}`);
+            }
+
+            const addData = await addResponse.json();
+            if (!addData.success) {
+                throw new Error(addData.error || "Failed to add vector");
+            }
+
+            console.log("Created vector result:", addData.result);
+            setStatusMessage(`Vector created successfully: ${JSON.stringify(addData.result)}`);
 
             // Add the new vector to the results list
-            setResults(prevResults => [...prevResults, [element, 1.0, vector]])
+            setResults(prevResults => [...prevResults, [element, 1.0, vector]]);
 
             // Update the record count
-            const count = await vcard(vectorSetName)
-            setRecordCount(count)
+            const cardResponse = await fetch("/api/redis/command/vcard", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    keyName: vectorSetName,
+                }),
+            });
+
+            if (!cardResponse.ok) {
+                throw new Error(`HTTP error! status: ${cardResponse.status}`);
+            }
+
+            const cardData = await cardResponse.json();
+            if (cardData.success) {
+                const newRecordCount = cardData.result;
+                setRecordCount(newRecordCount);
+                
+                // Update the cache
+                if (vectorSetCacheRef.current[vectorSetName]) {
+                    vectorSetCacheRef.current[vectorSetName].recordCount = newRecordCount;
+                }
+            }
         } catch (error) {
             console.error("Error creating vector:", error)
             setStatusMessage(error instanceof Error ? error.message : "Failed to create vector")
@@ -146,13 +259,52 @@ export function useVectorSet(): UseVectorSetReturn {
         if (!vectorSetName) return
 
         try {
-            await vrem(vectorSetName, element)
-            setStatusMessage(`Successfully deleted vector for element "${element}"`)
+            const remResponse = await fetch("/api/redis/command/vrem", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    keyName: vectorSetName,
+                    element: element,
+                }),
+            });
+
+            if (!remResponse.ok) {
+                throw new Error(`HTTP error! status: ${remResponse.status}`);
+            }
+
+            const remData = await remResponse.json();
+            if (!remData.success) {
+                throw new Error(remData.error || "Failed to delete vector");
+            }
+
+            setStatusMessage(`Successfully deleted vector for element "${element}"`);
+            
             // Remove the deleted item from results
-            setResults(results.filter((row) => row[0] !== element))
+            setResults(results.filter((row) => row[0] !== element));
+            
             // Update the record count
-            const count = await vcard(vectorSetName)
-            setRecordCount(count)
+            const cardResponse = await fetch("/api/redis/command/vcard", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    keyName: vectorSetName,
+                }),
+            });
+
+            if (!cardResponse.ok) {
+                throw new Error(`HTTP error! status: ${cardResponse.status}`);
+            }
+
+            const cardData = await cardResponse.json();
+            if (cardData.success) {
+                const newRecordCount = cardData.result;
+                setRecordCount(newRecordCount);
+                
+                // Update the cache
+                if (vectorSetCacheRef.current[vectorSetName]) {
+                    vectorSetCacheRef.current[vectorSetName].recordCount = newRecordCount;
+                }
+            }
         } catch (error) {
             console.error("Error deleting vector:", error)
             setStatusMessage(`Failed to delete vector for element "${element}"`)
@@ -163,10 +315,27 @@ export function useVectorSet(): UseVectorSetReturn {
     const handleShowVector = async (element: string) => {
         if (!vectorSetName) return
         try {
-            const vector = await vemb(vectorSetName, element)
-            console.log("Vector:", vector)
-            navigator.clipboard.writeText(vector.join(", "))
-            setStatusMessage(`Vector for element "${element}" copied to clipboard`)
+            const embResponse = await fetch("/api/redis/command/vemb", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    keyName: vectorSetName,
+                    element: element,
+                }),
+            });
+
+            if (!embResponse.ok) {
+                throw new Error(`HTTP error! status: ${embResponse.status}`);
+            }
+
+            const embData = await embResponse.json();
+            if (!embData.success) {
+                throw new Error(embData.error || "Failed to get vector");
+            }
+
+            const vector = embData.result;
+            navigator.clipboard.writeText(vector.join(", "));
+            setStatusMessage(`Vector for element "${element}" copied to clipboard`);
         } catch (error) {
             console.error("Error showing vector:", error)
             setStatusMessage(`Failed to load vector for element "${element}"`)
@@ -177,23 +346,61 @@ export function useVectorSet(): UseVectorSetReturn {
     const handleRowClick = async (element: string) => {
         if (!vectorSetName) return
         try {
-            const vector = await vemb(vectorSetName, element)
-            const startTime = performance.now()
-            const searchResult = await vsim(vectorSetName, vector, 10)
-            const endTime = performance.now()
-            const duration = (endTime - startTime).toFixed(2)
+            const embResponse = await fetch("/api/redis/command/vemb", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    keyName: vectorSetName,
+                    element: element,
+                }),
+            });
+
+            if (!embResponse.ok) {
+                throw new Error(`HTTP error! status: ${embResponse.status}`);
+            }
+
+            const embData = await embResponse.json();
+            if (!embData.success) {
+                throw new Error(embData.error || "Failed to get vector");
+            }
+
+            const vector = embData.result;
+            const startTime = performance.now();
+            
+            setStatusMessage(`Elements Similar to: ${element}`)
+
+            const simResponse = await fetch("/api/redis/command/vsim", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    keyName: vectorSetName,
+                    searchInput: vector,
+                    count: 10,
+                }),
+            });
+
+            if (!simResponse.ok) {
+                throw new Error(`HTTP error! status: ${simResponse.status}`);
+            }
+
+            const simData = await simResponse.json();
+            if (!simData.success) {
+                throw new Error(simData.error || "Failed to perform similarity search");
+            }
+
+            const searchResult = simData.result;
+            const endTime = performance.now();
+            const duration = (endTime - startTime).toFixed(2);
             
             // Just use the IDs and scores without fetching vectors
-            const resultsWithoutVectors = searchResult.map(([id, score]) => 
+            const resultsWithoutVectors = searchResult.map(([id, score]: [string, number]) => 
                 [id, score, []] as [string, number, number[]]
             );
             
-            setResults(resultsWithoutVectors)
-            // Don't show search time in status message anymore
-            setStatusMessage("")
+            setResults(resultsWithoutVectors);
             
             // Return the duration so it can be stored in the state
-            return duration
+            return duration;
         } catch (error) {
             console.error("Error processing row click:", error)
             setStatusMessage("Failed to load vector and perform search for the selected row.")
@@ -201,13 +408,29 @@ export function useVectorSet(): UseVectorSetReturn {
         }
     }
 
-    // Load metadata when vector set changes
+    // Clear state when changing vector sets
+    const handleSetVectorSetName = (name: string | null) => {
+        // If switching to a different vector set, clear the current results
+        if (name !== vectorSetName) {
+            setResults([]);
+        }
+        setVectorSetName(name);
+    }
+
+    // Load metadata and vector set data when vector set changes
     useEffect(() => {
-        console.log("USE EFFECT for vector set:", vectorSetName)
         
         if (vectorSetName) {
-            loadMetadata()
-            loadVectorSet()
+            // Check if we already have cached data
+            const cache = vectorSetCacheRef.current[vectorSetName]
+            if (cache?.loaded) {
+                setDim(cache.dim);
+                setRecordCount(cache.recordCount);
+                setMetadata(cache.metadata);
+            } else {
+                // Load data if not cached
+                loadVectorSet()
+            }
         } else {
             setDim(null)
             setRecordCount(null)
@@ -217,7 +440,7 @@ export function useVectorSet(): UseVectorSetReturn {
 
     return {
         vectorSetName,
-        setVectorSetName,
+        setVectorSetName: handleSetVectorSetName,
         dim,
         recordCount,
         metadata,

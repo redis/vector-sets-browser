@@ -1,11 +1,16 @@
 import { useState, useRef, ChangeEvent } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import Image from 'next/image';
-import * as tf from '@tensorflow/tfjs';
-import * as mobilenetModule from '@tensorflow-models/mobilenet';
+// Remove static imports
+// import * as tf from '@tensorflow/tfjs';
+// import * as mobilenetModule from '@tensorflow-models/mobilenet';
 import { ImageConfig } from '@/app/types/embedding';
+
+// Module references for lazy loading
+let tf: any = null;
+let mobilenetModule: any = null;
+let tfInitialized = false;
 
 // Cache for models to avoid reloading
 const modelCache: Record<string, any> = {};
@@ -126,10 +131,7 @@ export default function ImageUploader({
       
       // Convert to array and check values
       const embedding = Array.from(await activationLayer.data());
-      console.log('Embedding sample (first 10 values):', embedding.slice(0, 10));
-      console.log('Embedding length:', embedding.length);
-      console.log('Embedding has zeros:', embedding.filter(v => v === 0).length);
-      
+
       // Clean up the tensors
       tensor.dispose();
       activationLayer.dispose();
@@ -169,8 +171,23 @@ export default function ImageUploader({
       isModelLoading = true;
       console.log(`Loading image model: ${modelName}`);
       
+      // Lazy load TensorFlow.js and MobileNet
+      if (!tf) {
+        console.log('Dynamically importing TensorFlow.js');
+        tf = await import('@tensorflow/tfjs');
+      }
+      
+      if (!mobilenetModule) {
+        console.log('Dynamically importing MobileNet');
+        mobilenetModule = await import('@tensorflow-models/mobilenet');
+      }
+      
       // Initialize TensorFlow.js
-      await tf.ready();
+      if (!tfInitialized) {
+        console.log('Initializing TensorFlow.js');
+        await tf.ready();
+        tfInitialized = true;
+      }
       
       // Prefer WebGL if available
       if (tf.getBackend() !== 'webgl' && tf.ENV.getBool('HAS_WEBGL')) {
@@ -203,8 +220,20 @@ export default function ImageUploader({
   /**
    * Preprocess an image for the model
    */
-  async function preprocessImage(imageData: string): Promise<tf.Tensor3D> {
+  async function preprocessImage(imageData: string): Promise<any> {
     try {
+      // Ensure TensorFlow.js is loaded
+      if (!tf) {
+        console.log('Dynamically importing TensorFlow.js for preprocessing');
+        tf = await import('@tensorflow/tfjs');
+        
+        if (!tfInitialized) {
+          console.log('Initializing TensorFlow.js');
+          await tf.ready();
+          tfInitialized = true;
+        }
+      }
+      
       // MobileNet expects 224x224 images
       const inputSize = 224;
       

@@ -25,7 +25,7 @@ export async function GET(req: NextRequest) {
     try {
         const redisUrl = getRedisUrl();
         if (!redisUrl) {
-            console.log('No Redis URL available');
+            console.error('No Redis URL available');
             return NextResponse.json([]);
         }
 
@@ -37,18 +37,16 @@ export async function GET(req: NextRequest) {
             ]);
 
             if (!status) {
-                console.log(`Job ${jobId} not found`);
+                console.error(`Job ${jobId} not found`);
                 return NextResponse.json({ error: 'Job not found' }, { status: 404 });
             }
 
-            console.log(`Returning job ${jobId}:`, { status, metadata });
             return NextResponse.json({ jobId, status, metadata });
         }
 
         // Otherwise, list all jobs
         const result = await RedisClient.withConnection(redisUrl, async (client) => {
             const keys = await client.keys('job:*:status');
-            console.log('Found job status keys:', keys);
             const jobs = [];
 
             for (const key of keys) {
@@ -58,13 +56,9 @@ export async function GET(req: NextRequest) {
                     JobQueueService.getJobMetadata(redisUrl, jobId)
                 ]);
 
-                console.log(`Job ${jobId} status:`, status);
-                console.log(`Job ${jobId} metadata:`, metadata);
-
                 if (status && metadata) {
                     // If vectorSetName is provided, only include jobs for that vector set
                     if (vectorSetName && metadata.vectorSetName !== vectorSetName) {
-                        console.log(`Skipping job ${jobId} - wrong vector set`);
                         continue;
                     }
                     jobs.push({
@@ -75,7 +69,6 @@ export async function GET(req: NextRequest) {
                 }
             }
 
-            console.log('Returning jobs:', jobs);
             return jobs;
         });
 

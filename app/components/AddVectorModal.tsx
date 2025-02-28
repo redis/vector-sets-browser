@@ -1,10 +1,10 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import { VectorSetMetadata } from "../types/embedding"
+import { VectorSetMetadata, isImageEmbedding, isTextEmbedding } from "../types/embedding"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import ImageUploader from "./ImageUploader"
 
@@ -22,7 +22,6 @@ export default function AddVectorModal({
     onClose,
     onAdd,
     metadata,
-    dim,
     vectorSetName = null,
 }: AddVectorModalProps) {
     const [element, setElement] = useState("")
@@ -34,15 +33,18 @@ export default function AddVectorModal({
     const [isAdding, setIsAdding] = useState(false)
     const [status, setStatus] = useState("")
 
-    // Determine if we're using an image embedding model
-    const isImageEmbedding = metadata?.embedding?.provider === 'image';
+    // Determine if we're using an image embedding model using the helper function
+    const useImageEmbedding = metadata?.embedding ? isImageEmbedding(metadata.embedding) : false;
+    const useTextEmbedding = metadata?.embedding ? isTextEmbedding(metadata.embedding) : true;
 
-    // Set the default active tab based on the embedding provider
-    useState(() => {
-        if (isImageEmbedding) {
+    // Set the default active tab based on the embedding data format
+    useEffect(() => {
+        if (useImageEmbedding) {
             setActiveTab("image");
+        } else if (useTextEmbedding) {
+            setActiveTab("text");
         }
-    });
+    }, [useImageEmbedding, useTextEmbedding]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -103,8 +105,6 @@ export default function AddVectorModal({
     }
     
     const handleEmbeddingGenerated = (embedding: number[]) => {
-        console.log("Embedding generated:", embedding.length, "dimensions")
-        console.log("Sample values:", embedding.slice(0, 5))
         setImageEmbedding(embedding)
         setStatus(`Embedding generated: ${embedding.length} dimensions`)
     }
@@ -134,8 +134,8 @@ export default function AddVectorModal({
 
                         <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-4">
                             <TabsList className="mb-2">
-                                <TabsTrigger value="text" disabled={isImageEmbedding}>Text</TabsTrigger>
-                                <TabsTrigger value="image">Image</TabsTrigger>
+                                <TabsTrigger value="text" disabled={!useTextEmbedding}>Text</TabsTrigger>
+                                <TabsTrigger value="image" disabled={!useImageEmbedding && useTextEmbedding}>Image</TabsTrigger>
                             </TabsList>
                             
                             <TabsContent value="text">
