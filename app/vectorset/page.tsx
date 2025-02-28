@@ -21,7 +21,7 @@ import { getConnection, removeConnection } from "../lib/connectionManager"
 import { EmbeddingConfig, VectorSetMetadata } from "../types/embedding"
 import { Input } from "@/components/ui/input"
 import SearchTimeIndicator from "../components/SearchTimeIndicator"
-import HNSWVisualizer from "../components/HNSWVisualizer"
+import HNSWViz from "../components/HNSWViz"
 
 /**
  * VectorSetPage handles the display and management of vector sets.
@@ -574,11 +574,12 @@ export default function VectorSetPage() {
                                         </div>
                                     )}
                                     <div style={{ height: "600px" }}>
-                                        <HNSWVisualizer
+                                        <HNSWViz
+                                            key={`${results[0]}`}
                                             keyName={vectorSetName || ""}
                                             initialElement={results.length > 0 ? results[0][0] : vectorSetName}
-                                            maxNodes={200}
-                                            initialNodes={50}
+                                            maxNodes={500}
+                                            initialNodes={25}
                                         />
                                     </div>
                                 </div>
