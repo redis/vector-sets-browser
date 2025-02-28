@@ -153,14 +153,6 @@ export default function VectorSetPage() {
         },
     })
 
-    const handleVectorSelect = (element: string) => {
-        console.log("[VectorSetPage] handleVectorSelect:", element)
-
-        setSearchType("Element")        
-        setSearchQuery(element)
-
-    }
-
     // Initialize or restore vector set state when switching sets
     useEffect(() => {
         if (!vectorSetName) return
@@ -440,7 +432,7 @@ export default function VectorSetPage() {
                                         <div className="flex items-center gap-2 justify-between w-full">
                                             <div className="flex items-center gap-2">
                                                 <span className="whitespace-nowrap">
-                                                    Top
+                                                    Show top
                                                 </span>
                                                 <Input
                                                     type="number"
@@ -453,6 +445,7 @@ export default function VectorSetPage() {
                                                     className="border rounded p-1 w-16 h-8 text-center"
                                                     min="1"
                                                 />
+                                                results
                                             </div>
                                             <StatusMessage
                                                 message={
@@ -467,11 +460,16 @@ export default function VectorSetPage() {
                                                     searchTime={
                                                         vectorSetStates[
                                                             vectorSetName || ""
-                                                        ]?.searchState?.searchTime
-                                                        ? Number(vectorSetStates[
-                                                            vectorSetName || ""
-                                                        ]?.searchState?.searchTime)
-                                                        : undefined
+                                                        ]?.searchState
+                                                            ?.searchTime
+                                                            ? Number(
+                                                                  vectorSetStates[
+                                                                      vectorSetName ||
+                                                                          ""
+                                                                  ]?.searchState
+                                                                      ?.searchTime
+                                                              )
+                                                            : undefined
                                                     }
                                                 />
                                             )}
@@ -546,14 +544,36 @@ export default function VectorSetPage() {
                                 <div className="bg-white p-4 rounded shadow-md">
                                     <div className="flex mb-4 items-center">
                                         <div className="flex items-center gap-4 w-full">
-                                            <div>Visualization</div>
+                                            <div className="flex items-center gap-2">
+                                                <span className="whitespace-nowrap">
+                                                    Show top
+                                                </span>
+                                                <Input
+                                                    type="number"
+                                                    value={searchCount}
+                                                    onChange={(e) =>
+                                                        setSearchCount(
+                                                            e.target.value
+                                                        )
+                                                    }
+                                                    className="border rounded p-1 w-16 h-8 text-center"
+                                                    min="1"
+                                                />
+                                                results
+                                            </div>
+                                            {searchQuery && (
+                                                <span>
+                                                    Root node starting with &ldquo;
+                                                    {searchQuery}&rdquo;
+                                                </span>
+                                            )}
                                             <div className="grow"></div>
-                                            <StatusMessage
+                                            {/* <StatusMessage
                                                 message={
                                                     fileOperationStatus ||
                                                     vectorSetStatus
                                                 }
-                                            />
+                                            /> */}
                                         </div>
                                     </div>
                                     {vectorSetStates[vectorSetName || ""]
@@ -565,21 +585,29 @@ export default function VectorSetPage() {
                                                     vectorSetStates[
                                                         vectorSetName || ""
                                                     ]?.searchState?.searchTime
-                                                    ? Number(vectorSetStates[
-                                                        vectorSetName || ""
-                                                    ]?.searchState?.searchTime)
-                                                    : undefined
+                                                        ? Number(
+                                                              vectorSetStates[
+                                                                  vectorSetName ||
+                                                                      ""
+                                                              ]?.searchState
+                                                                  ?.searchTime
+                                                          )
+                                                        : undefined
                                                 }
                                             />
                                         </div>
                                     )}
                                     <div style={{ height: "600px" }}>
                                         <HNSWViz
-                                            key={`${results[0]}`}
+                                            key={`${vectorSetName}-${searchCount}-${results[0]?.[0] || ""}`}
                                             keyName={vectorSetName || ""}
-                                            initialElement={results.length > 0 ? results[0][0] : vectorSetName}
+                                            initialElement={
+                                                results.length > 0
+                                                    ? results[0][0]
+                                                    : vectorSetName
+                                            }
                                             maxNodes={500}
-                                            initialNodes={25}
+                                            initialNodes={Number(searchCount)}
                                         />
                                     </div>
                                 </div>

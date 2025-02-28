@@ -140,7 +140,7 @@ export default function RedisConnectionList({
             )
             saveConnections(updatedConnections)
             
-            toast.success("Connected successfully")
+            // Removed success toast as it's handled by the parent component
         } catch (error) {
             toast.error("Failed to connect")
             console.error("Failed to connect:", error)

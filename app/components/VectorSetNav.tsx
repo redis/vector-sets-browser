@@ -439,17 +439,16 @@ export default function VectorSetNav({
                                             </span>
                                         )}
                                     </div>
-                                    {info && (
+                                    
                                         <div className="flex w-full justify-between text-xs">
                                             <span>
-                                                {info.vectorCount.toLocaleString()}{" "}
-                                                vectors ({info.dimensions} Dim)
+                                                {info && info.vectorCount.toLocaleString()}{" "}
+                                                vectors ({info && (info.dimensions)} Dim)
                                             </span>
                                             <span>
-                                                {formatBytes(info.memoryBytes)}
+                                            {formatBytes(info ? info.memoryBytes : 0)}
                                             </span>
                                         </div>
-                                    )}
                                 </div>
                                 <div className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100">
                                     <Button

@@ -15,18 +15,24 @@ export default function HomePage() {
     const handleConnectionSuccess = async (url: string) => {
         setIsConnecting(true)
         try {
+            console.log("Starting connection process for:", url)
             // Clean up old connections first
             cleanupOldConnections()
             
             // Try to connect to Redis
+            console.log("Attempting to connect to Redis...")
             const success = await handleConnect(url)
+            console.log("Connection result:", success, "Status:", statusMessage)
             
             if (success) {
                 // Store connection details and get connection ID
                 const connectionId = storeConnection(url)
+                console.log("Connection stored with ID:", connectionId)
                 
                 // Redirect to vectorset page with the connection ID
-                router.push(`/vectorset?cid=${connectionId}`)
+                console.log("Redirecting to:", `/vectorset?cid=${connectionId}`)
+                // Use window.location for a more forceful redirect
+                window.location.href = `/vectorset?cid=${connectionId}`
             } else {
                 toast.error(statusMessage || "Failed to connect to Redis")
             }

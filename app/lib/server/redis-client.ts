@@ -1,4 +1,4 @@
-import { VectorSetMetadata } from "@/app/types/embedding"
+import { VectorSetMetadata, validateAndCorrectMetadata } from "@/app/types/embedding"
 import { createClient, RedisClientType } from "redis"
 
 // Types for Redis operations
@@ -303,19 +303,42 @@ export async function getMetadata(
     return RedisClient.withConnection(url, async (client) => {
         const metadataKey = `${keyName}_metadata`
         const storedData = await client.hGetAll(metadataKey)
-        const metadata = storedData.data ? JSON.parse(storedData.data) : null
-        return metadata // Return metadata directly without wrapping
+        
+        try {
+            // Parse the stored data
+            const parsedData = storedData.data ? JSON.parse(storedData.data) : null
+            
+            // Validate and correct the metadata
+            const validatedMetadata = validateAndCorrectMetadata(parsedData)
+            
+            // If the metadata needed correction, write it back to Redis
+            if (parsedData && JSON.stringify(validatedMetadata) !== JSON.stringify(parsedData)) {
+                console.log(`Correcting metadata for ${keyName}`)
+                await client.hSet(metadataKey, { data: JSON.stringify(validatedMetadata) })
+            }
+            
+            return validatedMetadata
+        } catch (error) {
+            console.error(`Error processing metadata for ${keyName}:`, error)
+            // Return a default metadata object in case of error
+            const defaultMetadata = validateAndCorrectMetadata(null)
+            await client.hSet(metadataKey, { data: JSON.stringify(defaultMetadata) })
+            return defaultMetadata
+        }
     })
 }
 
 export async function setMetadata(
     url: string,
     keyName: string,
-    metadata: any
+    metadata: unknown
 ): Promise<VectorOperationResult> {
     return RedisClient.withConnection(url, async (client) => {
+        // Validate and correct the metadata before storing
+        const validatedMetadata = validateAndCorrectMetadata(metadata)
+        
         const metadataKey = `${keyName}_metadata`
-        await client.hSet(metadataKey, { data: JSON.stringify(metadata) })
+        await client.hSet(metadataKey, { data: JSON.stringify(validatedMetadata) })
         return true
     })
 }

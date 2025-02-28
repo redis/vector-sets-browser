@@ -13,6 +13,7 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import { toast } from "sonner"
 // import { Button } from "@/components/ui/button"; // (Unused in this example)
 
 //
@@ -28,6 +29,11 @@ interface HNSWVizProps {
 interface VLinkResponse {
     success: boolean
     result: Array<[string, number][]>
+}
+
+interface VembResponse {
+    success: boolean
+    result: number[]
 }
 
 interface ForceNode {
@@ -467,7 +473,34 @@ function useNodeManager(keyName: string, maxNodes: number) {
         [keyName, maxNodes]
     )
 
-    return { errorMessage, getNeighbors }
+    const getVector = useCallback(
+        async (element: string): Promise<VembResponse> => {
+            try {
+                if (!element) {
+                    setErrorMessage("Element is undefined")
+                    return { success: false, result: [] }
+                }
+                const params = {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ keyName, element }),
+                }
+                const response = await fetch(`/api/redis/command/vemb`, params)
+                const data = await response.json()
+                if (!data.success) {
+                    setErrorMessage("VEMB request failed")
+                    return { success: false, result: [] }
+                }
+                return data
+            } catch (error) {
+                setErrorMessage("Error fetching vector")
+                return { success: false, result: [] }
+            }
+        },
+        [keyName]
+    )
+
+    return { errorMessage, getNeighbors, getVector }
 }
 
 //
@@ -479,7 +512,7 @@ function useCanvasEvents(
     scene: THREE.Scene | null,
     onNodeClick: (mesh: THREE.Mesh) => void,
     onNodeHover: (mesh: THREE.Mesh | null) => void,
-    updateHoverLabel: (mesh: THREE.Mesh | null) => void
+    updateHoverLabel: (mesh: THREE.Mesh | null, x: number, y: number) => void
 ) {
     const raycaster = new THREE.Raycaster()
     const mouse = new THREE.Vector2()
@@ -504,14 +537,17 @@ function useCanvasEvents(
                     // New node hovered
                     hoveredNodeRef.current = hovered.object as THREE.Mesh
                     onNodeHover(hoveredNodeRef.current)
-                    // Update hover label
-                    updateHoverLabel(hoveredNodeRef.current)
+                    // Update hover label with mouse position
+                    updateHoverLabel(hoveredNodeRef.current, event.clientX, event.clientY)
+                } else {
+                    // Same node, but update position
+                    updateHoverLabel(hoveredNodeRef.current, event.clientX, event.clientY)
                 }
             } else if (hoveredNodeRef.current) {
                 // No longer hovering over any node
                 hoveredNodeRef.current = null
                 onNodeHover(null)
-                updateHoverLabel(null)
+                updateHoverLabel(null, event.clientX, event.clientY)
             }
         }
 
@@ -557,7 +593,7 @@ const HNSWViz: React.FC<HNSWVizProps> = ({
         toggleAutoZoom,
         resetView,
     } = useThreeScene()
-    const { errorMessage, getNeighbors } = useNodeManager(keyName, maxNodes)
+    const { errorMessage, getNeighbors, getVector } = useNodeManager(keyName, maxNodes)
     const { nodesRef, edgesRef, addNode, addEdge, startSimulation } =
         useForceSimulator(scene, fitCameraToNodes)
     const [selectedNode, setSelectedNode] = useState<THREE.Mesh | null>(null)
@@ -580,9 +616,13 @@ const HNSWViz: React.FC<HNSWVizProps> = ({
     const [hoverLabel, setHoverLabel] = useState<{
         visible: boolean
         text: string
+        x: number
+        y: number
     }>({
         visible: false,
         text: "",
+        x: 0,
+        y: 0
     })
 
     // Create and add a node to the scene
@@ -969,7 +1009,7 @@ const HNSWViz: React.FC<HNSWVizProps> = ({
         handleNodeClick,
         handleNodeHover,
         // Update hover label
-        (mesh) => {
+        (mesh, x, y) => {
             if (mesh) {
                 // Truncate very long element names
                 const elementName = mesh.userData.element
@@ -981,9 +1021,11 @@ const HNSWViz: React.FC<HNSWVizProps> = ({
                 setHoverLabel({
                     visible: true,
                     text: truncatedText,
+                    x,
+                    y
                 })
             } else {
-                setHoverLabel({ visible: false, text: "" })
+                setHoverLabel({ visible: false, text: "", x, y })
             }
         }
     )
@@ -1016,7 +1058,7 @@ const HNSWViz: React.FC<HNSWVizProps> = ({
         // Clear selection and hover states
         setSelectedNode(null)
         setHoveredNode(null)
-        setHoverLabel({ visible: false, text: "" })
+        setHoverLabel({ visible: false, text: "", x: 0, y: 0 })
 
         // Remove hover highlight if it exists
         if (hoverHighlightRef.current) {
@@ -1079,6 +1121,25 @@ const HNSWViz: React.FC<HNSWVizProps> = ({
         resetView,
     ])
 
+    // Copy vector to clipboard
+    const copyVectorToClipboard = useCallback(async () => {
+        if (!selectedNode) return
+        
+        try {
+            const response = await getVector(selectedNode.userData.element)
+            
+            if (response.success) {
+                const vectorString = JSON.stringify(response.result)
+                await navigator.clipboard.writeText(vectorString)
+                toast.success("Vector copied to clipboard")
+            } else {
+                toast.error("Failed to get vector")
+            }
+        } catch (error) {
+            toast.error("Error copying vector to clipboard")
+        }
+    }, [selectedNode, getVector])
+
     return (
         <div style={{ position: "relative", width: "100%", height: "100%" }}>
             {errorMessage && (
@@ -1089,7 +1150,29 @@ const HNSWViz: React.FC<HNSWVizProps> = ({
                 style={{ display: "block", width: "100%", height: "100%" }}
             />
             {hoverLabel.visible && (
-                <div className="hover-label">{hoverLabel.text}</div>
+                <div 
+                    className="hover-label" 
+                    style={{ 
+                        position: 'fixed', // Fixed positioning relative to viewport
+                        left: `${hoverLabel.x}px`, 
+                        top: `${hoverLabel.y}px`,
+                        maxWidth: '400px',
+                        // Smart positioning logic:
+                        // - By default, position to the right of the cursor
+                        // - If near right edge of screen, position to the left of cursor
+                        // - Vertically center the label with the cursor
+                        // - If near bottom edge, position above the cursor
+                        transform: `translate(${
+                            hoverLabel.x + 250 > window.innerWidth ? '-110%' : '20px'
+                        }, ${
+                            hoverLabel.y + 50 > window.innerHeight ? '-100%' : '-50%'
+                        })`,
+                        // Add a subtle pointer to indicate which node the label belongs to
+                        boxShadow: '0 4px 16px rgba(0, 0, 0, 0.3)'
+                    }}
+                >
+                    {hoverLabel.text}
+                </div>
             )}
             {selectedNode && (
                 <div className="node-info-card">
@@ -1149,16 +1232,6 @@ const HNSWViz: React.FC<HNSWVizProps> = ({
                                     </span>
                                 </div>
 
-                                <div className="flex flex-col">
-                                    <span className="font-medium text-sm text-muted-foreground">
-                                        Position
-                                    </span>
-                                    <span className="font-mono">
-                                        x: {selectedNode.position.x.toFixed(2)},
-                                        y: {selectedNode.position.y.toFixed(2)}
-                                    </span>
-                                </div>
-
                                 <div className="flex gap-2 mt-2">
                                     {!selectedNode.userData.expanded && (
                                         <Button
@@ -1197,6 +1270,14 @@ const HNSWViz: React.FC<HNSWVizProps> = ({
                                                 Show Neighbors
                                             </Button>
                                         )}
+                                        
+                                    <Button
+                                        onClick={copyVectorToClipboard}
+                                        size="sm"
+                                        variant="secondary"
+                                    >
+                                        Copy Vector
+                                    </Button>
                                 </div>
                             </div>
                         </CardContent>
@@ -1280,9 +1361,6 @@ const HNSWViz: React.FC<HNSWVizProps> = ({
                     width: 250px;
                 }
                 .hover-label {
-                    position: absolute;
-                    top: 20px;
-                    left: 20px;
                     background-color: rgba(0, 0, 0, 0.95);
                     color: white;
                     padding: 10px 14px;
@@ -1290,11 +1368,9 @@ const HNSWViz: React.FC<HNSWVizProps> = ({
                     z-index: 20;
                     font-family: monospace;
                     font-size: 15px;
-                    max-width: 400px;
                     word-break: break-all;
-                    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
                     pointer-events: none;
-                    transition: opacity 0.2s ease;
+                    transition: opacity 0.2s ease, transform 0.1s ease;
                     white-space: nowrap;
                     border: 1px solid rgba(255, 255, 255, 0.3);
                 }
