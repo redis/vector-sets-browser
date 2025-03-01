@@ -342,72 +342,6 @@ export function useVectorSet(): UseVectorSetReturn {
         }
     }
 
-    // Handle row click for similarity search
-    const handleRowClick = async (element: string) => {
-        if (!vectorSetName) return
-        try {
-            const embResponse = await fetch("/api/redis/command/vemb", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    keyName: vectorSetName,
-                    element: element,
-                }),
-            });
-
-            if (!embResponse.ok) {
-                throw new Error(`HTTP error! status: ${embResponse.status}`);
-            }
-
-            const embData = await embResponse.json();
-            if (!embData.success) {
-                throw new Error(embData.error || "Failed to get vector");
-            }
-
-            const vector = embData.result;
-            const startTime = performance.now();
-            
-            setStatusMessage(`Elements Similar to: ${element}`)
-
-            const simResponse = await fetch("/api/redis/command/vsim", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    keyName: vectorSetName,
-                    searchInput: vector,
-                    count: 10,
-                }),
-            });
-
-            if (!simResponse.ok) {
-                throw new Error(`HTTP error! status: ${simResponse.status}`);
-            }
-
-            const simData = await simResponse.json();
-            if (!simData.success) {
-                throw new Error(simData.error || "Failed to perform similarity search");
-            }
-
-            const searchResult = simData.result;
-            const endTime = performance.now();
-            const duration = (endTime - startTime).toFixed(2);
-            
-            // Just use the IDs and scores without fetching vectors
-            const resultsWithoutVectors = searchResult.map(([id, score]: [string, number]) => 
-                [id, score, []] as [string, number, number[]]
-            );
-            
-            setResults(resultsWithoutVectors);
-            
-            // Return the duration so it can be stored in the state
-            return duration;
-        } catch (error) {
-            console.error("Error processing row click:", error)
-            setStatusMessage("Failed to load vector and perform search for the selected row.")
-            return "Error"
-        }
-    }
-
     // Clear state when changing vector sets
     const handleSetVectorSetName = (name: string | null) => {
         // If switching to a different vector set, clear the current results
@@ -451,6 +385,5 @@ export function useVectorSet(): UseVectorSetReturn {
         handleAddVector,
         handleDeleteVector,
         handleShowVector,
-        handleRowClick
     }
 } 

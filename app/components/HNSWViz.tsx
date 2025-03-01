@@ -23,6 +23,7 @@ import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { toast } from "sonner"
 import { div } from "@tensorflow/tfjs"
+import { ChevronDown, ChevronUp, X } from "lucide-react"
 // import { Button } from "@/components/ui/button"; // (Unused in this example)
 
 //
@@ -915,6 +916,9 @@ const HNSWViz: React.FC<HNSWVizProps> = ({
         y: 0,
     })
 
+    // State for card collapse
+    const [isCardCollapsed, setIsCardCollapsed] = useState<boolean>(false)
+
     // Create and add a node to the scene
     const createNode = useCallback(
         (
@@ -1622,188 +1626,202 @@ const HNSWViz: React.FC<HNSWVizProps> = ({
                     {selectedNode && (
                         <div>
                             <CardHeader className="pb-2">
-                                <div className="flex space-x-2 items-center">
-                                    <div className="rounded-full bg-red-500 w-4 h-4"></div>
-                                    <h3 className="text-lg font-semibold">
-                                        Element Details
-                                    </h3>
+                                <div className="flex justify-between items-center">
+                                    <div className="flex space-x-2 items-center">
+                                        <div className="rounded-full bg-red-500 w-4 h-4"></div>
+                                        <h3 className="text-lg font-semibold">
+                                            Element Details
+                                        </h3>
+                                    </div>
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={() => setIsCardCollapsed(!isCardCollapsed)}
+                                        className="h-8 w-8"
+                                    >
+                                        {isCardCollapsed ? <ChevronDown /> : <ChevronUp />}
+                                    </Button>
                                 </div>
                             </CardHeader>
-                            <CardContent>
-                                <div className="grid gap-2">
-                                    <div className="flex flex-col">
-                                        <span className="font-medium text-sm text-muted-foreground">
-                                            Element
-                                        </span>
-                                        <span className="font-mono">
-                                            {selectedNode.userData.element}
-                                        </span>
-                                    </div>
-
-                                    {selectedNode.userData.similarity !==
-                                        null && (
+                            {!isCardCollapsed && (
+                                <CardContent>
+                                    <div className="grid gap-2">
                                         <div className="flex flex-col">
                                             <span className="font-medium text-sm text-muted-foreground">
-                                                Similarity
+                                                Element
                                             </span>
-                                            <span>
-                                                {selectedNode.userData.similarity.toFixed(
-                                                    4
-                                                )}
+                                            <span className="font-mono">
+                                                {selectedNode.userData.element}
                                             </span>
                                         </div>
-                                    )}
 
-                                    <div className="flex flex-col">
-                                        <span className="font-medium text-sm text-muted-foreground">
-                                            Neighbors
-                                        </span>
-                                        <span>
-                                            {
-                                                selectedNode.userData
-                                                    .neighborCount
-                                            }
-                                        </span>
-                                    </div>
-
-                                    <div className="flex flex-col">
-                                        <span className="font-medium text-sm text-muted-foreground">
-                                            Status
-                                        </span>
-                                        <span>
-                                            {selectedNode.userData.expanded
-                                                ? selectedNode.userData
-                                                      .displayState ===
-                                                  "expanded"
-                                                    ? "Expanded"
-                                                    : "Collapsed"
-                                                : "Not Expanded"}
-                                        </span>
-                                    </div>
-
-                                    <div className="flex gap-2 mt-2">
-                                        {!selectedNode.userData.expanded && (
-                                            <Button
-                                                onClick={() =>
-                                                    expandNode(selectedNode)
-                                                }
-                                                size="sm"
-                                            >
-                                                Expand Node
-                                            </Button>
+                                        {selectedNode.userData.similarity !==
+                                            null && (
+                                            <div className="flex flex-col">
+                                                <span className="font-medium text-sm text-muted-foreground">
+                                                    Similarity
+                                                </span>
+                                                <span>
+                                                    {selectedNode.userData.similarity.toFixed(
+                                                        4
+                                                    )}
+                                                </span>
+                                            </div>
                                         )}
 
-                                        {selectedNode.userData.expanded &&
-                                            selectedNode.userData
-                                                .displayState ===
-                                                "expanded" && (
-                                                <Button
-                                                    onClick={() =>
-                                                        collapseNode(
-                                                            selectedNode
-                                                        )
-                                                    }
-                                                    size="sm"
-                                                    variant="outline"
-                                                >
-                                                    Collapse Node
-                                                </Button>
-                                            )}
+                                        <div className="flex flex-col">
+                                            <span className="font-medium text-sm text-muted-foreground">
+                                                Neighbors
+                                            </span>
+                                            <span>
+                                                {
+                                                    selectedNode.userData
+                                                        .neighborCount
+                                                }
+                                            </span>
+                                        </div>
 
-                                        {selectedNode.userData.expanded &&
-                                            selectedNode.userData
-                                                .displayState ===
-                                                "collapsed" && (
+                                        <div className="flex flex-col">
+                                            <span className="font-medium text-sm text-muted-foreground">
+                                                Status
+                                            </span>
+                                            <span>
+                                                {selectedNode.userData.expanded
+                                                    ? selectedNode.userData
+                                                          .displayState ===
+                                                      "expanded"
+                                                        ? "Expanded"
+                                                        : "Collapsed"
+                                                    : "Not Expanded"}
+                                            </span>
+                                        </div>
+
+                                        <div className="flex gap-2 mt-2">
+                                            {!selectedNode.userData.expanded && (
                                                 <Button
                                                     onClick={() =>
                                                         expandNode(selectedNode)
                                                     }
                                                     size="sm"
                                                 >
-                                                    Show Neighbors
+                                                    Expand Node
                                                 </Button>
                                             )}
 
-                                        <Button
-                                            onClick={copyVectorToClipboard}
-                                            size="sm"
-                                            variant="secondary"
-                                        >
-                                            Copy Vector
-                                        </Button>
+                                            {selectedNode.userData.expanded &&
+                                                selectedNode.userData
+                                                    .displayState ===
+                                                    "expanded" && (
+                                                    <Button
+                                                        onClick={() =>
+                                                            collapseNode(
+                                                                selectedNode
+                                                            )
+                                                        }
+                                                        size="sm"
+                                                        variant="outline"
+                                                    >
+                                                        Collapse Node
+                                                    </Button>
+                                                )}
+
+                                            {selectedNode.userData.expanded &&
+                                                selectedNode.userData
+                                                    .displayState ===
+                                                    "collapsed" && (
+                                                    <Button
+                                                        onClick={() =>
+                                                            expandNode(selectedNode)
+                                                        }
+                                                        size="sm"
+                                                    >
+                                                        Show Neighbors
+                                                    </Button>
+                                                )}
+
+                                            <Button
+                                                onClick={copyVectorToClipboard}
+                                                size="sm"
+                                                variant="secondary"
+                                            >
+                                                Copy Vector
+                                            </Button>
+                                        </div>
                                     </div>
-                                </div>
-                            </CardContent>
+                                </CardContent>
+                            )}
                         </div>
                     )}
-                    <div className="space-y-4 px-4 pb-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="layout-select">
-                                Layout Algorithm
-                            </Label>
-                            <Select
-                                value={currentLayout}
-                                onValueChange={(value: LayoutAlgorithmType) => {
-                                    applyLayout(
-                                        value,
-                                        selectedNode
-                                            ? nodesRef.current.find(
-                                                  (n) => n.mesh === selectedNode
-                                              ) || undefined
-                                            : undefined
-                                    )
-                                }}
-                            >
-                                <SelectTrigger id="layout-select">
-                                    <SelectValue placeholder="Select layout" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {Object.entries(layouts).map(
-                                        ([key, layout]) => (
-                                            <SelectItem key={key} value={key}>
-                                                {layout.name}
-                                            </SelectItem>
+                    {!isCardCollapsed && (
+                        <div className="space-y-4 px-4 pb-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="layout-select">
+                                    Layout Algorithm
+                                </Label>
+                                <Select
+                                    value={currentLayout}
+                                    onValueChange={(value: LayoutAlgorithmType) => {
+                                        applyLayout(
+                                            value,
+                                            selectedNode
+                                                ? nodesRef.current.find(
+                                                      (n) => n.mesh === selectedNode
+                                                  ) || undefined
+                                                : undefined
                                         )
-                                    )}
-                                </SelectContent>
-                            </Select>
-                            <p className="text-xs text-muted-foreground">
-                                {layouts[currentLayout].description}
-                            </p>
-                        </div>
+                                    }}
+                                >
+                                    <SelectTrigger id="layout-select">
+                                        <SelectValue placeholder="Select layout" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {Object.entries(layouts).map(
+                                            ([key, layout]) => (
+                                                <SelectItem key={key} value={key}>
+                                                    {layout.name}
+                                                </SelectItem>
+                                            )
+                                        )}
+                                    </SelectContent>
+                                </Select>
+                                <p className="text-xs text-muted-foreground">
+                                    {layouts[currentLayout].description}
+                                </p>
+                            </div>
 
-                        {selectedNode && currentLayout === "radial" && (
-                            <Button
-                                onClick={() => {
-                                    const rootNode = nodesRef.current.find(
-                                        (n) => n.mesh === selectedNode
-                                    )
-                                    if (rootNode) {
-                                        applyLayout(currentLayout, rootNode)
-                                        toast.success(
-                                            `Applied ${layouts[currentLayout].name} layout with selected node as root`
+                            {selectedNode && currentLayout === "radial" && (
+                                <Button
+                                    onClick={() => {
+                                        const rootNode = nodesRef.current.find(
+                                            (n) => n.mesh === selectedNode
                                         )
-                                    }
-                                }}
-                                variant="outline"
+                                        if (rootNode) {
+                                            applyLayout(currentLayout, rootNode)
+                                            toast.success(
+                                                `Applied ${layouts[currentLayout].name} layout with selected node as root`
+                                            )
+                                        }
+                                    }}
+                                    variant="outline"
+                                    size="sm"
+                                    className="w-full"
+                                >
+                                    Use Selected as Root
+                                </Button>
+                            )}
+
+                            <Separator />
+
+                            <Button
+                                onClick={() => setIsResetDialogOpen(true)}
+                                variant="destructive"
                                 size="sm"
                                 className="w-full"
                             >
-                                Use Selected as Root
+                                Reset Graph
                             </Button>
-                        )}
-
-                        <Separator />
-
-                        <Button
-                            onClick={() => setIsResetDialogOpen(true)}
-                            variant="destructive"
-                            size="sm"
-                            className="w-full"
-                        >
-                            Reset Graph
-                        </Button>
-                    </div>
+                        </div>
+                    )}
                 </Card>
             </div>
             {/* Reset Confirmation Dialog */}
@@ -1872,8 +1890,8 @@ const HNSWViz: React.FC<HNSWVizProps> = ({
                     font-family: monospace;
                 }
                 .node-info-card {
-                    position: absolute;
-                    top: 10px;
+                    position: fixed;
+                    top: 0;
                     right: 10px;
                     background: rgba(255, 255, 255, 0.95);
                     border-radius: 8px;

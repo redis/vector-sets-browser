@@ -80,7 +80,6 @@ export default function VectorSetPage() {
         handleAddVector,
         handleDeleteVector,
         handleShowVector,
-        handleRowClick,
     } = useVectorSet()
 
     const [isAddVectorModalOpen, setIsAddVectorModalOpen] = useState(false)
@@ -96,6 +95,7 @@ export default function VectorSetPage() {
         setSearchCount,
         resultsTitle,
         setResultsTitle,
+        isSearching,
     } = useVectorSearch({
         vectorSetName,
         metadata,
@@ -227,21 +227,9 @@ export default function VectorSetPage() {
     }
 
     // Wrapper for handleRowClick to store the search time
-    const handleRowClickWrapper = async (element: string) => {
-        const duration = await handleRowClick(element)
-        if (vectorSetName && duration) {
-            // Store the search time in the state
-            setVectorSetStates((prev) => ({
-                ...prev,
-                [vectorSetName]: {
-                    ...(prev[vectorSetName] || {}),
-                    searchState: {
-                        ...(prev[vectorSetName]?.searchState || {}),
-                        searchTime: duration,
-                    },
-                },
-            }))
-        }
+    const handleRowClick = async (element: string) => {
+        setSearchType("Element")
+        setSearchQuery(element)
     }
 
     const handleDisconnect = () => {
@@ -274,12 +262,16 @@ export default function VectorSetPage() {
 
                 // Try to get the friendly name from localStorage
                 try {
-                    const savedConnections = localStorage.getItem("recentRedisConnections")
+                    const savedConnections = localStorage.getItem(
+                        "recentRedisConnections"
+                    )
                     if (savedConnections) {
                         const connections = JSON.parse(savedConnections)
-                        const matchingConnection = connections.find((conn: any) => 
-                            conn.id === connection.url || 
-                            `redis://${conn.host}:${conn.port}` === connection.url
+                        const matchingConnection = connections.find(
+                            (conn: any) =>
+                                conn.id === connection.url ||
+                                `redis://${conn.host}:${conn.port}` ===
+                                    connection.url
                         )
                         if (matchingConnection) {
                             setRedisName(matchingConnection.name)
@@ -450,9 +442,9 @@ export default function VectorSetPage() {
                                     <div className="flex mb-4 items-center space-x-2">
                                         <div className="flex items-center gap-2 justify-between w-full">
                                             <div className="flex items-center gap-2">
-                                                <span className="whitespace-nowrap">
+                                                {/* <span className="text-xs whitespace-nowrap">
                                                     Show top
-                                                </span>
+                                                </span> */}
                                                 <Input
                                                     type="number"
                                                     value={searchCount}
@@ -464,17 +456,23 @@ export default function VectorSetPage() {
                                                     className="border rounded p-1 w-16 h-8 text-center"
                                                     min="1"
                                                 />
-                                                results
+                                                <span className="text-xs whitespace-nowrap">
+                                                    results
+                                                </span>
                                             </div>
-                                            <StatusMessage
-                                                message={
-                                                    fileOperationStatus ||
-                                                    vectorSetStatus
-                                                }
-                                            />
-                                            {vectorSetStates[
+                                            {searchQuery && (
+                                                <span className="text-xs whitespace-nowrap">
+                                                    Searched for &ldquo;
+                                                    <span className="font-bold">
+                                                        {searchQuery}
+                                                    </span>
+                                                    &rdquo;
+                                                </span>
+                                            )}
+                                            {(vectorSetStates[
                                                 vectorSetName || ""
-                                            ]?.searchState?.searchTime && (
+                                            ]?.searchState?.searchTime ||
+                                                isSearching) && (
                                                 <SearchTimeIndicator
                                                     searchTime={
                                                         vectorSetStates[
@@ -490,28 +488,11 @@ export default function VectorSetPage() {
                                                               )
                                                             : undefined
                                                     }
+                                                    isSearching={isSearching}
                                                 />
                                             )}
                                         </div>
-                                        {/* <Button
-                                            onClick={loadVectorSet}
-                                            title="Refresh results"
-                                            variant="ghost"
-                                        >
-                                            <svg
-                                                className="w-6 h-6"
-                                                fill="none"
-                                                stroke="currentColor"
-                                                viewBox="0 0 24 24"
-                                            >
-                                                <path
-                                                    strokeLinecap="round"
-                                                    strokeLinejoin="round"
-                                                    strokeWidth={2}
-                                                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                                                />
-                                            </svg>
-                                        </Button> */}
+
                                         <Button
                                             variant="default"
                                             onClick={() =>
@@ -536,7 +517,7 @@ export default function VectorSetPage() {
                                     </div>
                                     <VectorResults
                                         results={results}
-                                        onRowClick={handleRowClickWrapper}
+                                        onRowClick={handleRowClick}
                                         onDeleteClick={handleDeleteClick}
                                         onShowVectorClick={
                                             handleShowVectorClick
@@ -545,6 +526,7 @@ export default function VectorSetPage() {
                                             vectorSetStates[vectorSetName || ""]
                                                 ?.searchState?.searchTime
                                         }
+
                                     />
                                 </div>
                             </section>
@@ -582,7 +564,8 @@ export default function VectorSetPage() {
                                             </div>
                                             {searchQuery && (
                                                 <span>
-                                                    Root node starting with &ldquo;
+                                                    Root node starting with
+                                                    &ldquo;
                                                     {searchQuery}&rdquo;
                                                 </span>
                                             )}
@@ -595,10 +578,13 @@ export default function VectorSetPage() {
                                             /> */}
                                         </div>
                                     </div>
-                                    {vectorSetStates[vectorSetName || ""]
-                                        ?.searchState?.searchTime && (
+                                    {(vectorSetStates[vectorSetName || ""]
+                                        ?.searchState?.searchTime ||
+                                        isSearching) && (
                                         <div className="text-sm text-gray-500 mb-4">
-                                            Search completed in{" "}
+                                            {isSearching
+                                                ? "Searching..."
+                                                : "Search completed in "}
                                             <SearchTimeIndicator
                                                 searchTime={
                                                     vectorSetStates[
@@ -613,12 +599,15 @@ export default function VectorSetPage() {
                                                           )
                                                         : undefined
                                                 }
+                                                isSearching={isSearching}
                                             />
                                         </div>
                                     )}
                                     <div style={{ height: "600px" }}>
                                         <HNSWViz
-                                            key={`${vectorSetName}-${searchCount}-${results[0]?.[0] || ""}`}
+                                            key={`${vectorSetName}-${searchCount}-${
+                                                results[0]?.[0] || ""
+                                            }`}
                                             keyName={vectorSetName || ""}
                                             initialElement={
                                                 results.length > 0

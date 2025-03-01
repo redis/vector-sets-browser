@@ -28,7 +28,7 @@ export default function TopNav({
         { 
             href: "/config", 
             label: "Config", 
-            visible: pathname?.includes("/vectorset") || pathname?.includes("/console") 
+            visible: pathname?.includes("/vectorset") || pathname?.includes("/console") || pathname?.includes("/config")
         },
         { href: "/vectorset", label: "Console", visible: true },
     ]
