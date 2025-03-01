@@ -15,7 +15,6 @@ interface UseVectorSetReturn {
     handleAddVector: (element: string, elementData: string | number[]) => Promise<void>
     handleDeleteVector: (element: string) => Promise<void>
     handleShowVector: (element: string) => Promise<void>
-    handleRowClick: (element: string) => Promise<string | undefined>
 }
 
 // Cache for vector set data to prevent unnecessary reloading
@@ -384,6 +383,6 @@ export function useVectorSet(): UseVectorSetReturn {
         loadVectorSet,
         handleAddVector,
         handleDeleteVector,
-        handleShowVector,
+        handleShowVector
     }
 } 
