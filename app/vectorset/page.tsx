@@ -43,6 +43,7 @@ export default function VectorSetPage() {
     const searchParams = useSearchParams()
     const connectionId = searchParams.get("cid")
     const [isRestoring, setIsRestoring] = useState(true)
+    const [redisName, setRedisName] = useState<string | null>(null)
 
     // Combined state for each vector set's data
     const [vectorSetStates, setVectorSetStates] = useState<
@@ -248,7 +249,7 @@ export default function VectorSetPage() {
             removeConnection(connectionId)
         }
         disconnect()
-        router.push("/home")
+        router.push("/console")
     }
 
     // If no connection ID is present, redirect to home
@@ -256,7 +257,7 @@ export default function VectorSetPage() {
         const restoreConnection = async () => {
             if (!connectionId) {
                 console.error("No connection ID found")
-                router.push("/home")
+                router.push("/console")
                 return
             }
 
@@ -267,15 +268,32 @@ export default function VectorSetPage() {
                 if (!connection) {
                     // Invalid or expired connection ID
                     console.error("Invalid or expired connection ID")
-                    router.push("/home")
+                    router.push("/console")
                     return
+                }
+
+                // Try to get the friendly name from localStorage
+                try {
+                    const savedConnections = localStorage.getItem("recentRedisConnections")
+                    if (savedConnections) {
+                        const connections = JSON.parse(savedConnections)
+                        const matchingConnection = connections.find((conn: any) => 
+                            conn.id === connection.url || 
+                            `redis://${conn.host}:${conn.port}` === connection.url
+                        )
+                        if (matchingConnection) {
+                            setRedisName(matchingConnection.name)
+                        }
+                    }
+                } catch (e) {
+                    console.error("Error getting Redis name:", e)
                 }
 
                 // Connect using the stored URL
                 const success = await handleConnect(connection.url)
                 if (!success) {
                     console.error("Failed to restore connection")
-                    router.push("/home")
+                    router.push("/console")
                     return
                 }
 
@@ -290,14 +308,14 @@ export default function VectorSetPage() {
                         "Connection verification failed:",
                         data.error || "No active connection"
                     )
-                    router.push("/home")
+                    router.push("/console")
                     return
                 }
 
                 setIsRestoring(false)
             } catch (error) {
                 console.error("Error restoring connection:", error)
-                router.push("/home")
+                router.push("/console")
             }
         }
 
@@ -356,6 +374,7 @@ export default function VectorSetPage() {
         <div className="flex flex-1 h-screen">
             <VectorSetNav
                 redisUrl={redisUrl}
+                redisName={redisName}
                 selectedVectorSet={vectorSetName}
                 onVectorSetSelect={setVectorSetName}
                 onRedisUrlChange={setRedisUrl}

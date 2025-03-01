@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button"
-import { useState, useEffect } from "react"
+import { useState, useEffect, forwardRef, useImperativeHandle } from "react"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Pencil, Trash2 } from "lucide-react"
 import { Input } from "@/components/ui/input"
@@ -19,15 +19,22 @@ interface RedisConnectionListProps {
     onConnect: (url: string) => Promise<void>
     currentUrl: string | null
     isConnecting?: boolean
+    isAddDialogOpen?: boolean
+    setIsAddDialogOpen?: (open: boolean) => void
 }
 
-export default function RedisConnectionList({
+const RedisConnectionList = forwardRef<
+    { setIsAddDialogOpen: (open: boolean) => void },
+    RedisConnectionListProps
+>(({
     onConnect,
     currentUrl,
-    isConnecting = false
-}: RedisConnectionListProps) {
+    isConnecting = false,
+    isAddDialogOpen: externalIsAddDialogOpen,
+    setIsAddDialogOpen: externalSetIsAddDialogOpen
+}, ref) => {
     const [recentConnections, setRecentConnections] = useState<RedisConnection[]>([])
-    const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
+    const [internalIsAddDialogOpen, setInternalIsAddDialogOpen] = useState(false)
     const [editingConnection, setEditingConnection] = useState<RedisConnection | null>(null)
     const [newConnection, setNewConnection] = useState<RedisConnection>({
         id: "",
@@ -36,6 +43,15 @@ export default function RedisConnectionList({
         port: 6379,
         lastConnected: null
     })
+
+    // Use external state if provided, otherwise use internal state
+    const isAddDialogOpen = externalIsAddDialogOpen !== undefined ? externalIsAddDialogOpen : internalIsAddDialogOpen
+    const setIsAddDialogOpen = externalSetIsAddDialogOpen || setInternalIsAddDialogOpen
+
+    // Expose the setIsAddDialogOpen method to parent components via ref
+    useImperativeHandle(ref, () => ({
+        setIsAddDialogOpen
+    }))
 
     useEffect(() => {
         // Load recent connections from localStorage
@@ -190,7 +206,7 @@ export default function RedisConnectionList({
     }
 
     return (
-        <div className="p-4 h-screen flex flex-col">
+        <div className="p-4 flex flex-col">
             <div className="mb-6">
                 <div className="flex items-center justify-between mb-4 ">
                     <h2 className="texg-black font-bold text-2xl">
@@ -269,7 +285,7 @@ export default function RedisConnectionList({
                                 Cancel
                             </Button>
                             <Button onClick={handleAddConnection} disabled={isConnecting}>
-                                Add Connection
+                                {isConnecting ? 'Connecting...' : 'Connect'}
                             </Button>
                         </DialogFooter>
                     </DialogContent>
@@ -470,4 +486,6 @@ export default function RedisConnectionList({
             </div>
         </div>
     )
-}
+})
+
+export default RedisConnectionList

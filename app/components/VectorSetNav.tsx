@@ -12,6 +12,7 @@ import { Sidebar, SidebarHeader, SidebarContent } from "@/components/ui/sidebar"
 
 interface VectorSetNavProps {
     redisUrl: string | null
+    redisName?: string | null
     selectedVectorSet: string | null
     onVectorSetSelect: (vectorSet: string | null) => void
     onRedisUrlChange: (url: string) => void
@@ -45,6 +46,7 @@ interface Job {
 
 export default function VectorSetNav({
     redisUrl,
+    redisName,
     selectedVectorSet,
     onVectorSetSelect,
     onRedisUrlChange,
@@ -365,7 +367,7 @@ export default function VectorSetNav({
                                 d="M10 19l-7-7m0 0l7-7m-7 7h18"
                             />
                         </svg>
-                        {redisUrl}
+                        <span className="text-lg">{redisName}</span><span className="text-sm text-gray-500">({redisUrl})</span>
                     </Button>
                 </div>
             </SidebarHeader>
@@ -504,7 +506,7 @@ export default function VectorSetNav({
                     setEditingVectorSet(null)
                 }}
                 vectorSetName={editingVectorSet || ""}
-                onSave={handleSaveMetadata}
+                onSave={(config) => handleSaveMetadata(editingVectorSet || "", config)}
             />
         </Sidebar>
     )

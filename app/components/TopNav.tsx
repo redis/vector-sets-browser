@@ -1,3 +1,5 @@
+import { Button } from "@/components/ui/button"
+import { ArrowRight } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
@@ -20,36 +22,43 @@ export default function TopNav({
     const pathname = usePathname()
 
     const navItems = [
-        { href: "/home", label: "Home" },
-        { href: "/docs", label: "Docs" },
-        { href: "/config", label: "Config" },
+        { href: "/docs", label: "Docs", visible: true },
+        { href: "/examples", label: "Examples", visible: true },
+
+        { 
+            href: "/config", 
+            label: "Config", 
+            visible: pathname?.includes("/vectorset") || pathname?.includes("/console") 
+        },
+        { href: "/vectorset", label: "Console", visible: true },
     ]
 
     return (
-        <header className="bg-white border-b">
-            <div className="flex items-center p-2 space-x-2 pr-4">
-                <div className="flex items-center">
+        <header className="bg-white border-b sticky top-0 z-10">
+            <div className="flex items-center p-2 space-x-4 pr-4">
+                <a href="/" className="ml-2 flex items-center">
                     {/* Set height to auto */}
                     <Image
                         priority
                         src="/Redis_logo.png"
                         alt="Redis Logo"
-                        width={100}
-                        height={100}
+                        width={80}
+                        height={80}
                         className="mr-2"
                     />
                     <div>
-                        <h1 className="text-xl uppercase font-bold">
+                        <h1 className="text-xl font-bold">
                             VectorSet
                         </h1>
                     </div>
-                </div>
+                </a>
+                <div className="grow"></div>
                 <nav className="flex items-center gap-4 pl-8">
-                    {navItems.map(({ href, label }) => (
+                    {navItems.filter(({ visible }) => visible).map(({ href, label }) => (
                         <Link
                             key={href}
                             href={href}
-                            className={`uppercase font-bold hover:text-gray-900 py-2 border-b-2 ${
+                            className={` font-mono hover:text-gray-900 py-2 border-b-2 ${
                                 pathname === href
                                     ? "border-red-500 text-red-600"
                                     : "border-transparent text-black"
@@ -59,7 +68,12 @@ export default function TopNav({
                         </Link>
                     ))}
                 </nav>
-                <div className="grow"></div>
+                {/* <Button variant="default">
+                    <Link href="/console" className="flex items-center gap-2">
+                        Console
+                        <ArrowRight className="w-5 h-5" />
+                    </Link>
+                </Button> */}
             </div>
         </header>
     )
