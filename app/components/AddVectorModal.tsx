@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -34,17 +34,32 @@ export default function AddVectorModal({
     const [status, setStatus] = useState("")
 
     // Determine if we're using an image embedding model using the helper function
-    const useImageEmbedding = metadata?.embedding ? isImageEmbedding(metadata.embedding) : false;
-    const useTextEmbedding = metadata?.embedding ? isTextEmbedding(metadata.embedding) : true;
+    const useImageEmbedding = metadata?.embedding
+        ? isImageEmbedding(metadata.embedding)
+        : false
+    const useTextEmbedding = metadata?.embedding
+        ? isTextEmbedding(metadata.embedding)
+        : true
+    const supportsEmbeddings =
+        metadata?.embedding.provider && metadata?.embedding.provider !== "none"
 
     // Set the default active tab based on the embedding data format
     useEffect(() => {
         if (useImageEmbedding) {
-            setActiveTab("image");
+            setActiveTab("image")
         } else if (useTextEmbedding) {
-            setActiveTab("text");
+            setActiveTab("text")
         }
-    }, [useImageEmbedding, useTextEmbedding]);
+    }, [useImageEmbedding, useTextEmbedding])
+
+    // Compute the placeholder text based on current searchType
+    const embeddingPlaceholder = useMemo(() => {
+        if (!supportsEmbeddings) {
+            return "Enter vector data (0.1, 0.2, ...)"
+        } else { 
+            return "Enter Text to embed or Enter vector data (0.1, 0.2, ...)"
+        }
+    }, [supportsEmbeddings])
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -68,7 +83,7 @@ export default function AddVectorModal({
         try {
             setIsAdding(true)
             setStatus("Adding vector...")
-            
+
             // Use the pre-generated embedding if available for images
             if (activeTab === "image" && imageEmbedding) {
                 await onAdd(element, imageEmbedding)
@@ -80,18 +95,20 @@ export default function AddVectorModal({
                 await onAdd(element, elementData)
                 setStatus("Vector added successfully!")
             }
-            
+
             // Reset form
             setElement("")
             setElementData("")
             setImageData("")
             setImageEmbedding(null)
-            
+
             // Close modal
             onClose()
         } catch (err) {
             console.error("Error adding vector:", err)
-            setError(err instanceof Error ? err.message : "Failed to add vector")
+            setError(
+                err instanceof Error ? err.message : "Failed to add vector"
+            )
             setStatus("Error adding vector")
         } finally {
             setIsAdding(false)
@@ -103,7 +120,7 @@ export default function AddVectorModal({
         // Reset embedding when a new image is selected
         setImageEmbedding(null)
     }
-    
+
     const handleEmbeddingGenerated = (embedding: number[]) => {
         setImageEmbedding(embedding)
         setStatus(`Embedding generated: ${embedding.length} dimensions`)
@@ -118,10 +135,13 @@ export default function AddVectorModal({
                     <h2 className="text-2xl font-bold mb-4">
                         Add Vector to {vectorSetName || "Vector Set"}
                     </h2>
-                    
+
                     <form onSubmit={handleSubmit}>
                         <div className="mb-4">
-                            <label htmlFor="element" className="block text-sm font-medium mb-1">
+                            <label
+                                htmlFor="element"
+                                className="block text-sm font-medium mb-1"
+                            >
                                 Element ID
                             </label>
                             <Input
@@ -132,40 +152,68 @@ export default function AddVectorModal({
                             />
                         </div>
 
-                        <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-4">
+                        <Tabs
+                            value={activeTab}
+                            onValueChange={setActiveTab}
+                            className="mb-4"
+                        >
                             <TabsList className="mb-2">
-                                <TabsTrigger value="text" disabled={!useTextEmbedding}>Text</TabsTrigger>
-                                <TabsTrigger value="image" disabled={!useImageEmbedding && useTextEmbedding}>Image</TabsTrigger>
+                                <TabsTrigger
+                                    value="text"
+                                    disabled={!useTextEmbedding}
+                                >
+                                    Text
+                                </TabsTrigger>
+                                <TabsTrigger
+                                    value="image"
+                                    disabled={
+                                        !useImageEmbedding && useTextEmbedding
+                                    }
+                                >
+                                    Image
+                                </TabsTrigger>
                             </TabsList>
-                            
+
                             <TabsContent value="text">
                                 <div>
-                                    <label htmlFor="elementData" className="block text-sm font-medium mb-1">
+                                    <label
+                                        htmlFor="elementData"
+                                        className="block text-sm font-medium mb-1"
+                                    >
                                         Text Content
                                     </label>
                                     <Textarea
                                         id="elementData"
                                         value={elementData}
-                                        onChange={(e) => setElementData(e.target.value)}
-                                        placeholder="Enter the text to embed"
+                                        onChange={(e) =>
+                                            setElementData(e.target.value)
+                                        }
+                                        placeholder={embeddingPlaceholder}
                                         rows={5}
                                     />
                                 </div>
                             </TabsContent>
-                            
+
                             <TabsContent value="image">
                                 <div>
                                     <label className="block text-sm font-medium mb-1">
                                         Image Upload
                                     </label>
-                                    <ImageUploader 
-                                        onImageSelect={handleImageSelect} 
-                                        onEmbeddingGenerated={handleEmbeddingGenerated}
-                                        config={metadata?.embedding?.image || { model: 'mobilenet' }}
+                                    <ImageUploader
+                                        onImageSelect={handleImageSelect}
+                                        onEmbeddingGenerated={
+                                            handleEmbeddingGenerated
+                                        }
+                                        config={
+                                            metadata?.embedding?.image || {
+                                                model: "mobilenet",
+                                            }
+                                        }
                                     />
                                     {imageEmbedding && (
                                         <div className="mt-2 text-sm text-green-600">
-                                            ✓ Embedding generated ({imageEmbedding.length} dimensions)
+                                            ✓ Embedding generated (
+                                            {imageEmbedding.length} dimensions)
                                         </div>
                                     )}
                                 </div>
@@ -177,7 +225,7 @@ export default function AddVectorModal({
                                 {error}
                             </div>
                         )}
-                        
+
                         {status && !error && (
                             <div className="mb-4 p-2 bg-blue-100 border border-blue-400 text-blue-700 rounded">
                                 {status}

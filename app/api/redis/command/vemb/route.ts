@@ -11,24 +11,18 @@ function getRedisUrl(): string | null {
 // Type definitions for the request body
 interface VembRequestBody {
     keyName: string
-    element: string
+    element?: string
+    elements?: string[]
 }
 
 export async function POST(request: Request) {
     try {
-        const body = await request.json() as VembRequestBody
-        const { keyName, element } = body
+        const body = (await request.json()) as VembRequestBody
+        const { keyName, element, elements } = body
 
-        if (!keyName) {
+        if (!keyName || (!element && !elements)) {
             return NextResponse.json(
-                { success: false, error: "Key name is required" },
-                { status: 400 }
-            )
-        }
-
-        if (!element) {
-            return NextResponse.json(
-                { success: false, error: "Element is required" },
+                { success: false, error: "Key name and element(s) are required" },
                 { status: 400 }
             )
         }
@@ -41,26 +35,27 @@ export async function POST(request: Request) {
             )
         }
 
-        const result = await redis.vemb(url, keyName, element)
-
-        if (!result.success) {
-            return NextResponse.json(
-                { success: false, error: result.error },
-                { status: 500 }
-            )
+        // Handle single element case
+        if (element) {
+            const result = await redis.vemb(url, keyName, element)
+            return NextResponse.json({ success: true, result: result })
         }
 
-        return NextResponse.json({
-            success: true,
-            result: result.result
-        })
-    } catch (error) {
-        console.error("Error in VEMB API:", error)
+        // Handle multiple elements case
+        if (elements) {
+            const promises = elements.map(el => redis.vemb(url, keyName, el))
+            const results = await Promise.all(promises)
+            return NextResponse.json({ success: true, result: results })
+        }
+
         return NextResponse.json(
-            { 
-                success: false,
-                error: error instanceof Error ? error.message : String(error) 
-            },
+            { success: false, error: "Invalid request format" },
+            { status: 400 }
+        )
+    } catch (error) {
+        console.error("Error in VEMB route:", error)
+        return NextResponse.json(
+            { success: false, error: String(error) },
             { status: 500 }
         )
     }

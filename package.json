@@ -39,6 +39,7 @@
     "csv-parse": "^5.6.0",
     "d3": "^7.9.0",
     "lucide-react": "^0.474.0",
+    "ml-pca": "^4.1.1",
     "next": "14.2.16",
     "prism-react-renderer": "^2.4.1",
     "prismjs": "^1.29.0",
@@ -52,6 +53,7 @@
     "tailwind-merge": "^3.0.1",
     "tailwindcss-animate": "^1.0.7",
     "three": "^0.173.0",
+    "umap-js": "^1.4.0",
     "uuid": "^11.1.0",
     "zod": "^3.24.2"
   },

@@ -9,7 +9,6 @@ import SearchBox from "../components/SearchBox"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import InfoPanel from "../components/InfoPanel"
 import VectorResults from "../components/VectorResults"
-import StatusMessage from "../components/StatusMessage"
 import VectorSetHeader from "../components/VectorSetHeader"
 import { useRedisConnection } from "../hooks/useRedisConnection"
 import { useVectorSet } from "../hooks/useVectorSet"
@@ -21,7 +20,10 @@ import { getConnection, removeConnection } from "../lib/connectionManager"
 import { EmbeddingConfig, VectorSetMetadata } from "../types/embedding"
 import { Input } from "@/components/ui/input"
 import SearchTimeIndicator from "../components/SearchTimeIndicator"
-import HNSWViz from "../components/HNSWViz"
+import HNSWVizPure from "../components/vizualizer/HNSWVizPure"
+import type { VLinkResponse } from "../components/vizualizer/types"
+import * as redis from "../services/redis"
+import { toast } from "sonner"
 
 /**
  * VectorSetPage handles the display and management of vector sets.
@@ -218,12 +220,29 @@ export default function VectorSetPage() {
     // Event handler wrappers for vector operations
     const handleDeleteClick = (e: React.MouseEvent, element: string) => {
         e.stopPropagation()
-        handleDeleteVector(element)
+        
+        if (confirm("Are you sure you want to delete this vector?")) {
+            handleDeleteVector(element)
+        }
     }
 
-    const handleShowVectorClick = (e: React.MouseEvent, element: string) => {
+    const handleShowVectorClick = async (e: React.MouseEvent, element: string) => {
         e.stopPropagation()
-        handleShowVector(element)
+        try {
+            // Get the vector either from results or Redis
+            const vector = await handleShowVector(element)
+            if (!vector) {
+                toast.error("Error retrieving vector")
+                return
+            }
+
+            // Copy vector to clipboard
+            await navigator.clipboard.writeText(JSON.stringify(vector))
+            toast.success("Vector copied to clipboard")
+        } catch (error) {
+            console.error("Error copying vector:", error)
+            toast.error("Failed to copy vector to clipboard")
+        }
     }
 
     // Wrapper for handleRowClick to store the search time
@@ -362,6 +381,19 @@ export default function VectorSetPage() {
         }
     }
 
+    // Callbacks for HNSWVizPure
+    const getNeighbors = async (keyName: string, element: string, count: number, withEmbeddings?: boolean): Promise<VLinkResponse> => {
+        try {
+            console.log("[VectorSetPage] Getting neighbors for:", keyName, element, count)
+            const data = await redis.vlinks(keyName, element, count, withEmbeddings ?? false )
+            console.log("[VectorSetPage] Neighbors:", data)
+            return { success: true, result: data }
+        } catch (error) {
+            console.error("Error fetching neighbors:", error)
+            return { success: false, result: [] }
+        }
+    }
+
     return (
         <div className="flex flex-1 h-screen">
             <VectorSetNav
@@ -375,7 +407,7 @@ export default function VectorSetPage() {
                 onBack={handleDisconnect}
             />
 
-            <div className="flex-1 p-4 overflow-y-auto">
+            <div className="flex-1 p-4 overflow-y-auto flex flex-col">
                 {vectorSetName ? (
                     <div className="mb-4 border-b border-gray-500">
                         <VectorSetHeader
@@ -391,10 +423,10 @@ export default function VectorSetPage() {
                 {vectorSetName ? (
                     <Tabs
                         defaultValue="search"
-                        className="w-full"
+                        className="w-full h-full flex flex-col"
                         onValueChange={setActiveTab}
                     >
-                        <TabsList className="bg-gray-200 p-0 w-full">
+                        <TabsList className="bg-gray-200 w-full">
                             <TabsTrigger className="w-full" value="search">
                                 Search / Explore
                             </TabsTrigger>
@@ -464,7 +496,10 @@ export default function VectorSetPage() {
                                                 <span className="text-xs whitespace-nowrap">
                                                     Searched for &ldquo;
                                                     <span className="font-bold">
-                                                        {searchQuery}
+                                                        {searchQuery.slice(
+                                                            0,
+                                                            25
+                                                        )}
                                                     </span>
                                                     &rdquo;
                                                 </span>
@@ -526,13 +561,12 @@ export default function VectorSetPage() {
                                             vectorSetStates[vectorSetName || ""]
                                                 ?.searchState?.searchTime
                                         }
-
                                     />
                                 </div>
                             </section>
                         </TabsContent>
 
-                        <TabsContent value="visualize">
+                        <TabsContent value="visualize" className="h-full">
                             <SearchBox
                                 searchType={searchType}
                                 setSearchType={setSearchType}
@@ -541,14 +575,11 @@ export default function VectorSetPage() {
                                 dim={dim}
                                 metadata={metadata}
                             />
-                            <div className="mt-8">
-                                <div className="bg-white p-4 rounded shadow-md">
+                            <div className="bg-white rounded shadow-md h-[calc(100vh-300px)]">
+                                <div className="bg-white p-4 rounded shadow-md flex-1 flex flex-col">
                                     <div className="flex mb-4 items-center">
                                         <div className="flex items-center gap-4 w-full">
                                             <div className="flex items-center gap-2">
-                                                <span className="whitespace-nowrap">
-                                                    Show top
-                                                </span>
                                                 <Input
                                                     type="number"
                                                     value={searchCount}
@@ -560,13 +591,15 @@ export default function VectorSetPage() {
                                                     className="border rounded p-1 w-16 h-8 text-center"
                                                     min="1"
                                                 />
-                                                results
+                                                <span className="text-xs">
+                                                    results
+                                                </span>
                                             </div>
                                             {searchQuery && (
                                                 <span>
-                                                    Root node starting with
-                                                    &ldquo;
-                                                    {searchQuery}&rdquo;
+                                                    Searched for &ldquo;
+                                                    {searchQuery.slice(0, 25)}
+                                                    &rdquo;
                                                 </span>
                                             )}
                                             <div className="grow"></div>
@@ -576,47 +609,62 @@ export default function VectorSetPage() {
                                                     vectorSetStatus
                                                 }
                                             /> */}
+                                            {(vectorSetStates[
+                                                vectorSetName || ""
+                                            ]?.searchState?.searchTime ||
+                                                isSearching) && (
+                                                <div className="text-sm text-gray-500 mb-4">
+                                                    <SearchTimeIndicator
+                                                        searchTime={
+                                                            vectorSetStates[
+                                                                vectorSetName ||
+                                                                    ""
+                                                            ]?.searchState
+                                                                ?.searchTime
+                                                                ? Number(
+                                                                      vectorSetStates[
+                                                                          vectorSetName ||
+                                                                              ""
+                                                                      ]
+                                                                          ?.searchState
+                                                                          ?.searchTime
+                                                                  )
+                                                                : undefined
+                                                        }
+                                                        isSearching={
+                                                            isSearching
+                                                        }
+                                                    />
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
-                                    {(vectorSetStates[vectorSetName || ""]
-                                        ?.searchState?.searchTime ||
-                                        isSearching) && (
-                                        <div className="text-sm text-gray-500 mb-4">
-                                            {isSearching
-                                                ? "Searching..."
-                                                : "Search completed in "}
-                                            <SearchTimeIndicator
-                                                searchTime={
-                                                    vectorSetStates[
-                                                        vectorSetName || ""
-                                                    ]?.searchState?.searchTime
-                                                        ? Number(
-                                                              vectorSetStates[
-                                                                  vectorSetName ||
-                                                                      ""
-                                                              ]?.searchState
-                                                                  ?.searchTime
-                                                          )
-                                                        : undefined
+                                    <div
+                                        className="flex-grow flex-1"
+                                        style={{
+                                            minHeight: "calc(100vh - 300px)",
+                                        }}
+                                    >
+                                        {results[0] ? (
+                                            <HNSWVizPure
+                                                key={`${vectorSetName}-${searchCount}-${
+                                                    results[0]?.[0] || ""
+                                                }`}
+                                                keyName={vectorSetName || ""}
+                                                initialElement={
+                                                    results.length > 0
+                                                        ? results[0][0]
+                                                        : vectorSetName
                                                 }
-                                                isSearching={isSearching}
+                                                maxNodes={500}
+                                                initialNodes={Number(
+                                                    searchCount
+                                                )}
+                                                getNeighbors={getNeighbors}
                                             />
-                                        </div>
-                                    )}
-                                    <div style={{ height: "600px" }}>
-                                        <HNSWViz
-                                            key={`${vectorSetName}-${searchCount}-${
-                                                results[0]?.[0] || ""
-                                            }`}
-                                            keyName={vectorSetName || ""}
-                                            initialElement={
-                                                results.length > 0
-                                                    ? results[0][0]
-                                                    : vectorSetName
-                                            }
-                                            maxNodes={500}
-                                            initialNodes={Number(searchCount)}
-                                        />
+                                        ) : (
+                                            "No Results Found"
+                                        )}
                                     </div>
                                 </div>
                             </div>

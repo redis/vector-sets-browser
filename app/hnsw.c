@@ -36,46 +36,47 @@
 #include <string.h>
 #include <math.h>
 #include <stdint.h>
-#include <float.h>  /* for INFINITY if not in math.h */
+#include <float.h> /* for INFINITY if not in math.h */
 #include <assert.h>
 #include "hnsw.h"
 
 #if 0
 #define debugmsg printf
 #else
-#define debugmsg if(0) printf
+#define debugmsg \
+    if (0)       \
+    printf
 #endif
 
 #ifndef INFINITY
-#define INFINITY (1.0/0.0)
+#define INFINITY (1.0 / 0.0)
 #endif
 
-#define MIN(a,b) ((a) < (b) ? (a) : (b))
+#define MIN(a, b) ((a) < (b) ? (a) : (b))
 
 /* Algorithm parameters. */
 
-#define HNSW_M 16           /* Number of max connections per node. Note that
-                             * layer zero has twice as many. Also note that
-                             * when a new node is added, we will populate
-                             * even layer 0 links to just HNSW_M neighbors, so
-                             * initially half layer 0 slots will be empty. */
-#define HNSW_M0 (HNSW_M*2)  /* Maximum number of connections for layer 0 */
-#define HNSW_P 0.25         /* Probability of level increase. */
-#define HNSW_MAX_LEVEL 16   /* Max level nodes can reach. */
-#define HNSW_EF_C 200       /* Default size of dynamic candidate list while
-                             * inserting a new node, in case 0 is passed to
-                             * the 'ef' argument while inserting. This is also
-                             * used when deleting nodes for the search step
-                             * needed sometimes to reconnect nodes that remain
-                             * orphaned of one link. */
+#define HNSW_M 16            /* Number of max connections per node. Note that   \
+                              * layer zero has twice as many. Also note that    \
+                              * when a new node is added, we will populate      \
+                              * even layer 0 links to just HNSW_M neighbors, so \
+                              * initially half layer 0 slots will be empty. */
+#define HNSW_M0 (HNSW_M * 2) /* Maximum number of connections for layer 0 */
+#define HNSW_P 0.25          /* Probability of level increase. */
+#define HNSW_MAX_LEVEL 16    /* Max level nodes can reach. */
+#define HNSW_EF_C 200        /* Default size of dynamic candidate list while    \
+                              * inserting a new node, in case 0 is passed to    \
+                              * the 'ef' argument while inserting. This is also \
+                              * used when deleting nodes for the search step    \
+                              * needed sometimes to reconnect nodes that remain \
+                              * orphaned of one link. */
 
+static void (*hfree)(void *p) = free;
+static void *(*hmalloc)(size_t s) = malloc;
+static void *(*hrealloc)(void *old, size_t s) = realloc;
 
-void (*hfree)(void *p) = free;
-void *(*hmalloc)(size_t s) = malloc;
-void *(*hrealloc)(void *old, size_t s) = realloc;
-
-void hnsw_set_allocator(void (*free_ptr)(void*), void *(*malloc_ptr)(size_t),
-                        void *(*realloc_ptr)(void*, size_t))
+void hnsw_set_allocator(void (*free_ptr)(void *), void *(*malloc_ptr)(size_t),
+                        void *(*realloc_ptr)(void *, size_t))
 {
     hfree = free_ptr;
     hmalloc = malloc_ptr;
@@ -103,32 +104,37 @@ void hnsw_cursor_element_deleted(HNSW *index, hnswNode *deleted);
 /* Maximum number of candidates we'll ever need (cit. Bill Gates). */
 #define HNSW_MAX_CANDIDATES 256
 
-typedef struct {
+typedef struct
+{
     hnswNode *node;
     float distance;
 } pqitem;
 
-typedef struct {
-    pqitem *items;         /* Array of items. */
-    uint32_t count;        /* Current number of items. */
-    uint32_t cap;          /* Maximum capacity. */
+typedef struct
+{
+    pqitem *items;  /* Array of items. */
+    uint32_t count; /* Current number of items. */
+    uint32_t cap;   /* Maximum capacity. */
 } pqueue;
 
 /* The HNSW algorithms access the pqueue conceptually from nearest (index 0)
  * to farest (larger indexes) node, so the following macros are used to
  * access the pqueue in this fashion, even if the internal order is
  * actually reversed. */
-#define pq_get_node(q,i) ((q)->items[(q)->count-(i+1)].node)
-#define pq_get_distance(q,i) ((q)->items[(q)->count-(i+1)].distance)
+#define pq_get_node(q, i) ((q)->items[(q)->count - (i + 1)].node)
+#define pq_get_distance(q, i) ((q)->items[(q)->count - (i + 1)].distance)
 
 /* Create a new priority queue with given capacity. Adding to the
  * pqueue only retains 'capacity' elements with the shortest distance. */
-pqueue *pq_new(uint32_t capacity) {
+pqueue *pq_new(uint32_t capacity)
+{
     pqueue *pq = hmalloc(sizeof(*pq));
-    if (!pq) return NULL;
+    if (!pq)
+        return NULL;
 
     pq->items = hmalloc(sizeof(pqitem) * capacity);
-    if (!pq->items) {
+    if (!pq->items)
+    {
         hfree(pq);
         return NULL;
     }
@@ -139,32 +145,41 @@ pqueue *pq_new(uint32_t capacity) {
 }
 
 /* Free a priority queue. */
-void pq_free(pqueue *pq) {
-    if (!pq) return;
+void pq_free(pqueue *pq)
+{
+    if (!pq)
+        return;
     hfree(pq->items);
     hfree(pq);
 }
 
 /* Insert maintaining distance order (higher distances first). */
-void pq_push(pqueue *pq, hnswNode *node, float distance) {
-    if (pq->count < pq->cap) {
+void pq_push(pqueue *pq, hnswNode *node, float distance)
+{
+    if (pq->count < pq->cap)
+    {
         /* Queue not full: shift right from high distances to make room. */
         uint32_t i = pq->count;
-        while (i > 0 && pq->items[i-1].distance < distance) {
-            pq->items[i] = pq->items[i-1];
+        while (i > 0 && pq->items[i - 1].distance < distance)
+        {
+            pq->items[i] = pq->items[i - 1];
             i--;
         }
         pq->items[i].node = node;
         pq->items[i].distance = distance;
         pq->count++;
-    } else {
+    }
+    else
+    {
         /* Queue full: if new item is worse than worst, ignore it. */
-        if (distance >= pq->items[0].distance) return;
+        if (distance >= pq->items[0].distance)
+            return;
 
         /* Otherwise shift left from low distances to drop worst. */
         uint32_t i = 0;
-        while (i < pq->cap-1 && pq->items[i+1].distance > distance) {
-            pq->items[i] = pq->items[i+1];
+        while (i < pq->cap - 1 && pq->items[i + 1].distance > distance)
+        {
+            pq->items[i] = pq->items[i + 1];
             i++;
         }
         pq->items[i].node = node;
@@ -175,8 +190,10 @@ void pq_push(pqueue *pq, hnswNode *node, float distance) {
 /* Remove and return the top (closest) element, which is at count-1
  * since we store elements with higher distances first.
  * Runs in constant time. */
-hnswNode *pq_pop(pqueue *pq, float *distance) {
-    if (pq->count == 0) return NULL;
+hnswNode *pq_pop(pqueue *pq, float *distance)
+{
+    if (pq->count == 0)
+        return NULL;
     pq->count--;
     *distance = pq->items[pq->count].distance;
     return pq->items[pq->count].node;
@@ -185,8 +202,10 @@ hnswNode *pq_pop(pqueue *pq, float *distance) {
 /* Get distance of the furthest element.
  * An empty priority queue has infinite distance as its furthest element,
  * note that this behavior is needed by the algorithms below. */
-float pq_max_distance(pqueue *pq) {
-    if (pq->count == 0) return INFINITY;
+float pq_max_distance(pqueue *pq)
+{
+    if (pq->count == 0)
+        return INFINITY;
     return pq->items[0].distance;
 }
 
@@ -194,7 +213,8 @@ float pq_max_distance(pqueue *pq) {
 
 /* Dot product: our vectors are already normalized.
  * Version for not quantized vectors of floats. */
-float vectors_distance_float(const float *x, const float *y, uint32_t dim) {
+float vectors_distance_float(const float *x, const float *y, uint32_t dim)
+{
     /* Use two accumulators to reduce dependencies among multiplications.
      * This provides a clear speed boost in Apple silicon, but should be
      * help in general. */
@@ -202,21 +222,23 @@ float vectors_distance_float(const float *x, const float *y, uint32_t dim) {
     uint32_t i;
 
     // Process 8 elements per iteration, 50/50 with the two accumulators.
-    for (i = 0; i + 7 < dim; i += 8) {
+    for (i = 0; i + 7 < dim; i += 8)
+    {
         dot0 += x[i] * y[i] +
-                x[i+1] * y[i+1] +
-                x[i+2] * y[i+2] +
-                x[i+3] * y[i+3];
+                x[i + 1] * y[i + 1] +
+                x[i + 2] * y[i + 2] +
+                x[i + 3] * y[i + 3];
 
-        dot1 += x[i+4] * y[i+4] +
-                x[i+5] * y[i+5] +
-                x[i+6] * y[i+6] +
-                x[i+7] * y[i+7];
+        dot1 += x[i + 4] * y[i + 4] +
+                x[i + 5] * y[i + 5] +
+                x[i + 6] * y[i + 6] +
+                x[i + 7] * y[i + 7];
     }
 
     /* Handle the remaining elements. These are a minority in the case
      * of a smal vector, don't optimze this part. */
-    for (; i < dim; i++) dot0 += x[i] * y[i];
+    for (; i < dim; i++)
+        dot0 += x[i] * y[i];
 
     /* The following line may be counter intuitive. The dot product of
      * normalized vectors is equivalent to their cosine similarity. The
@@ -239,9 +261,11 @@ float vectors_distance_float(const float *x, const float *y, uint32_t dim) {
 
 /* Q8 quants dotproduct. We do integer math and later fix it by range. */
 float vectors_distance_q8(const int8_t *x, const int8_t *y, uint32_t dim,
-                        float range_a, float range_b) {
+                          float range_a, float range_b)
+{
     // Handle zero vectors special case.
-    if (range_a == 0 || range_b == 0) {
+    if (range_a == 0 || range_b == 0)
+    {
         /* Zero vector distance from anything is 1.0
          * (since 1.0 - dot_product where dot_product = 0). */
         return 1.0f;
@@ -249,38 +273,43 @@ float vectors_distance_q8(const int8_t *x, const int8_t *y, uint32_t dim,
 
     /* Each vector is quantized from [-max_abs, +max_abs] to [-127, 127]
      * where range = 2*max_abs. */
-    const float scale_product = (range_a/127) * (range_b/127);
+    const float scale_product = (range_a / 127) * (range_b / 127);
 
     int32_t dot0 = 0, dot1 = 0;
     uint32_t i;
 
     // Process 8 elements at a time for better pipeline utilization.
-    for (i = 0; i + 7 < dim; i += 8) {
+    for (i = 0; i + 7 < dim; i += 8)
+    {
         dot0 += ((int32_t)x[i]) * ((int32_t)y[i]) +
-                ((int32_t)x[i+1]) * ((int32_t)y[i+1]) +
-                ((int32_t)x[i+2]) * ((int32_t)y[i+2]) +
-                ((int32_t)x[i+3]) * ((int32_t)y[i+3]);
+                ((int32_t)x[i + 1]) * ((int32_t)y[i + 1]) +
+                ((int32_t)x[i + 2]) * ((int32_t)y[i + 2]) +
+                ((int32_t)x[i + 3]) * ((int32_t)y[i + 3]);
 
-        dot1 += ((int32_t)x[i+4]) * ((int32_t)y[i+4]) +
-                ((int32_t)x[i+5]) * ((int32_t)y[i+5]) +
-                ((int32_t)x[i+6]) * ((int32_t)y[i+6]) +
-                ((int32_t)x[i+7]) * ((int32_t)y[i+7]);
+        dot1 += ((int32_t)x[i + 4]) * ((int32_t)y[i + 4]) +
+                ((int32_t)x[i + 5]) * ((int32_t)y[i + 5]) +
+                ((int32_t)x[i + 6]) * ((int32_t)y[i + 6]) +
+                ((int32_t)x[i + 7]) * ((int32_t)y[i + 7]);
     }
 
     // Handle remaining elements.
-    for (; i < dim; i++) dot0 += ((int32_t)x[i]) * ((int32_t)y[i]);
+    for (; i < dim; i++)
+        dot0 += ((int32_t)x[i]) * ((int32_t)y[i]);
 
     // Convert to original range.
     float dotf = (dot0 + dot1) * scale_product;
     float distance = 1.0f - dotf;
 
     // Clamp distance to [0, 2].
-    if (distance < 0) distance = 0;
-    else if (distance > 2) distance = 2;
+    if (distance < 0)
+        distance = 0;
+    else if (distance > 2)
+        distance = 2;
     return distance;
 }
 
-static inline int popcount64(uint64_t x) {
+static inline int popcount64(uint64_t x)
+{
     x = (x & 0x5555555555555555) + ((x >> 1) & 0x5555555555555555);
     x = (x & 0x3333333333333333) + ((x >> 2) & 0x3333333333333333);
     x = (x & 0x0F0F0F0F0F0F0F0F) + ((x >> 4) & 0x0F0F0F0F0F0F0F0F);
@@ -291,26 +320,30 @@ static inline int popcount64(uint64_t x) {
 }
 
 /* Binary vectors distance. */
-float vectors_distance_bin(const uint64_t *x, const uint64_t *y, uint32_t dim) {
-    uint32_t len = (dim+63)/64;
+float vectors_distance_bin(const uint64_t *x, const uint64_t *y, uint32_t dim)
+{
+    uint32_t len = (dim + 63) / 64;
     uint32_t opposite = 0;
-    for (uint32_t j = 0; j < len; j++) {
-        int64_t xor = x[j]^y[j];
+    for (uint32_t j = 0; j < len; j++)
+    {
+        uint64_t xor = x[j] ^ y[j];
         opposite += popcount64(xor);
     }
-    return (float)opposite*2/dim;
+    return (float)opposite * 2 / dim;
 }
 
 /* Dot product between nodes. Will call the right version depending on the
  * quantization used. */
-float hnsw_distance(HNSW *index, hnswNode *a, hnswNode *b) {
-    switch(index->quant_type) {
+float hnsw_distance(HNSW *index, hnswNode *a, hnswNode *b)
+{
+    switch (index->quant_type)
+    {
     case HNSW_QUANT_NONE:
-        return vectors_distance_float(a->vector,b->vector,index->vector_dim);
+        return vectors_distance_float(a->vector, b->vector, index->vector_dim);
     case HNSW_QUANT_Q8:
-        return vectors_distance_q8(a->vector,b->vector,index->vector_dim,a->quants_range,b->quants_range);
+        return vectors_distance_q8(a->vector, b->vector, index->vector_dim, a->quants_range, b->quants_range);
     case HNSW_QUANT_BIN:
-        return vectors_distance_bin(a->vector,b->vector,index->vector_dim);
+        return vectors_distance_bin(a->vector, b->vector, index->vector_dim);
     default:
         assert(1 != 1);
         return 0;
@@ -321,25 +354,33 @@ float hnsw_distance(HNSW *index, hnswNode *a, hnswNode *b) {
  * For people looking at this code thinking: Oh, I could use min/max
  * quants instead! Well: I tried with min/max normalization but the dot
  * product needs to accumulate the sum for later correction, and it's slower. */
-void quantize_to_q8(float *src, int8_t *dst, uint32_t dim, float *rangeptr) {
+void quantize_to_q8(float *src, int8_t *dst, uint32_t dim, float *rangeptr)
+{
     float max_abs = 0;
-    for (uint32_t j = 0; j < dim; j++) {
-        if (src[j] > max_abs) max_abs = src[j];
-        if (-src[j] > max_abs) max_abs = -src[j];
+    for (uint32_t j = 0; j < dim; j++)
+    {
+        if (src[j] > max_abs)
+            max_abs = src[j];
+        if (-src[j] > max_abs)
+            max_abs = -src[j];
     }
 
-    if (max_abs == 0) {
-        if (rangeptr) *rangeptr = 0;
+    if (max_abs == 0)
+    {
+        if (rangeptr)
+            *rangeptr = 0;
         memset(dst, 0, dim);
         return;
     }
 
-    const float scale = 127.0f / max_abs;  // Scale to map to [-127, 127].
+    const float scale = 127.0f / max_abs; // Scale to map to [-127, 127].
 
-    for (uint32_t j = 0; j < dim; j++) {
+    for (uint32_t j = 0; j < dim; j++)
+    {
         dst[j] = (int8_t)roundf(src[j] * scale);
     }
-    if (rangeptr) *rangeptr = max_abs;  // Return max_abs instead of 2*max_abs.
+    if (rangeptr)
+        *rangeptr = max_abs; // Return max_abs instead of 2*max_abs.
 }
 
 /* Binary quantization of vector 'src' to 'dst'. We use full words of
@@ -347,15 +388,18 @@ void quantize_to_q8(float *src, int8_t *dst, uint32_t dim, float *rangeptr) {
  * so that they'll be the same in all the vectors, and when xor+popcount
  * is used to compute the distance, such bits are not considered. This
  * allows to go faster. */
-void quantize_to_bin(float *src, uint64_t *dst, uint32_t dim) {
-    memset(dst,0,(dim+63)/64*sizeof(uint64_t));
-    for (uint32_t j = 0; j < dim; j++) {
-        uint32_t word = j/64;
-        uint32_t bit = j&63;
+void quantize_to_bin(float *src, uint64_t *dst, uint32_t dim)
+{
+    memset(dst, 0, (dim + 63) / 64 * sizeof(uint64_t));
+    for (uint32_t j = 0; j < dim; j++)
+    {
+        uint32_t word = j / 64;
+        uint32_t bit = j & 63;
         /* Since cosine similarity checks the vector direction and
          * not magnitudo, we do likewise in the binary quantization and
          * just remember if the component is positive or negative. */
-        if (src[j] > 0) dst[word] |= 1ULL<<bit;
+        if (src[j] > 0)
+            dst[word] |= 1ULL << bit;
     }
 }
 
@@ -363,25 +407,32 @@ void quantize_to_bin(float *src, uint64_t *dst, uint32_t dim) {
  *
  * Store the L2 value on 'l2ptr' if not NULL. This way the process
  * can be reversed even if some precision will be lost. */
-void hnsw_normalize_vector(float *x, float *l2ptr, uint32_t dim) {
+void hnsw_normalize_vector(float *x, float *l2ptr, uint32_t dim)
+{
     float l2 = 0;
     uint32_t i;
-    for (i = 0; i + 3 < dim; i += 4) {
-        l2 += x[i]*x[i] +
-              x[i+1]*x[i+1] +
-              x[i+2]*x[i+2] +
-              x[i+3]*x[i+3];
+    for (i = 0; i + 3 < dim; i += 4)
+    {
+        l2 += x[i] * x[i] +
+              x[i + 1] * x[i + 1] +
+              x[i + 2] * x[i + 2] +
+              x[i + 3] * x[i + 3];
     }
-    for (; i < dim; i++) l2 += x[i]*x[i];
-    if (l2 == 0) return; // All zero vector, can't normalize.
+    for (; i < dim; i++)
+        l2 += x[i] * x[i];
+    if (l2 == 0)
+        return; // All zero vector, can't normalize.
 
     l2 = sqrtf(l2);
-    if (l2ptr) *l2ptr = l2;
-    for (i = 0; i < dim; i++) x[i] /= l2;
+    if (l2ptr)
+        *l2ptr = l2;
+    for (i = 0; i < dim; i++)
+        x[i] /= l2;
 }
 
 /* Helper function to generate random level. */
-uint32_t random_level() {
+uint32_t random_level()
+{
     static const int threshold = HNSW_P * RAND_MAX;
     uint32_t level = 0;
 
@@ -391,9 +442,11 @@ uint32_t random_level() {
 }
 
 /* Create new HNSW index, quantized or not. */
-HNSW *hnsw_new(uint32_t vector_dim, uint32_t quant_type) {
+HNSW *hnsw_new(uint32_t vector_dim, uint32_t quant_type)
+{
     HNSW *index = hmalloc(sizeof(HNSW));
-    if (!index) return NULL;
+    if (!index)
+        return NULL;
 
     index->quant_type = quant_type;
     index->enter_point = NULL;
@@ -409,13 +462,16 @@ HNSW *hnsw_new(uint32_t vector_dim, uint32_t quant_type) {
         index->current_epoch[i] = 0;
 
     /* Initialize locks. */
-    if (pthread_rwlock_init(&index->global_lock, NULL) != 0) {
+    if (pthread_rwlock_init(&index->global_lock, NULL) != 0)
+    {
         hfree(index);
         return NULL;
     }
 
-    for (int i = 0; i < HNSW_MAX_THREADS; i++) {
-        if (pthread_mutex_init(&index->slot_locks[i], NULL) != 0) {
+    for (int i = 0; i < HNSW_MAX_THREADS; i++)
+    {
+        if (pthread_mutex_init(&index->slot_locks[i], NULL) != 0)
+        {
             /* Clean up previously initialized mutexes. */
             for (int j = 0; j < i; j++)
                 pthread_mutex_destroy(&index->slot_locks[j]);
@@ -434,24 +490,32 @@ HNSW *hnsw_new(uint32_t vector_dim, uint32_t quant_type) {
 /* Fill 'vec' with the node vector, de-normalizing and de-quantizing it
  * as needed. Note that this function will return an approximated version
  * of the original vector. */
-void hnsw_get_node_vector(HNSW *index, hnswNode *node, float *vec) {
-    if (index->quant_type == HNSW_QUANT_NONE) {
-        memcpy(vec,node->vector,index->vector_dim*sizeof(float));
-    } else if (index->quant_type == HNSW_QUANT_Q8) {
+void hnsw_get_node_vector(HNSW *index, hnswNode *node, float *vec)
+{
+    if (index->quant_type == HNSW_QUANT_NONE)
+    {
+        memcpy(vec, node->vector, index->vector_dim * sizeof(float));
+    }
+    else if (index->quant_type == HNSW_QUANT_Q8)
+    {
         int8_t *quants = node->vector;
         for (uint32_t j = 0; j < index->vector_dim; j++)
-            vec[j] = (quants[j]*node->quants_range)/127;
-    } else if (index->quant_type == HNSW_QUANT_BIN) {
+            vec[j] = (quants[j] * node->quants_range) / 127;
+    }
+    else if (index->quant_type == HNSW_QUANT_BIN)
+    {
         uint64_t *bits = node->vector;
-        for (uint32_t j = 0; j < index->vector_dim; j++) {
-            uint32_t word = j/64;
-            uint32_t bit = j&63;
-            vec[j] = (bits[word] & (1ULL<<bit)) ? 1.0f : -1.0f;
+        for (uint32_t j = 0; j < index->vector_dim; j++)
+        {
+            uint32_t word = j / 64;
+            uint32_t bit = j & 63;
+            vec[j] = (bits[word] & (1ULL << bit)) ? 1.0f : -1.0f;
         }
     }
 
     // De-normalize.
-    if (index->quant_type != HNSW_QUANT_BIN) {
+    if (index->quant_type != HNSW_QUANT_BIN)
+    {
         for (uint32_t j = 0; j < index->vector_dim; j++)
             vec[j] *= node->l2;
     }
@@ -460,12 +524,18 @@ void hnsw_get_node_vector(HNSW *index, hnswNode *node, float *vec) {
 /* Return the number of bytes needed to represent a vector in the index,
  * that is function of the dimension of the vectors and the quantization
  * type used. */
-uint32_t hnsw_quants_bytes(HNSW *index) {
-    switch(index->quant_type) {
-    case HNSW_QUANT_NONE: return index->vector_dim * sizeof(float);
-    case HNSW_QUANT_Q8: return index->vector_dim;
-    case HNSW_QUANT_BIN: return (index->vector_dim+63)/64*8;
-    default: assert(0 && "Quantization type not supported.");
+uint32_t hnsw_quants_bytes(HNSW *index)
+{
+    switch (index->quant_type)
+    {
+    case HNSW_QUANT_NONE:
+        return index->vector_dim * sizeof(float);
+    case HNSW_QUANT_Q8:
+        return index->vector_dim;
+    case HNSW_QUANT_BIN:
+        return (index->vector_dim + 63) / 64 * 8;
+    default:
+        assert(0 && "Quantization type not supported.");
     }
 }
 
@@ -488,49 +558,57 @@ uint32_t hnsw_quants_bytes(HNSW *index) {
  * original vector) make sure to save the l2 on disk and set it back
  * after the node creation (see later for the serialization API that
  * handles this and more). */
-hnswNode *hnsw_node_new(HNSW *index, uint64_t id, const float *vector, const int8_t *qvector, float qrange, uint32_t level, int normalize) {
-    hnswNode *node = hmalloc(sizeof(hnswNode)+(sizeof(hnswNodeLayer)*(level+1)));
-    if (!node) return NULL;
+hnswNode *hnsw_node_new(HNSW *index, uint64_t id, const float *vector, const int8_t *qvector, float qrange, uint32_t level, int normalize)
+{
+    hnswNode *node = hmalloc(sizeof(hnswNode) + (sizeof(hnswNodeLayer) * (level + 1)));
+    if (!node)
+        return NULL;
 
-    if (id == 0) id = ++index->last_id;
+    if (id == 0)
+        id = ++index->last_id;
     node->level = level;
     node->id = id;
     node->next = NULL;
     node->vector = NULL;
-    node->l2 = 1;   // Default in case of already quantized vectors. It is
-                    // up to the caller to fill this later, if needed.
+    node->l2 = 1; // Default in case of already quantized vectors. It is
+                  // up to the caller to fill this later, if needed.
 
     /* Initialize visited epoch array. */
     for (int i = 0; i < HNSW_MAX_THREADS; i++)
         node->visited_epoch[i] = 0;
 
-    if (qvector == NULL) {
+    if (qvector == NULL)
+    {
         /* Copy input vector. */
         node->vector = hmalloc(sizeof(float) * index->vector_dim);
-        if (!node->vector) {
+        if (!node->vector)
+        {
             hfree(node);
             return NULL;
         }
         memcpy(node->vector, vector, sizeof(float) * index->vector_dim);
         if (normalize)
-            hnsw_normalize_vector(node->vector,&node->l2,index->vector_dim);
+            hnsw_normalize_vector(node->vector, &node->l2, index->vector_dim);
 
         /* Handle quantization. */
-        if (index->quant_type != HNSW_QUANT_NONE) {
+        if (index->quant_type != HNSW_QUANT_NONE)
+        {
             void *quants = hmalloc(hnsw_quants_bytes(index));
-            if (quants == NULL) {
+            if (quants == NULL)
+            {
                 hfree(node->vector);
                 hfree(node);
                 return NULL;
             }
 
             // Quantize.
-            switch(index->quant_type) {
+            switch (index->quant_type)
+            {
             case HNSW_QUANT_Q8:
-                quantize_to_q8(node->vector,quants,index->vector_dim,&node->quants_range);
+                quantize_to_q8(node->vector, quants, index->vector_dim, &node->quants_range);
                 break;
             case HNSW_QUANT_BIN:
-                quantize_to_bin(node->vector,quants,index->vector_dim);
+                quantize_to_bin(node->vector, quants, index->vector_dim);
                 break;
             default:
                 assert(0 && "Quantization type not handled.");
@@ -541,30 +619,35 @@ hnswNode *hnsw_node_new(HNSW *index, uint64_t id, const float *vector, const int
             hfree(node->vector);
             node->vector = quants;
         }
-    } else {
+    }
+    else
+    {
         // We got the already quantized vector. Just copy it.
         assert(index->quant_type != HNSW_QUANT_NONE);
         uint32_t vector_bytes = hnsw_quants_bytes(index);
         node->vector = hmalloc(vector_bytes);
         node->quants_range = qrange;
-        if (node->vector == NULL) {
+        if (node->vector == NULL)
+        {
             hfree(node);
             return NULL;
         }
-        memcpy(node->vector,qvector,vector_bytes);
+        memcpy(node->vector, qvector, vector_bytes);
     }
 
     /* Initialize each layer. */
-    for (uint32_t i = 0; i <= level; i++) {
+    for (uint32_t i = 0; i <= level; i++)
+    {
         uint32_t max_links = (i == 0) ? HNSW_M0 : HNSW_M;
         node->layers[i].max_links = max_links;
         node->layers[i].num_links = 0;
         node->layers[i].worst_distance = 0;
         node->layers[i].worst_idx = 0;
-        node->layers[i].links = hmalloc(sizeof(hnswNode*) * max_links);
-        if (!node->layers[i].links) {
-            for (uint32_t j = 0; j < i; j++) hfree(node->layers[j].links);
-            hfree(node->layers);
+        node->layers[i].links = hmalloc(sizeof(hnswNode *) * max_links);
+        if (!node->layers[i].links)
+        {
+            for (uint32_t j = 0; j < i; j++)
+                hfree(node->layers[j].links);
             hfree(node->vector);
             hfree(node);
             return NULL;
@@ -575,8 +658,10 @@ hnswNode *hnsw_node_new(HNSW *index, uint64_t id, const float *vector, const int
 }
 
 /* Free a node. */
-void hnsw_node_free(hnswNode *node) {
-    if (!node) return;
+void hnsw_node_free(hnswNode *node)
+{
+    if (!node)
+        return;
 
     for (uint32_t i = 0; i <= node->level; i++)
         hfree(node->layers[i].links);
@@ -586,20 +671,25 @@ void hnsw_node_free(hnswNode *node) {
 }
 
 /* Free the entire index. */
-void hnsw_free(HNSW *index,void(*free_value)(void*value)) {
-    if (!index) return;
+void hnsw_free(HNSW *index, void (*free_value)(void *value))
+{
+    if (!index)
+        return;
 
     hnswNode *current = index->head;
-    while (current) {
+    while (current)
+    {
         hnswNode *next = current->next;
-        if (free_value) free_value(current->value);
+        if (free_value)
+            free_value(current->value);
         hnsw_node_free(current);
         current = next;
     }
 
     /* Destroy locks */
     pthread_rwlock_destroy(&index->global_lock);
-    for (int i = 0; i < HNSW_MAX_THREADS; i++) {
+    for (int i = 0; i < HNSW_MAX_THREADS; i++)
+    {
         pthread_mutex_destroy(&index->slot_locks[i]);
     }
 
@@ -609,7 +699,8 @@ void hnsw_free(HNSW *index,void(*free_value)(void*value)) {
 /* Add node to linked list of nodes. We may need to scan the whole
  * HNSW graph for several reasons. The list is doubly linked since we
  * also need the ability to remove a node without scanning the whole thing. */
-void hnsw_add_node(HNSW *index, hnswNode *node) {
+void hnsw_add_node(HNSW *index, hnswNode *node)
+{
     node->next = index->head;
     node->prev = NULL;
     if (index->head)
@@ -619,45 +710,68 @@ void hnsw_add_node(HNSW *index, hnswNode *node) {
 }
 
 /* Search the specified layer starting from the specified entry point
- * to collect 'ef' nodes that are near to 'query'. */
-pqueue *search_layer(HNSW *index, hnswNode *query, hnswNode *entry_point,
-                    uint32_t ef, uint32_t layer, uint32_t slot)
+ * to collect 'ef' nodes that are near to 'query'.
+ *
+ * This function implements optional hybrid search, so that each node
+ * can be accepted or not based on its associated value. In this case
+ * a callback 'filter_callback' should be passed, together with a maximum
+ * effort for the search (number of candidates to evaluate), since even
+ * with a a low "EF" value we risk that there are too few nodes that satisfy
+ * the provided filter, and we could trigger a full scan. */
+pqueue *search_layer_with_filter(
+    HNSW *index, hnswNode *query, hnswNode *entry_point,
+    uint32_t ef, uint32_t layer, uint32_t slot,
+    int (*filter_callback)(void *value, void *privdata),
+    void *filter_privdata, uint32_t max_candidates)
 {
     // Mark visited nodes with a never seen epoch.
     index->current_epoch[slot]++;
 
     pqueue *candidates = pq_new(HNSW_MAX_CANDIDATES);
     pqueue *results = pq_new(ef);
-    if (!candidates || !results) {
-        if (candidates) pq_free(candidates);
-        if (results) pq_free(results);
+    if (!candidates || !results)
+    {
+        if (candidates)
+            pq_free(candidates);
+        if (results)
+            pq_free(results);
         return NULL;
     }
+
+    // Take track of the total effort: only used when filtering via
+    // a callback to have a bound effort.
+    uint32_t evaluated_candidates = 1;
 
     // Add entry point.
     float dist = hnsw_distance(index, query, entry_point);
     pq_push(candidates, entry_point, dist);
-    pq_push(results, entry_point, dist);
+    if (filter_callback == NULL ||
+        filter_callback(entry_point->value, filter_privdata))
+    {
+        pq_push(results, entry_point, dist);
+    }
     entry_point->visited_epoch[slot] = index->current_epoch[slot];
 
     // Process candidates.
-    while (candidates->count > 0) {
-        // Pop closest element and use its saved distance.
+    while (candidates->count > 0)
+    {
+        // Max effort. If zero, we keep scanning.
+        if (filter_callback &&
+            max_candidates &&
+            evaluated_candidates >= max_candidates)
+            break;
+
         float cur_dist;
         hnswNode *current = pq_pop(candidates, &cur_dist);
+        evaluated_candidates++;
 
-        /* Stop if we can't get better results. Note that this can
-         * be true only if we already collected 'ef' elements in
-         * the priority queue. This is why: if we have less than EF
-         * elements, later in the for loop that checks the neighbors we
-         * add new elements BOTH in the results and candidates pqueue: this
-         * means that before accumulating EF elements, the worst candidate
-         * can be as bad as the worst result, but not worse. */
         float furthest = pq_max_distance(results);
-        if (cur_dist > furthest) break;
+        if (results->count >= ef && cur_dist > furthest)
+            break;
 
         /* Check neighbors. */
-        for (uint32_t i = 0; i < current->layers[layer].num_links; i++) {
+        for (uint32_t i = 0; i < current->layers[layer].num_links; i++)
+        {
             hnswNode *neighbor = current->layers[layer].links[i];
 
             if (neighbor->visited_epoch[slot] == index->current_epoch[slot])
@@ -665,17 +779,50 @@ pqueue *search_layer(HNSW *index, hnswNode *query, hnswNode *entry_point,
 
             neighbor->visited_epoch[slot] = index->current_epoch[slot];
             float neighbor_dist = hnsw_distance(index, query, neighbor);
-            // Add to results if better than current max or results not full.
+
             furthest = pq_max_distance(results);
-            if (neighbor_dist < furthest || results->count < ef) {
-                pq_push(candidates, neighbor, neighbor_dist);
-                pq_push(results, neighbor, neighbor_dist);
+            if (filter_callback == NULL)
+            {
+                /* Original HNSW logic when no filtering:
+                 * Add to results if better than current max or
+                 * results not full. */
+                if (neighbor_dist < furthest || results->count < ef)
+                {
+                    pq_push(candidates, neighbor, neighbor_dist);
+                    pq_push(results, neighbor, neighbor_dist);
+                }
+            }
+            else
+            {
+                /* With filtering: we add candidates even if doesn't match
+                 * the filter, in order to continue to explore the graph. */
+                if (neighbor_dist < furthest || candidates->count < ef)
+                {
+                    pq_push(candidates, neighbor, neighbor_dist);
+                }
+
+                /* Add results only if passes filter. */
+                if (filter_callback(neighbor->value, filter_privdata))
+                {
+                    if (neighbor_dist < furthest || results->count < ef)
+                    {
+                        pq_push(results, neighbor, neighbor_dist);
+                    }
+                }
             }
         }
     }
 
     pq_free(candidates);
     return results;
+}
+
+/* Just a wrapper without hybrid search callback. */
+pqueue *search_layer(HNSW *index, hnswNode *query, hnswNode *entry_point,
+                     uint32_t ef, uint32_t layer, uint32_t slot)
+{
+    return search_layer_with_filter(index, query, entry_point, ef, layer, slot,
+                                    NULL, NULL, 0);
 }
 
 /* This function is used in order to initialize a node allocated in the
@@ -695,63 +842,88 @@ pqueue *search_layer(HNSW *index, hnswNode *query, hnswNode *entry_point,
  *
  * Return 0 on out of memory, 1 on success.
  */
-int hnsw_init_tmp_node(HNSW *index, hnswNode *node, int is_normalized, const float *vector) {
+int hnsw_init_tmp_node(HNSW *index, hnswNode *node, int is_normalized, const float *vector)
+{
     node->vector = NULL;
 
     /* Work on a normalized query vector if the input vector is
      * not normalized. */
-    if (!is_normalized) {
-        node->vector = hmalloc(sizeof(float)*index->vector_dim);
-        if (node->vector == NULL) return 0;
-        memcpy(node->vector,vector,sizeof(float)*index->vector_dim);
-        hnsw_normalize_vector(node->vector,NULL,index->vector_dim);
-    } else {
-        node->vector = (float*)vector;
+    if (!is_normalized)
+    {
+        node->vector = hmalloc(sizeof(float) * index->vector_dim);
+        if (node->vector == NULL)
+            return 0;
+        memcpy(node->vector, vector, sizeof(float) * index->vector_dim);
+        hnsw_normalize_vector(node->vector, NULL, index->vector_dim);
+    }
+    else
+    {
+        node->vector = (float *)vector;
     }
 
     /* If quantization is enabled, our query fake node should be
      * quantized as well. */
-    if (index->quant_type != HNSW_QUANT_NONE) {
+    if (index->quant_type != HNSW_QUANT_NONE)
+    {
         void *quants = hmalloc(hnsw_quants_bytes(index));
-        if (quants == NULL) {
-            if (node->vector != vector) hfree(node->vector);
+        if (quants == NULL)
+        {
+            if (node->vector != vector)
+                hfree(node->vector);
             return 0;
         }
-        switch(index->quant_type) {
+        switch (index->quant_type)
+        {
         case HNSW_QUANT_Q8:
             quantize_to_q8(node->vector, quants, index->vector_dim, &node->quants_range);
             break;
         case HNSW_QUANT_BIN:
             quantize_to_bin(node->vector, quants, index->vector_dim);
         }
-        if (node->vector != vector) hfree(node->vector);
+        if (node->vector != vector)
+            hfree(node->vector);
         node->vector = quants;
     }
     return 1;
 }
 
 /* Free the stack allocated node initialized by hnsw_init_tmp_node(). */
-void hnsw_free_tmp_node(hnswNode *node, const float *vector) {
-    if (node->vector != vector) hfree(node->vector);
+void hnsw_free_tmp_node(hnswNode *node, const float *vector)
+{
+    if (node->vector != vector)
+        hfree(node->vector);
 }
 
 /* Return approximated K-NN items. Note that neighbors and distances
  * arrays must have space for at least 'k' items.
  * norm_query should be set to 1 if the query vector is already
  * normalized, otherwise, if 0, the function will copy the vector,
- * L2-normalize the copy and search using the normalized version. */
-int hnsw_search(HNSW *index, const float *query_vector, uint32_t k,
-                hnswNode **neighbors, float *distances, uint32_t slot,
-                int query_vector_is_normalized)
+ * L2-normalize the copy and search using the normalized version.
+ *
+ * If the filter_privdata callback is passed, only elements passing the
+ * specified filter (invoked with privdata and the value associated
+ * to the node as arguments) are returned. In such case, if max_candidates
+ * is not NULL, it represents the maximum number of nodes to explore, since
+ * the search may be otherwise unbound if few or no elements pass the
+ * filter. */
+int hnsw_search_with_filter(HNSW *index, const float *query_vector, uint32_t k,
+                            hnswNode **neighbors, float *distances, uint32_t slot,
+                            int query_vector_is_normalized,
+                            int (*filter_callback)(void *value, void *privdata),
+                            void *filter_privdata, uint32_t max_candidates)
+
 {
-    if (!index || !query_vector || !neighbors || k == 0) return -1;
-    if (!index->enter_point) return 0; // Empty index.
+    if (!index || !query_vector || !neighbors || k == 0)
+        return -1;
+    if (!index->enter_point)
+        return 0; // Empty index.
 
     /* Use a fake node that holds the query vector, this way we can
      * use our normal node to node distance functions when checking
      * the distance between query and graph nodes. */
     hnswNode query;
-    if (hnsw_init_tmp_node(index,&query,query_vector_is_normalized,query_vector) == 0) return -1;
+    if (hnsw_init_tmp_node(index, &query, query_vector_is_normalized, query_vector) == 0)
+        return -1;
 
     // Start searching from the entry point.
     hnswNode *curr_ep = index->enter_point;
@@ -759,29 +931,37 @@ int hnsw_search(HNSW *index, const float *query_vector, uint32_t k,
     /* Start from higher layer to layer 1 (layer 0 is handled later)
      * in the next section. Descend to the most similar node found
      * so far. */
-    for (int lc = index->max_level; lc > 0; lc--) {
+    for (int lc = index->max_level; lc > 0; lc--)
+    {
         pqueue *results = search_layer(index, &query, curr_ep, 1, lc, slot);
-        if (!results) continue;
+        if (!results)
+            continue;
 
-        if (results->count > 0) {
-            curr_ep = pq_get_node(results,0);
+        if (results->count > 0)
+        {
+            curr_ep = pq_get_node(results, 0);
         }
         pq_free(results);
     }
 
     /* Search bottom layer (the most densely populated) with ef = k */
-    pqueue *results = search_layer(index, &query, curr_ep, k, 0, slot);
-    if (!results) {
+    pqueue *results = search_layer_with_filter(
+        index, &query, curr_ep, k, 0, slot, filter_callback,
+        filter_privdata, max_candidates);
+    if (!results)
+    {
         hnsw_free_tmp_node(&query, query_vector);
         return -1;
     }
 
     /* Copy results. */
     uint32_t found = MIN(k, results->count);
-    for (uint32_t i = 0; i < found; i++) {
-        neighbors[i] = pq_get_node(results,i);
-        if (distances) {
-            distances[i] = pq_get_distance(results,i);
+    for (uint32_t i = 0; i < found; i++)
+    {
+        neighbors[i] = pq_get_node(results, i);
+        if (distances)
+        {
+            distances[i] = pq_get_distance(results, i);
         }
     }
 
@@ -790,15 +970,28 @@ int hnsw_search(HNSW *index, const float *query_vector, uint32_t k,
     return found;
 }
 
+/* Wrapper to hnsw_search_with_filter() when no filter is needed. */
+int hnsw_search(HNSW *index, const float *query_vector, uint32_t k,
+                hnswNode **neighbors, float *distances, uint32_t slot,
+                int query_vector_is_normalized)
+{
+    return hnsw_search_with_filter(index, query_vector, k, neighbors,
+                                   distances, slot, query_vector_is_normalized,
+                                   NULL, NULL, 0);
+}
+
 /* Rescan a node and update the wortst neighbor index.
  * The followinng two functions are variants of this function to be used
  * when links are added or removed: they may do less work than a full scan. */
-void hnsw_update_worst_neighbor(HNSW *index, hnswNode *node, uint32_t layer) {
+void hnsw_update_worst_neighbor(HNSW *index, hnswNode *node, uint32_t layer)
+{
     float worst_dist = 0;
     uint32_t worst_idx = 0;
-    for (uint32_t i = 0; i < node->layers[layer].num_links; i++) {
+    for (uint32_t i = 0; i < node->layers[layer].num_links; i++)
+    {
         float dist = hnsw_distance(index, node, node->layers[layer].links[i]);
-        if (dist > worst_dist) {
+        if (dist > worst_dist)
+        {
             worst_dist = dist;
             worst_idx = i;
         }
@@ -809,10 +1002,11 @@ void hnsw_update_worst_neighbor(HNSW *index, hnswNode *node, uint32_t layer) {
 
 /* Update node worst neighbor distance information when a new neighbor
  * is added. */
-void hnsw_update_worst_neighbor_on_add(HNSW *index, hnswNode *node, uint32_t layer, uint32_t added_index, float distance) {
-    (void) index; // Unused but here for API symmetry.
-    if (node->layers[layer].num_links == 1 ||           // First neighbor?
-        distance > node->layers[layer].worst_distance)  // New worst?
+void hnsw_update_worst_neighbor_on_add(HNSW *index, hnswNode *node, uint32_t layer, uint32_t added_index, float distance)
+{
+    (void)index;                                       // Unused but here for API symmetry.
+    if (node->layers[layer].num_links == 1 ||          // First neighbor?
+        distance > node->layers[layer].worst_distance) // New worst?
     {
         node->layers[layer].worst_distance = distance;
         node->layers[layer].worst_idx = added_index;
@@ -823,12 +1017,17 @@ void hnsw_update_worst_neighbor_on_add(HNSW *index, hnswNode *node, uint32_t lay
  * is removed. */
 void hnsw_update_worst_neighbor_on_remove(HNSW *index, hnswNode *node, uint32_t layer, uint32_t removed_idx)
 {
-    if (node->layers[layer].num_links == 0) {
+    if (node->layers[layer].num_links == 0)
+    {
         node->layers[layer].worst_distance = 0;
         node->layers[layer].worst_idx = 0;
-    } else if (removed_idx == node->layers[layer].worst_idx) {
-        hnsw_update_worst_neighbor(index,node,layer);
-    } else if (removed_idx < node->layers[layer].worst_idx) {
+    }
+    else if (removed_idx == node->layers[layer].worst_idx)
+    {
+        hnsw_update_worst_neighbor(index, node, layer);
+    }
+    else if (removed_idx < node->layers[layer].worst_idx)
+    {
         // Just update index if we removed element before worst.
         node->layers[layer].worst_idx--;
     }
@@ -877,33 +1076,40 @@ void select_neighbors(HNSW *index, pqueue *candidates, hnswNode *new_node,
 {
     uint32_t max_links = (layer == 0) ? HNSW_M0 : HNSW_M;
 
-    for (uint32_t i = 0; i < candidates->count; i++) {
-        hnswNode *neighbor = pq_get_node(candidates,i);
-        if (neighbor == new_node) continue; // Don't link node with itself.
+    for (uint32_t i = 0; i < candidates->count; i++)
+    {
+        hnswNode *neighbor = pq_get_node(candidates, i);
+        if (neighbor == new_node)
+            continue; // Don't link node with itself.
 
         /* Use our cached distance among the new node and the candidate. */
-        float dist = pq_get_distance(candidates,i);
+        float dist = pq_get_distance(candidates, i);
 
         /* First of all, since our links are all bidirectional, if the
          * new node for any reason has no longer room, or if it accumulated
          * the required number of links, return ASAP. */
         if (new_node->layers[layer].num_links >= new_node->layers[layer].max_links ||
-            new_node->layers[layer].num_links >= required_links) return;
+            new_node->layers[layer].num_links >= required_links)
+            return;
 
         /* If aggressive is true, it is possible that the new node
          * already got some link among the candidates (see the top comment,
          * this function gets re-called in case of too few links).
          * So we need to check if this candidate is already linked to
          * the new node. */
-        if (aggressive) {
+        if (aggressive)
+        {
             int duplicated = 0;
-            for (uint32_t j = 0; j < new_node->layers[layer].num_links; j++) {
-                if (new_node->layers[layer].links[j] == neighbor) {
+            for (uint32_t j = 0; j < new_node->layers[layer].num_links; j++)
+            {
+                if (new_node->layers[layer].links[j] == neighbor)
+                {
                     duplicated = 1;
                     break;
                 }
             }
-            if (duplicated) continue;
+            if (duplicated)
+                continue;
         }
 
         /* Diversity check. We accept new candidates
@@ -911,29 +1117,34 @@ void select_neighbors(HNSW *index, pqueue *candidates, hnswNode *new_node,
          * to the candidate than the new element itself.
          * However this check is disabled if we have pressure to find
          * new links (aggressive != 0) */
-        if (!aggressive) {
+        if (!aggressive)
+        {
             int diversity_failed = 0;
-            for (uint32_t j = 0; j < new_node->layers[layer].num_links; j++) {
+            for (uint32_t j = 0; j < new_node->layers[layer].num_links; j++)
+            {
                 float link_dist = hnsw_distance(index, neighbor,
-                    new_node->layers[layer].links[j]);
-                if (link_dist < dist) {
+                                                new_node->layers[layer].links[j]);
+                if (link_dist < dist)
+                {
                     diversity_failed = 1;
                     break;
                 }
             }
-            if (diversity_failed) continue;
+            if (diversity_failed)
+                continue;
         }
 
         /* If potential neighbor node has space, simply add the new link.
          * We will have space as well. */
         uint32_t n = neighbor->layers[layer].num_links;
-        if (n < max_links) {
+        if (n < max_links)
+        {
             /* Link candidate to new node. */
             neighbor->layers[layer].links[n] = new_node;
             neighbor->layers[layer].num_links++;
 
             /* Update candidate worst link info. */
-            hnsw_update_worst_neighbor_on_add(index,neighbor,layer,n,dist);
+            hnsw_update_worst_neighbor_on_add(index, neighbor, layer, n, dist);
 
             /* Link new node to candidate. */
             uint32_t new_links = new_node->layers[layer].num_links;
@@ -941,7 +1152,7 @@ void select_neighbors(HNSW *index, pqueue *candidates, hnswNode *new_node,
             new_node->layers[layer].num_links++;
 
             /* Update new node worst link info. */
-            hnsw_update_worst_neighbor_on_add(index,new_node,layer,new_links,dist);
+            hnsw_update_worst_neighbor_on_add(index, new_node, layer, new_links, dist);
             continue;
         }
 
@@ -967,13 +1178,13 @@ void select_neighbors(HNSW *index, pqueue *candidates, hnswNode *new_node,
          * if we remove the candidate node as its link. Let's check if
          * this is the case: */
         if (aggressive == 0 &&
-            worst_node->layers[layer].num_links <= HNSW_M/2)
+            worst_node->layers[layer].num_links <= HNSW_M / 2)
             continue;
 
         /* Aggressive level = 1. It's ok if the node remains with just
          * HNSW_M/4 links. */
         else if (aggressive == 1 &&
-                 worst_node->layers[layer].num_links <= HNSW_M/4)
+                 worst_node->layers[layer].num_links <= HNSW_M / 4)
             continue;
 
         /* If aggressive is set to 2, then the new node we are adding failed
@@ -981,7 +1192,7 @@ void select_neighbors(HNSW *index, pqueue *candidates, hnswNode *new_node,
          * node, so let's see if the target node has some other link
          * that is well connected in the graph: we could drop it instead
          * of the worst link. */
-        if (aggressive == 2 && worst_node->layers[layer].num_links <= HNSW_M/4)
+        if (aggressive == 2 && worst_node->layers[layer].num_links <= HNSW_M / 4)
         {
             /* Let's see if we can find at least a candidate link that
              * would remain with a few connections. Track the one
@@ -990,7 +1201,8 @@ void select_neighbors(HNSW *index, pqueue *candidates, hnswNode *new_node,
             worst_node = NULL;
             uint32_t worst_idx = 0;
             float max_dist = 0;
-            for (uint32_t j = 0; j < neighbor->layers[layer].num_links; j++) {
+            for (uint32_t j = 0; j < neighbor->layers[layer].num_links; j++)
+            {
                 hnswNode *to_drop = neighbor->layers[layer].links[j];
 
                 /* Skip this if it would remain too disconnected as well.
@@ -1001,23 +1213,28 @@ void select_neighbors(HNSW *index, pqueue *candidates, hnswNode *new_node,
                  * single link does not just leave it too weakly connected, but
                  * also sometimes creates cycles with few disconnected
                  * nodes linked among them. */
-                if (to_drop->layers[layer].num_links <= HNSW_M/4) continue;
+                if (to_drop->layers[layer].num_links <= HNSW_M / 4)
+                    continue;
 
                 float link_dist = hnsw_distance(index, neighbor, to_drop);
-                if (worst_node == NULL || link_dist > max_dist) {
+                if (worst_node == NULL || link_dist > max_dist)
+                {
                     worst_node = to_drop;
                     max_dist = link_dist;
                     worst_idx = j;
                 }
             }
 
-            if (worst_node != NULL) {
+            if (worst_node != NULL)
+            {
                 /* We found a node that we can drop. Let's pretend this is
                  * the worst node of the candidate to unify the following
                  * code path. Later we will fix the worst node info anyway. */
                 neighbor->layers[layer].worst_distance = max_dist;
                 neighbor->layers[layer].worst_idx = worst_idx;
-            } else {
+            }
+            else
+            {
                 /* Otherwise we have no other option than reallocating
                  * the max number of links for this target node, and
                  * ensure at least a few connections for our new node.
@@ -1029,13 +1246,15 @@ void select_neighbors(HNSW *index, pqueue *candidates, hnswNode *new_node,
         }
 
         // Remove backlink from the worst node of our candidate.
-        for (uint64_t j = 0; j < worst_node->layers[layer].num_links; j++) {
-            if (worst_node->layers[layer].links[j] == neighbor) {
+        for (uint64_t j = 0; j < worst_node->layers[layer].num_links; j++)
+        {
+            if (worst_node->layers[layer].links[j] == neighbor)
+            {
                 memmove(&worst_node->layers[layer].links[j],
-                        &worst_node->layers[layer].links[j+1],
-                        (worst_node->layers[layer].num_links - j - 1) * sizeof(hnswNode*));
+                        &worst_node->layers[layer].links[j + 1],
+                        (worst_node->layers[layer].num_links - j - 1) * sizeof(hnswNode *));
                 worst_node->layers[layer].num_links--;
-                hnsw_update_worst_neighbor_on_remove(index,worst_node,layer,j);
+                hnsw_update_worst_neighbor_on_remove(index, worst_node, layer, j);
                 break;
             }
         }
@@ -1045,7 +1264,7 @@ void select_neighbors(HNSW *index, pqueue *candidates, hnswNode *new_node,
 
         /* Update the worst link in the target node, at this point
          * the link that we replaced may no longer be the worst. */
-        hnsw_update_worst_neighbor(index,neighbor,layer);
+        hnsw_update_worst_neighbor(index, neighbor, layer);
 
         // Add new node -> candidate link.
         uint32_t new_links = new_node->layers[layer].num_links;
@@ -1053,7 +1272,7 @@ void select_neighbors(HNSW *index, pqueue *candidates, hnswNode *new_node,
         new_node->layers[layer].num_links++;
 
         // Update new node worst link.
-        hnsw_update_worst_neighbor_on_add(index,new_node,layer,new_links,dist);
+        hnsw_update_worst_neighbor_on_add(index, new_node, layer, new_links, dist);
     }
 }
 
@@ -1100,22 +1319,27 @@ void select_neighbors(HNSW *index, pqueue *candidates, hnswNode *new_node,
  * (due to odd count or existing connections) are handled by searching
  * the broader graph using the standard HNSW neighbor selection logic.
  */
-void hnsw_reconnect_nodes(HNSW *index, hnswNode **nodes, int count, uint32_t layer) {
-    if (count <= 0) return;
+void hnsw_reconnect_nodes(HNSW *index, hnswNode **nodes, int count, uint32_t layer)
+{
+    if (count <= 0)
+        return;
     debugmsg("Reconnecting %d nodes\n", count);
 
     /* Step 1: Build the distance matrix between all nodes.
      * Since distance(i,j) = distance(j,i), we only compute the upper triangle
      * and mirror it to the lower triangle. */
     float *distances = hmalloc(count * count * sizeof(float));
-    if (!distances) return;
+    if (!distances)
+        return;
 
-    for (int i = 0; i < count; i++) {
-        distances[i*count + i] = 0;  // Distance to self is 0
-        for (int j = i+1; j < count; j++) {
+    for (int i = 0; i < count; i++)
+    {
+        distances[i * count + i] = 0; // Distance to self is 0
+        for (int j = i + 1; j < count; j++)
+        {
             float dist = hnsw_distance(index, nodes[i], nodes[j]);
-            distances[i*count + j] = dist;     // Upper triangle.
-            distances[j*count + i] = dist;     // Lower triangle.
+            distances[i * count + j] = dist; // Upper triangle.
+            distances[j * count + i] = dist; // Lower triangle.
         }
     }
 
@@ -1125,17 +1349,21 @@ void hnsw_reconnect_nodes(HNSW *index, hnswNode **nodes, int count, uint32_t lay
      * are the same: check the image in the top comment if you have any
      * doubt about this. */
     float *row_avgs = hmalloc(count * sizeof(float));
-    if (!row_avgs) {
+    if (!row_avgs)
+    {
         hfree(distances);
         return;
     }
 
-    for (int i = 0; i < count; i++) {
+    for (int i = 0; i < count; i++)
+    {
         float sum = 0;
         int valid_count = 0;
-        for (int j = 0; j < count; j++) {
-            if (i != j) {
-                sum += distances[i*count + j];
+        for (int j = 0; j < count; j++)
+        {
+            if (i != j)
+            {
+                sum += distances[i * count + j];
                 valid_count++;
             }
         }
@@ -1147,7 +1375,8 @@ void hnsw_reconnect_nodes(HNSW *index, hnswNode **nodes, int count, uint32_t lay
      * i,j will affect the remaining quality of connections left to
      * pair the other nodes. */
     float *scores = hmalloc(count * count * sizeof(float));
-    if (!scores) {
+    if (!scores)
+    {
         hfree(distances);
         hfree(row_avgs);
         return;
@@ -1157,13 +1386,16 @@ void hnsw_reconnect_nodes(HNSW *index, hnswNode **nodes, int count, uint32_t lay
      * are optimal. However with these values the algorithm is certain
      * better than its greedy version that just attempts to pick the
      * best pair each time (verified experimentally). */
-    const float W1 = 0.7;  // Weight for immediate distance.
-    const float W2 = 0.3;  // Weight for future potential.
+    const float W1 = 0.7; // Weight for immediate distance.
+    const float W2 = 0.3; // Weight for future potential.
 
-    for (int i = 0; i < count; i++) {
-        for (int j = 0; j < count; j++) {
-            if (i == j) {
-                scores[i*count + j] = -1;  // Invalid pairing.
+    for (int i = 0; i < count; i++)
+    {
+        for (int j = 0; j < count; j++)
+        {
+            if (i == j)
+            {
+                scores[i * count + j] = -1; // Invalid pairing.
                 continue;
             }
 
@@ -1171,15 +1403,17 @@ void hnsw_reconnect_nodes(HNSW *index, hnswNode **nodes, int count, uint32_t lay
             int already_linked = 0;
             for (uint32_t k = 0; k < nodes[i]->layers[layer].num_links; k++)
             {
-                if (nodes[i]->layers[layer].links[k] == nodes[j]) {
-                    scores[i*count + j] = -1;  // Already linked.
+                if (nodes[i]->layers[layer].links[k] == nodes[j])
+                {
+                    scores[i * count + j] = -1; // Already linked.
                     already_linked = 1;
                     break;
                 }
             }
-            if (already_linked) continue;
+            if (already_linked)
+                continue;
 
-            float dist = distances[i*count + j];
+            float dist = distances[i * count + j];
 
             /* Calculate new averages excluding this pair.
              * Handle edge case where we might have too few elements.
@@ -1187,21 +1421,24 @@ void hnsw_reconnect_nodes(HNSW *index, hnswNode **nodes, int count, uint32_t lay
              * each time scanning the row, we can remove the element
              * and adjust the average without it. */
             float new_avg_i = 0, new_avg_j = 0;
-            if (count > 2) {
-                new_avg_i = (row_avgs[i] * (count-1) - dist) / (count-2);
-                new_avg_j = (row_avgs[j] * (count-1) - dist) / (count-2);
+            if (count > 2)
+            {
+                new_avg_i = (row_avgs[i] * (count - 1) - dist) / (count - 2);
+                new_avg_j = (row_avgs[j] * (count - 1) - dist) / (count - 2);
             }
 
             /* Final weighted score: the more similar i,j, the better
              * the score. The more distant are the pairs we lose by
              * connecting i,j, the better the score. */
-            scores[i*count + j] = W1*(2-dist) + W2*((new_avg_i + new_avg_j)/2);
+            scores[i * count + j] = W1 * (2 - dist) + W2 * ((new_avg_i + new_avg_j) / 2);
         }
     }
 
     // Step 5: Pair nodes greedily based on scores.
-    int *used = calloc(count, sizeof(int));
-    if (!used) {
+    int *used = hmalloc(count * sizeof(int));
+    memset(used, 0, count * sizeof(int));
+    if (!used)
+    {
         hfree(distances);
         hfree(row_avgs);
         hfree(scores);
@@ -1210,30 +1447,38 @@ void hnsw_reconnect_nodes(HNSW *index, hnswNode **nodes, int count, uint32_t lay
 
     /* Scan the matrix looking each time for the potential
      * link with the best score. */
-    while(1) {
+    while (1)
+    {
         float max_score = -1;
         int best_j = -1, best_i = -1;
 
         // Seek best score i,j values.
-        for (int i = 0; i < count; i++) {
-            if (used[i]) continue;  // Already connected.
+        for (int i = 0; i < count; i++)
+        {
+            if (used[i])
+                continue; // Already connected.
 
             /* No space left? Not possible after a node deletion but makes
              * this function more future-proof. */
             if (nodes[i]->layers[layer].num_links >=
-                nodes[i]->layers[layer].max_links) continue;
+                nodes[i]->layers[layer].max_links)
+                continue;
 
-            for (int j = 0; j < count; j++) {
-                if (i == j) continue; // Same node, skip.
-                if (used[j]) continue; // Already connected.
-                float score = scores[i*count + j];
-                if (score < 0) continue; // Invalid link.
+            for (int j = 0; j < count; j++)
+            {
+                if (i == j)
+                    continue; // Same node, skip.
+                if (used[j])
+                    continue; // Already connected.
+                float score = scores[i * count + j];
+                if (score < 0)
+                    continue; // Invalid link.
 
                 /* If the target node has space, and its score is better
                  * than any other seen so far... remember it is the best. */
                 if (score > max_score &&
                     nodes[j]->layers[layer].num_links <
-                    nodes[j]->layers[layer].max_links)
+                        nodes[j]->layers[layer].max_links)
                 {
                     // Track the best connection found so far.
                     max_score = score;
@@ -1244,7 +1489,8 @@ void hnsw_reconnect_nodes(HNSW *index, hnswNode **nodes, int count, uint32_t lay
         }
 
         // Possible link found? Connect i and j.
-        if (best_j != -1) {
+        if (best_j != -1)
+        {
             debugmsg("[%d] linking %d with %d: %f\n", layer, (int)best_i, (int)best_j, max_score);
             // Link i -> j.
             int link_idx = nodes[best_i]->layers[layer].num_links;
@@ -1252,8 +1498,8 @@ void hnsw_reconnect_nodes(HNSW *index, hnswNode **nodes, int count, uint32_t lay
             nodes[best_i]->layers[layer].num_links++;
 
             // Update worst distance if needed.
-            float dist = distances[best_i*count + best_j];
-            hnsw_update_worst_neighbor_on_add(index,nodes[best_i],layer,link_idx,dist);
+            float dist = distances[best_i * count + best_j];
+            hnsw_update_worst_neighbor_on_add(index, nodes[best_i], layer, link_idx, dist);
 
             // Link j -> i.
             link_idx = nodes[best_j]->layers[layer].num_links;
@@ -1261,19 +1507,23 @@ void hnsw_reconnect_nodes(HNSW *index, hnswNode **nodes, int count, uint32_t lay
             nodes[best_j]->layers[layer].num_links++;
 
             // Update worst distance if needed.
-            hnsw_update_worst_neighbor_on_add(index,nodes[best_j],layer,link_idx,dist);
+            hnsw_update_worst_neighbor_on_add(index, nodes[best_j], layer, link_idx, dist);
 
             // Mark connection as used.
             used[best_i] = used[best_j] = 1;
-        } else {
+        }
+        else
+        {
             break; // No more valid connections available.
         }
     }
 
     /* Step 6: Handle remaining unpaired nodes using the standard HNSW
      * neighbor selection. */
-    for (int i = 0; i < count; i++) {
-        if (used[i]) continue;
+    for (int i = 0; i < count; i++)
+    {
+        if (used[i])
+            continue;
 
         // Skip if node is already at max connections.
         if (nodes[i]->layers[layer].num_links >=
@@ -1285,16 +1535,18 @@ void hnsw_reconnect_nodes(HNSW *index, hnswNode **nodes, int count, uint32_t lay
         /* First, try with local nodes as candidates.
          * Some candidate may have space. */
         pqueue *candidates = pq_new(count);
-        if (!candidates) continue;
+        if (!candidates)
+            continue;
 
         /* Add all the local nodes having some space as candidates
          * to be linked with this node. */
-        for (int j = 0; j < count; j++) {
-            if (i != j &&       // Must not be itself.
-            nodes[j]->layers[layer].num_links <     // Must not be full.
-            nodes[j]->layers[layer].max_links)
+        for (int j = 0; j < count; j++)
+        {
+            if (i != j &&                           // Must not be itself.
+                nodes[j]->layers[layer].num_links < // Must not be full.
+                    nodes[j]->layers[layer].max_links)
             {
-                float dist = distances[i*count + j];
+                float dist = distances[i * count + j];
                 pq_push(candidates, nodes[j], dist);
             }
         }
@@ -1302,37 +1554,44 @@ void hnsw_reconnect_nodes(HNSW *index, hnswNode **nodes, int count, uint32_t lay
         /* Try local candidates first with aggressive = 1.
          * So we will link only if there is space.
          * We want one link more than the links we already have. */
-        uint32_t wanted_links = nodes[i]->layers[layer].num_links+1;
-        if (candidates->count > 0) {
+        uint32_t wanted_links = nodes[i]->layers[layer].num_links + 1;
+        if (candidates->count > 0)
+        {
             select_neighbors(index, candidates, nodes[i], layer,
-                wanted_links, 1);
+                             wanted_links, 1);
             debugmsg("Final links after attempt with local nodes: %d (wanted: %d)\n", (int)nodes[i]->layers[layer].num_links, wanted_links);
         }
 
         // If still no connection, search the broader graph.
-        if (nodes[i]->layers[layer].num_links != wanted_links) {
+        if (nodes[i]->layers[layer].num_links != wanted_links)
+        {
             debugmsg("No force linking possible with local candidats\n");
             pq_free(candidates);
 
             // Find entry point for target layer by descending through levels.
             hnswNode *curr_ep = index->enter_point;
-            for (uint32_t lc = index->max_level; lc > layer; lc--) {
+            for (uint32_t lc = index->max_level; lc > layer; lc--)
+            {
                 pqueue *results = search_layer(index, nodes[i], curr_ep, 1, lc, 0);
-                if (results) {
-                    if (results->count > 0) {
-                        curr_ep = pq_get_node(results,0);
+                if (results)
+                {
+                    if (results->count > 0)
+                    {
+                        curr_ep = pq_get_node(results, 0);
                     }
                     pq_free(results);
                 }
             }
 
-            if (curr_ep) {
+            if (curr_ep)
+            {
                 /* Search this layer for candidates.
                  * Use the defalt EF_C in this case, since it's not an
                  * "insert" operation, and we don't know the user
                  * specified "EF". */
                 candidates = search_layer(index, nodes[i], curr_ep, HNSW_EF_C, layer, 0);
-                if (candidates) {
+                if (candidates)
+                {
                     /* Try to connect with aggressiveness proportional to the
                      * node linking condition. */
                     int aggressiveness =
@@ -1342,7 +1601,9 @@ void hnsw_reconnect_nodes(HNSW *index, hnswNode **nodes, int count, uint32_t lay
                     pq_free(candidates);
                 }
             }
-        } else {
+        }
+        else
+        {
             pq_free(candidates);
         }
     }
@@ -1372,8 +1633,10 @@ void hnsw_reconnect_nodes(HNSW *index, hnswNode **nodes, int count, uint32_t lay
  * In general it is more future-proof to be able to reuse the node if
  * needed. Right now this library reuses the node only when links are
  * not touched (see hnsw_update() for more information). */
-void hnsw_unlink_node(HNSW *index, hnswNode *node) {
-    if (!index || !node) return;
+void hnsw_unlink_node(HNSW *index, hnswNode *node)
+{
+    if (!index || !node)
+        return;
 
     index->version++; // This node may be missing in an already compiled list
                       // of neighbors. Make optimistic concurrent inserts fail.
@@ -1383,19 +1646,23 @@ void hnsw_unlink_node(HNSW *index, hnswNode *node) {
      * links are guaranteed to be bedirectional. */
 
     /* For each level of the deleted node... */
-    for (uint32_t level = 0; level <= node->level; level++) {
+    for (uint32_t level = 0; level <= node->level; level++)
+    {
         /* For each linked node of the deleted node... */
-        for (uint32_t i = 0; i < node->layers[level].num_links; i++) {
+        for (uint32_t i = 0; i < node->layers[level].num_links; i++)
+        {
             hnswNode *linked = node->layers[level].links[i];
             /* Find and remove the backlink in the linked node */
-            for (uint32_t j = 0; j < linked->layers[level].num_links; j++) {
-                if (linked->layers[level].links[j] == node) {
+            for (uint32_t j = 0; j < linked->layers[level].num_links; j++)
+            {
+                if (linked->layers[level].links[j] == node)
+                {
                     /* Remove by shifting remaining links left */
                     memmove(&linked->layers[level].links[j],
-                           &linked->layers[level].links[j + 1],
-                           (linked->layers[level].num_links - j - 1) * sizeof(hnswNode*));
+                            &linked->layers[level].links[j + 1],
+                            (linked->layers[level].num_links - j - 1) * sizeof(hnswNode *));
                     linked->layers[level].num_links--;
-                    hnsw_update_worst_neighbor_on_remove(index,linked,level,j);
+                    hnsw_update_worst_neighbor_on_remove(index, linked, level, j);
                     break;
                 }
             }
@@ -1403,24 +1670,30 @@ void hnsw_unlink_node(HNSW *index, hnswNode *node) {
     }
 
     /* Update cursors pointing at this element. */
-    if (index->cursors) hnsw_cursor_element_deleted(index,node);
+    if (index->cursors)
+        hnsw_cursor_element_deleted(index, node);
 
     /* Update the previous node's next pointer. */
-    if (node->prev) {
+    if (node->prev)
+    {
         node->prev->next = node->next;
-    } else {
+    }
+    else
+    {
         /* If there's no previous node, this is the head. */
         index->head = node->next;
     }
 
     /* Update the next node's prev pointer. */
-    if (node->next) node->next->prev = node->prev;
+    if (node->next)
+        node->next->prev = node->prev;
 
     /* Update node count. */
     index->node_count--;
 
     /* If this node was the enter_point, we need to update it. */
-    if (node == index->enter_point) {
+    if (node == index->enter_point)
+    {
         /* Reset entry point - we'll find a new one (unless the HNSW is
          * now empty) */
         index->enter_point = NULL;
@@ -1431,8 +1704,10 @@ void hnsw_unlink_node(HNSW *index, hnswNode *node) {
          * any other node at the same level, we have a link. Anyway
          * we descend levels to find any neighbor at the higher level
          * possible. */
-        for (int level = node->level; level >= 0; level--) {
-            if (node->layers[level].num_links > 0) {
+        for (int level = node->level; level >= 0; level--)
+        {
+            if (node->layers[level].num_links > 0)
+            {
                 index->enter_point = node->layers[level].links[0];
                 break;
             }
@@ -1441,12 +1716,15 @@ void hnsw_unlink_node(HNSW *index, hnswNode *node) {
         /* Step 2: If no links were found at any level, do a full scan.
          * This should never happen in practice if the HNSW is not
          * empty. */
-        if (!index->enter_point) {
+        if (!index->enter_point)
+        {
             uint32_t new_max_level = 0;
             hnswNode *current = index->head;
 
-            while (current) {
-                if (current != node && current->level >= new_max_level) {
+            while (current)
+            {
+                if (current != node && current->level >= new_max_level)
+                {
                     new_max_level = current->level;
                     index->enter_point = current;
                 }
@@ -1468,16 +1746,19 @@ void hnsw_unlink_node(HNSW *index, hnswNode *node) {
  * reconnect the node neighbors among themselves, and unlock again.
  * If free_value function pointer is not NULL, then the function provided is
  * used to free node->value. */
-void hnsw_delete_node(HNSW *index, hnswNode *node, void(*free_value)(void*value)) {
+void hnsw_delete_node(HNSW *index, hnswNode *node, void (*free_value)(void *value))
+{
     pthread_rwlock_wrlock(&index->global_lock);
-    hnsw_unlink_node(index,node);
-    if (free_value && node->value) free_value(node->value);
+    hnsw_unlink_node(index, node);
+    if (free_value && node->value)
+        free_value(node->value);
 
     /* Relink all the nodes orphaned of this node link.
      * Do it for all the levels. */
-    for (unsigned int j = 0; j <= node->level; j++) {
+    for (unsigned int j = 0; j <= node->level; j++)
+    {
         hnsw_reconnect_nodes(index, node->layers[j].links,
-            node->layers[j].num_links, j);
+                             node->layers[j].num_links, j);
     }
     hnsw_node_free(node);
     pthread_rwlock_unlock(&index->global_lock);
@@ -1496,11 +1777,15 @@ void hnsw_delete_node(HNSW *index, hnswNode *node, void(*free_value)(void*value)
 
 /* Try to acquire a read slot. Returns the slot number (0 to HNSW_MAX_THREADS-1)
  * on success, -1 on error (pthread mutex errors). */
-int hnsw_acquire_read_slot(HNSW *index) {
+int hnsw_acquire_read_slot(HNSW *index)
+{
     /* First try a non-blocking approach on all slots. */
-    for (uint32_t i = 0; i < HNSW_MAX_THREADS; i++) {
-        if (pthread_mutex_trylock(&index->slot_locks[i]) == 0) {
-            if (pthread_rwlock_rdlock(&index->global_lock) != 0) {
+    for (uint32_t i = 0; i < HNSW_MAX_THREADS; i++)
+    {
+        if (pthread_mutex_trylock(&index->slot_locks[i]) == 0)
+        {
+            if (pthread_rwlock_rdlock(&index->global_lock) != 0)
+            {
                 pthread_mutex_unlock(&index->slot_locks[i]);
                 return -1;
             }
@@ -1512,10 +1797,12 @@ int hnsw_acquire_read_slot(HNSW *index) {
     uint32_t slot = index->next_slot++ % HNSW_MAX_THREADS;
 
     /* Try to lock the selected slot. */
-    if (pthread_mutex_lock(&index->slot_locks[slot]) != 0) return -1;
+    if (pthread_mutex_lock(&index->slot_locks[slot]) != 0)
+        return -1;
 
     /* Get read lock. */
-    if (pthread_rwlock_rdlock(&index->global_lock) != 0) {
+    if (pthread_rwlock_rdlock(&index->global_lock) != 0)
+    {
         pthread_mutex_unlock(&index->slot_locks[slot]);
         return -1;
     }
@@ -1526,8 +1813,10 @@ int hnsw_acquire_read_slot(HNSW *index) {
 /* Release a previously acquired read slot: note that it is important that
  * nodes returned by hnsw_search() are accessed while the read lock is
  * still active, to be sure that nodes are not freed. */
-void hnsw_release_read_slot(HNSW *index, int slot) {
-    if (slot < 0 || slot >= HNSW_MAX_THREADS) return;
+void hnsw_release_read_slot(HNSW *index, int slot)
+{
+    if (slot < 0 || slot >= HNSW_MAX_THREADS)
+        return;
     pthread_rwlock_unlock(&index->global_lock);
     pthread_mutex_unlock(&index->slot_locks[slot]);
 }
@@ -1537,11 +1826,12 @@ void hnsw_release_read_slot(HNSW *index, int slot) {
  * and the write side (actual node insertion). We internally also use
  * this API to provide the plain hnsw_insert() function for code unification. */
 
-struct InsertContext {
+struct InsertContext
+{
     pqueue *level_queues[HNSW_MAX_LEVEL]; /* Candidates for each level. */
-    hnswNode *node;         /* Pre-allocated node ready for insertion */
-    uint64_t version;       /* Index version at preparation time. This is used
-                             * for CAS-like locking during change commit. */
+    hnswNode *node;                       /* Pre-allocated node ready for insertion */
+    uint64_t version;                     /* Index version at preparation time. This is used
+                                           * for CAS-like locking during change commit. */
 };
 
 /* Optimistic insertion API.
@@ -1564,11 +1854,12 @@ struct InsertContext {
  * See hnsw_node_new() for information about 'vector' and 'qvector'
  * arguments, and which one to pass. */
 InsertContext *hnsw_prepare_insert_nolock(HNSW *index, const float *vector,
-                const int8_t *qvector, float qrange, uint64_t id, void *value,
-                int slot, int ef)
+                                          const int8_t *qvector, float qrange, uint64_t id, void *value,
+                                          int slot, int ef)
 {
     InsertContext *ctx = hmalloc(sizeof(*ctx));
-    if (!ctx) return NULL;
+    if (!ctx)
+        return NULL;
 
     memset(ctx, 0, sizeof(*ctx));
     ctx->version = index->version;
@@ -1577,7 +1868,8 @@ InsertContext *hnsw_prepare_insert_nolock(HNSW *index, const float *vector,
      * graph later, when calling the commit function. */
     uint32_t level = random_level();
     ctx->node = hnsw_node_new(index, id, vector, qvector, qrange, level, 1);
-    if (!ctx->node) {
+    if (!ctx->node)
+    {
         hfree(ctx);
         return NULL;
     }
@@ -1586,27 +1878,33 @@ InsertContext *hnsw_prepare_insert_nolock(HNSW *index, const float *vector,
     hnswNode *curr_ep = index->enter_point;
 
     /* Empty graph, no need to collect candidates. */
-    if (curr_ep == NULL) return ctx;
+    if (curr_ep == NULL)
+        return ctx;
 
     /* Phase 1: Find good entry point on the highest level of the new
      * node we are going to insert. */
-    for (unsigned int lc = index->max_level; lc > level; lc--) {
+    for (unsigned int lc = index->max_level; lc > level; lc--)
+    {
         pqueue *results = search_layer(index, ctx->node, curr_ep, 1, lc, slot);
 
-        if (results) {
-            if (results->count > 0) curr_ep = pq_get_node(results,0);
+        if (results)
+        {
+            if (results->count > 0)
+                curr_ep = pq_get_node(results, 0);
             pq_free(results);
         }
     }
 
     /* Phase 2: Collect a set of potential connections for each layer of
      * the new node. */
-    for (int lc = MIN(level, index->max_level); lc >= 0; lc--) {
+    for (int lc = MIN(level, index->max_level); lc >= 0; lc--)
+    {
         pqueue *candidates =
             search_layer(index, ctx->node, curr_ep, ef, lc, slot);
 
-        if (!candidates) continue;
-        curr_ep = (candidates->count > 0) ? pq_get_node(candidates,0) : curr_ep;
+        if (!candidates)
+            continue;
+        curr_ep = (candidates->count > 0) ? pq_get_node(candidates, 0) : curr_ep;
         ctx->level_queues[lc] = candidates;
     }
 
@@ -1615,23 +1913,28 @@ InsertContext *hnsw_prepare_insert_nolock(HNSW *index, const float *vector,
 
 /* External API for hnsw_prepare_insert_nolock(), handling locking. */
 InsertContext *hnsw_prepare_insert(HNSW *index, const float *vector,
-                const int8_t *qvector, float qrange, uint64_t id, void *value,
-                int ef)
+                                   const int8_t *qvector, float qrange, uint64_t id, void *value,
+                                   int ef)
 {
     InsertContext *ctx;
     int slot = hnsw_acquire_read_slot(index);
-    ctx = hnsw_prepare_insert_nolock(index,vector,qvector,qrange,id,value,slot,ef);
-    hnsw_release_read_slot(index,slot);
+    ctx = hnsw_prepare_insert_nolock(index, vector, qvector, qrange, id, value, slot, ef);
+    hnsw_release_read_slot(index, slot);
     return ctx;
 }
 
 /* Free an insert context and all its resources. */
-void hnsw_free_insert_context(InsertContext *ctx) {
-    if (!ctx) return;
-    for (uint32_t i = 0; i < HNSW_MAX_LEVEL; i++) {
-        if (ctx->level_queues[i]) pq_free(ctx->level_queues[i]);
+void hnsw_free_insert_context(InsertContext *ctx)
+{
+    if (!ctx)
+        return;
+    for (uint32_t i = 0; i < HNSW_MAX_LEVEL; i++)
+    {
+        if (ctx->level_queues[i])
+            pq_free(ctx->level_queues[i]);
     }
-    if (ctx->node) hnsw_node_free(ctx->node);
+    if (ctx->node)
+        hnsw_node_free(ctx->node);
     hfree(ctx);
 }
 
@@ -1646,11 +1949,13 @@ void hnsw_free_insert_context(InsertContext *ctx) {
  * just inserted node. Out of memory is not possible since no critical
  * allocation is never performed in this code path: we populate links
  * on already allocated nodes. */
-hnswNode *hnsw_commit_insert_nolock(HNSW *index, InsertContext *ctx) {
+hnswNode *hnsw_commit_insert_nolock(HNSW *index, InsertContext *ctx)
+{
     hnswNode *node = ctx->node;
 
     /* Handle first node case. */
-    if (index->enter_point == NULL) {
+    if (index->enter_point == NULL)
+    {
         index->version++; // First node, make concurrent inserts fail.
         index->enter_point = node;
         index->max_level = node->level;
@@ -1661,8 +1966,10 @@ hnswNode *hnsw_commit_insert_nolock(HNSW *index, InsertContext *ctx) {
     }
 
     /* Connect the node with near neighbors at each level. */
-    for (int lc = MIN(node->level,index->max_level); lc >= 0; lc--) {
-        if (ctx->level_queues[lc] == NULL) continue;
+    for (int lc = MIN(node->level, index->max_level); lc >= 0; lc--)
+    {
+        if (ctx->level_queues[lc] == NULL)
+            continue;
 
         /* Try to provide HNSW_M connections to our node. The call
          * is not guaranteed to be able to provide all the links we would
@@ -1674,21 +1981,24 @@ hnswNode *hnsw_commit_insert_nolock(HNSW *index, InsertContext *ctx) {
         select_neighbors(index, ctx->level_queues[lc], node, lc, HNSW_M, 0);
 
         /* Layer 0 and too few connections? Let's be more aggressive. */
-        if (lc == 0 && node->layers[0].num_links < HNSW_M/2) {
+        if (lc == 0 && node->layers[0].num_links < HNSW_M / 2)
+        {
             select_neighbors(index, ctx->level_queues[lc], node, lc,
                              HNSW_M, 1);
 
             /* Still too few connections? Let's go to
              * aggressiveness level '2' in linking strategy. */
-            if (node->layers[0].num_links < HNSW_M/4) {
+            if (node->layers[0].num_links < HNSW_M / 4)
+            {
                 select_neighbors(index, ctx->level_queues[lc], node, lc,
-                                 HNSW_M/4, 2);
+                                 HNSW_M / 4, 2);
             }
         }
     }
 
     /* If new node level is higher than current max, update entry point. */
-    if (node->level > index->max_level) {
+    if (node->level > index->max_level)
+    {
         index->version++; // Entry point changed, make concurrent inserts fail.
         index->enter_point = node;
         index->max_level = node->level;
@@ -1706,25 +2016,29 @@ hnswNode *hnsw_commit_insert_nolock(HNSW *index, InsertContext *ctx) {
  * index and return its pointer. Otherwise NULL is returned and the operation
  * should be either performed with the blocking API hnsw_insert() or attempted
  * again. */
-hnswNode *hnsw_try_commit_insert(HNSW *index, InsertContext *ctx) {
+hnswNode *hnsw_try_commit_insert(HNSW *index, InsertContext *ctx)
+{
     /* Check if the version changed since preparation. Note that we
      * should access index->version under the write lock in order to
      * be sure we can safely commit the write: this is just a fast-path
      * in order to return ASAP without acquiring the write lock in case
      * the version changed. */
-    if (ctx->version != index->version) {
+    if (ctx->version != index->version)
+    {
         hnsw_free_insert_context(ctx);
         return NULL;
     }
 
     /* Try to acquire write lock. */
-    if (pthread_rwlock_wrlock(&index->global_lock) != 0) {
+    if (pthread_rwlock_wrlock(&index->global_lock) != 0)
+    {
         hnsw_free_insert_context(ctx);
         return NULL;
     }
 
     /* Check version again under write lock. */
-    if (ctx->version != index->version) {
+    if (ctx->version != index->version)
+    {
         pthread_rwlock_unlock(&index->global_lock);
         hnsw_free_insert_context(ctx);
         return NULL;
@@ -1745,19 +2059,22 @@ hnswNode *hnsw_try_commit_insert(HNSW *index, InsertContext *ctx) {
  *
  * Return NULL on out of memory during insert. Otherwise the newly
  * inserted node pointer is returned. */
-hnswNode *hnsw_insert(HNSW *index, const float *vector, const int8_t *qvector, float qrange, uint64_t id, void *value, int ef) {
+hnswNode *hnsw_insert(HNSW *index, const float *vector, const int8_t *qvector, float qrange, uint64_t id, void *value, int ef)
+{
     /* Write lock. We acquire the write lock even for the prepare()
      * operation (that is a read-only operation) since we want this function
      * to don't fail in the check-and-set stage of commit().
      *
      * Basically here we are using the optimistic API in a non-optimistinc
      * way in order to have a single insertion code in the implementation. */
-    if (pthread_rwlock_wrlock(&index->global_lock) != 0) return NULL;
+    if (pthread_rwlock_wrlock(&index->global_lock) != 0)
+        return NULL;
 
     // Prepare the insertion - note we pass slot 0 since we're single threaded.
     InsertContext *ctx = hnsw_prepare_insert_nolock(index, vector, qvector,
-                                                   qrange, id, value, 0, ef);
-    if (!ctx) {
+                                                    qrange, id, value, 0, ef);
+    if (!ctx)
+    {
         pthread_rwlock_unlock(&index->global_lock);
         return NULL;
     }
@@ -1771,9 +2088,12 @@ hnswNode *hnsw_insert(HNSW *index, const float *vector, const int8_t *qvector, f
 }
 
 /* Helper function for qsort call in hnsw_should_reuse_node(). */
-static int compare_floats(const float *a, const float *b) {
-    if (*a < *b) return 1;
-    if (*a > *b) return -1;
+static int compare_floats(const float *a, const float *b)
+{
+    if (*a < *b)
+        return 1;
+    if (*a > *b)
+        return -1;
     return 0;
 }
 
@@ -1796,51 +2116,60 @@ static int compare_floats(const float *a, const float *b) {
  * from its neighbors. One of the additional metrics used could be
  * neighbor-to-neighbor distance, that represents a more absolute check
  * of fit for the new vector. */
-int hnsw_should_reuse_node(HNSW *index, hnswNode *node, int is_normalized, const float *new_vector) {
+int hnsw_should_reuse_node(HNSW *index, hnswNode *node, int is_normalized, const float *new_vector)
+{
     /* Step 1: Not enough links? Advice to avoid reuse. */
     const uint32_t min_links_for_reuse = 4;
     uint32_t layer0_connections = node->layers[0].num_links;
-    if (layer0_connections < min_links_for_reuse) return 0;
+    if (layer0_connections < min_links_for_reuse)
+        return 0;
 
     /* Step2: get all current distances and run our heuristic. */
     float *old_distances = hmalloc(sizeof(float) * layer0_connections);
-    if (!old_distances) return 0;
+    if (!old_distances)
+        return 0;
 
     // Temporary node with the new vector, to simplify the next logic.
     hnswNode tmp_node;
-    if (hnsw_init_tmp_node(index,&tmp_node,is_normalized,new_vector) == 0) {
+    if (hnsw_init_tmp_node(index, &tmp_node, is_normalized, new_vector) == 0)
+    {
         hfree(old_distances);
         return 0;
     }
 
     /* Get old dinstances and sort them to access the 25% worst
      * (bigger) ones. */
-    for (uint32_t i = 0; i < layer0_connections; i++) {
+    for (uint32_t i = 0; i < layer0_connections; i++)
+    {
         old_distances[i] = hnsw_distance(index, node, node->layers[0].links[i]);
     }
     qsort(old_distances, layer0_connections, sizeof(float),
-          (int (*)(const void*, const void*))(&compare_floats));
+          (int (*)(const void *, const void *))(&compare_floats));
 
-    uint32_t count = (layer0_connections+3)/4; // 25% approx to larger int.
-    if (count > layer0_connections) count = layer0_connections; // Futureproof.
+    uint32_t count = (layer0_connections + 3) / 4; // 25% approx to larger int.
+    if (count > layer0_connections)
+        count = layer0_connections; // Futureproof.
     float worst_avg = 0;
 
     // Compute average of 25% worst dinstances.
-    for (uint32_t i = 0; i < count; i++) worst_avg += old_distances[i];
+    for (uint32_t i = 0; i < count; i++)
+        worst_avg += old_distances[i];
     worst_avg /= count;
     hfree(old_distances);
 
     // Count how many new distances stay below the threshold.
     uint32_t good_distances = 0;
-    for (uint32_t i = 0; i < layer0_connections; i++) {
+    for (uint32_t i = 0; i < layer0_connections; i++)
+    {
         float new_dist = hnsw_distance(index, &tmp_node, node->layers[0].links[i]);
-        if (new_dist <= worst_avg) good_distances++;
+        if (new_dist <= worst_avg)
+            good_distances++;
     }
-    hnsw_free_tmp_node(&tmp_node,new_vector);
+    hnsw_free_tmp_node(&tmp_node, new_vector);
 
     /* At least 50% of the nodes should pass our quality test, for the
      * node to be reused. */
-    return good_distances >= layer0_connections/2;
+    return good_distances >= layer0_connections / 2;
 }
 
 /* ============================= Serialization ==============================
@@ -1922,13 +2251,15 @@ int hnsw_should_reuse_node(HNSW *index, hnswNode *node, int is_normalized, const
  *
  * The function hnsw_serialize_node() should be called in order to
  * free the result of this function. */
-hnswSerNode *hnsw_serialize_node(HNSW *index, hnswNode *node) {
+hnswSerNode *hnsw_serialize_node(HNSW *index, hnswNode *node)
+{
     /* The first step is calculating the number of uint64_t parameters
      * that we need in order to serialize the node. */
     uint32_t num_params = 0;
-    num_params += 2;    // node ID, number of layers.
-    for (uint32_t i = 0; i <= node->level; i++) {
-        num_params += 2; // max_links and num_links info for this layer.
+    num_params += 2; // node ID, number of layers.
+    for (uint32_t i = 0; i <= node->level; i++)
+    {
+        num_params += 2;                         // max_links and num_links info for this layer.
         num_params += node->layers[i].num_links; // The IDs of linked nodes.
     }
 
@@ -1939,9 +2270,11 @@ hnswSerNode *hnsw_serialize_node(HNSW *index, hnswNode *node) {
 
     /* Allocate the return object and the parameters array. */
     hnswSerNode *sn = hmalloc(sizeof(hnswSerNode));
-    if (sn == NULL) return NULL;
-    sn->params = hmalloc(sizeof(uint64_t)*num_params);
-    if (sn->params == NULL) {
+    if (sn == NULL)
+        return NULL;
+    sn->params = hmalloc(sizeof(uint64_t) * num_params);
+    if (sn->params == NULL)
+    {
         hfree(sn);
         return NULL;
     }
@@ -1954,17 +2287,19 @@ hnswSerNode *hnsw_serialize_node(HNSW *index, hnswNode *node) {
     uint32_t param_idx = 0;
     sn->params[param_idx++] = node->id;
     sn->params[param_idx++] = node->level;
-    for (uint32_t i = 0; i <= node->level; i++) {
+    for (uint32_t i = 0; i <= node->level; i++)
+    {
         sn->params[param_idx++] = node->layers[i].num_links;
         sn->params[param_idx++] = node->layers[i].max_links;
-        for (uint32_t j = 0; j < node->layers[i].num_links; j++) {
+        for (uint32_t j = 0; j < node->layers[i].num_links; j++)
+        {
             sn->params[param_idx++] = node->layers[i].links[j]->id;
         }
     }
     uint64_t l2_and_range = 0;
-    unsigned char *aux = (unsigned char*)&l2_and_range;
-    memcpy(aux,&node->l2,sizeof(float));
-    memcpy(aux+4,&node->quants_range,sizeof(float));
+    unsigned char *aux = (unsigned char *)&l2_and_range;
+    memcpy(aux, &node->l2, sizeof(float));
+    memcpy(aux + 4, &node->quants_range, sizeof(float));
     sn->params[param_idx++] = l2_and_range;
 
     /* Better safe than sorry: */
@@ -1974,7 +2309,8 @@ hnswSerNode *hnsw_serialize_node(HNSW *index, hnswNode *node) {
 
 /* This is needed in order to free hnsw_serialize_node() returned
  * structure. */
-void hnsw_free_serialized_node(hnswSerNode *sn) {
+void hnsw_free_serialized_node(hnswSerNode *sn)
+{
     hfree(sn->params);
     hfree(sn);
 }
@@ -1987,28 +2323,36 @@ void hnsw_free_serialized_node(hnswSerNode *sn) {
  * to load. */
 hnswNode *hnsw_insert_serialized(HNSW *index, void *vector, uint64_t *params, uint32_t params_len, void *value)
 {
-    if (params_len < 2) return NULL;
+    if (params_len < 2)
+        return NULL;
 
     uint64_t id = params[0];
     uint32_t level = params[1];
 
     /* Keep track of maximum ID seen while loading. */
-    if (id >= index->last_id) index->last_id = id;
+    if (id >= index->last_id)
+        index->last_id = id;
 
     /* Create node, passing vector data directly based on quantization type. */
     hnswNode *node;
-    if (index->quant_type != HNSW_QUANT_NONE) {
+    if (index->quant_type != HNSW_QUANT_NONE)
+    {
         node = hnsw_node_new(index, id, NULL, vector, 0, level, 0);
-    } else {
+    }
+    else
+    {
         node = hnsw_node_new(index, id, vector, NULL, 0, level, 0);
     }
-    if (!node) return NULL;
+    if (!node)
+        return NULL;
 
     /* Load params array into the node. */
     uint32_t param_idx = 2;
-    for (uint32_t i = 0; i <= level; i++) {
+    for (uint32_t i = 0; i <= level; i++)
+    {
         /* Sanity check. */
-        if (param_idx + 2 > params_len) {
+        if (param_idx + 2 > params_len)
+        {
             hnsw_node_free(node);
             return NULL;
         }
@@ -2019,10 +2363,12 @@ hnswNode *hnsw_insert_serialized(HNSW *index, void *vector, uint64_t *params, ui
         /* If max_links is larger than current allocation, reallocate.
          * It could happen in select_neighbors() that we over-allocate the
          * node under very unlikely to happen conditions. */
-        if (max_links > node->layers[i].max_links) {
-            hnswNode **new_links = hrealloc(node->layers[i].links, 
-                                         sizeof(hnswNode*) * max_links);
-            if (!new_links) {
+        if (max_links > node->layers[i].max_links)
+        {
+            hnswNode **new_links = hrealloc(node->layers[i].links,
+                                            sizeof(hnswNode *) * max_links);
+            if (!new_links)
+            {
                 hnsw_node_free(node);
                 return NULL;
             }
@@ -2032,7 +2378,8 @@ hnswNode *hnsw_insert_serialized(HNSW *index, void *vector, uint64_t *params, ui
         node->layers[i].num_links = num_links;
 
         /* Sanity check. */
-        if (param_idx + num_links > params_len) {
+        if (param_idx + num_links > params_len)
+        {
             hnsw_node_free(node);
             return NULL;
         }
@@ -2042,18 +2389,19 @@ hnswNode *hnsw_insert_serialized(HNSW *index, void *vector, uint64_t *params, ui
          * nodes can produce IDs larger than 2^32-1 even if we can't never
          * fit more than 2^32 nodes in a 32 bit system. */
         for (uint32_t j = 0; j < num_links; j++)
-            node->layers[i].links[j] = (hnswNode*)params[param_idx++];
+            node->layers[i].links[j] = (hnswNode *)params[param_idx++];
     }
 
     /* Get l2 and quantization range. */
-    if (param_idx >= params_len) {
+    if (param_idx >= params_len)
+    {
         hnsw_node_free(node);
         return NULL;
     }
     uint64_t l2_and_range = params[param_idx];
-    unsigned char *aux = (unsigned char*)&l2_and_range;
+    unsigned char *aux = (unsigned char *)&l2_and_range;
     memcpy(&node->l2, aux, sizeof(float));
-    memcpy(&node->quants_range, aux+4, sizeof(float));
+    memcpy(&node->quants_range, aux + 4, sizeof(float));
 
     node->value = value;
     hnsw_add_node(index, node);
@@ -2061,7 +2409,8 @@ hnswNode *hnsw_insert_serialized(HNSW *index, void *vector, uint64_t *params, ui
     /* Keep track of higher node level and set the entry point to the
      * greatest level node seen so far: thanks to this check we don't
      * need to remember what our entry point was during serialization. */
-    if (index->enter_point == NULL || level > index->max_level) {
+    if (index->enter_point == NULL || level > index->max_level)
+    {
         index->max_level = level;
         index->enter_point = node;
     }
@@ -2070,7 +2419,8 @@ hnswNode *hnsw_insert_serialized(HNSW *index, void *vector, uint64_t *params, ui
 
 /* Integer hashing, used by hnsw_deserialize_index().
  * MurmurHash3's 64-bit finalizer function. */
-uint64_t hnsw_hash_node_id(uint64_t id) {
+uint64_t hnsw_hash_node_id(uint64_t id)
+{
     id ^= id >> 33;
     id *= 0xff51afd7ed558ccd;
     id ^= id >> 33;
@@ -2085,48 +2435,60 @@ uint64_t hnsw_hash_node_id(uint64_t id) {
  *
  * Return 0 on error (out of memory or some ID that can't be resolved), 1 on
  * success. */
-int hnsw_deserialize_index(HNSW *index) {
+int hnsw_deserialize_index(HNSW *index)
+{
     /* We will use simple linear probing, so over-allocating is a good
      * idea: anyway this flat array of pointers will consume a fraction
      * of the memory of the loaded index. */
-    uint64_t min_size = index->node_count*2;
+    uint64_t min_size = index->node_count * 2;
     uint64_t table_size = 1;
-    while(table_size < min_size) table_size <<= 1;
+    while (table_size < min_size)
+        table_size <<= 1;
 
-    hnswNode **table = hmalloc(sizeof(hnswNode*) * table_size);
-    if (table == NULL) return 0;
-    memset(table,0,sizeof(hnswNode*) * table_size);
+    hnswNode **table = hmalloc(sizeof(hnswNode *) * table_size);
+    if (table == NULL)
+        return 0;
+    memset(table, 0, sizeof(hnswNode *) * table_size);
 
     /* First pass: populate the ID -> pointer hash table. */
     hnswNode *node = index->head;
-    while(node) {
-        uint64_t bucket = hnsw_hash_node_id(node->id) & (table_size-1);
-        for (uint64_t j = 0; j < table_size; j++) {
-            if (table[bucket] == NULL) {
+    while (node)
+    {
+        uint64_t bucket = hnsw_hash_node_id(node->id) & (table_size - 1);
+        for (uint64_t j = 0; j < table_size; j++)
+        {
+            if (table[bucket] == NULL)
+            {
                 table[bucket] = node;
                 break;
             }
-            bucket = (bucket+1) & (table_size-1);
+            bucket = (bucket + 1) & (table_size - 1);
         }
         node = node->next;
     }
 
     /* Second pass: fix pointers of all the neighbors links. */
     node = index->head; // Rewind.
-    while(node) {
-        for (uint32_t i = 0; i <= node->level; i++) {
-            for (uint32_t j = 0; j < node->layers[i].num_links; j++) {
-                uint64_t linked_id = (uint64_t) node->layers[i].links[j];
-                uint64_t bucket = hnsw_hash_node_id(linked_id) & (table_size-1);
+    while (node)
+    {
+        for (uint32_t i = 0; i <= node->level; i++)
+        {
+            for (uint32_t j = 0; j < node->layers[i].num_links; j++)
+            {
+                uint64_t linked_id = (uint64_t)node->layers[i].links[j];
+                uint64_t bucket = hnsw_hash_node_id(linked_id) & (table_size - 1);
                 hnswNode *neighbor = NULL;
-                for (uint64_t k = 0; k < table_size; k++) {
-                    if (table[bucket] && table[bucket]->id == linked_id) {
+                for (uint64_t k = 0; k < table_size; k++)
+                {
+                    if (table[bucket] && table[bucket]->id == linked_id)
+                    {
                         neighbor = table[bucket];
                         break;
                     }
-                    bucket = (bucket+1) & (table_size-1);
+                    bucket = (bucket + 1) & (table_size - 1);
                 }
-                if (neighbor == NULL) {
+                if (neighbor == NULL)
+                {
                     /* Unresolved link! Either a bug in this code
                      * or broken serialization data. */
                     hfree(table);
@@ -2148,9 +2510,11 @@ int hnsw_deserialize_index(HNSW *index) {
  * iteration, excluding newly added elements.
  *
  * The function returns NULL on out of memory. */
-hnswCursor *hnsw_cursor_init(HNSW *index) {
+hnswCursor *hnsw_cursor_init(HNSW *index)
+{
     hnswCursor *cursor = hmalloc(sizeof(*cursor));
-    if (cursor == NULL) return NULL;
+    if (cursor == NULL)
+        return NULL;
     cursor->next = index->cursors;
     cursor->current = index->head;
     index->cursors = cursor;
@@ -2159,11 +2523,14 @@ hnswCursor *hnsw_cursor_init(HNSW *index) {
 
 /* Free the cursor. Can be called both at the end of the iteration, when
  * hnsw_cursor_next() returned NULL, or before. */
-void hnsw_cursor_free(HNSW *index, hnswCursor *cursor) {
+void hnsw_cursor_free(HNSW *index, hnswCursor *cursor)
+{
     hnswCursor *x = index->cursors;
     hnswCursor *prev = NULL;
-    while(x) {
-        if (x == cursor) {
+    while (x)
+    {
+        if (x == cursor)
+        {
             if (prev)
                 prev->next = cursor->next;
             else
@@ -2177,20 +2544,25 @@ void hnsw_cursor_free(HNSW *index, hnswCursor *cursor) {
 
 /* Return the next element of the HNSW. See hnsw_cursor_init() for
  * the guarantees of the function. */
-hnswNode *hnsw_cursor_next(HNSW *index, hnswCursor *cursor) {
+hnswNode *hnsw_cursor_next(HNSW *index, hnswCursor *cursor)
+{
     (void)index; // Unused but future proof to have.
     hnswNode *ret = cursor->current;
-    if (ret) cursor->current = ret->next;
+    if (ret)
+        cursor->current = ret->next;
     return ret;
 }
 
 /* Called by hnsw_unlink_node() if there is at least an active cursor.
  * Will scan the cursors to see if any cursor is going to yeld this
  * one, and in this case, updates the current element to the next. */
-void hnsw_cursor_element_deleted(HNSW *index, hnswNode *deleted) {
+void hnsw_cursor_element_deleted(HNSW *index, hnswNode *deleted)
+{
     hnswCursor *x = index->cursors;
-    while(x) {
-        if (x->current == deleted) x->current = deleted->next;
+    while (x)
+    {
+        if (x->current == deleted)
+            x->current = deleted->next;
         x = x->next;
     }
 }
@@ -2198,20 +2570,23 @@ void hnsw_cursor_element_deleted(HNSW *index, hnswNode *deleted) {
 /* ============================ Debugging stuff ============================= */
 
 /* Show stats about nodes connections. */
-void hnsw_print_stats(HNSW *index) {
-    if (!index || !index->head) {
+void hnsw_print_stats(HNSW *index)
+{
+    if (!index || !index->head)
+    {
         printf("Empty index or NULL pointer passed\n");
         return;
     }
 
     long long total_links = 0;
-    int min_links = -1;         // We'll set this to first node's count.
+    int min_links = -1; // We'll set this to first node's count.
     int isolated_nodes = 0;
     uint32_t node_count = 0;
 
     // Iterate through all nodes using the linked list.
     hnswNode *current = index->head;
-    while (current) {
+    while (current)
+    {
         // Count total links for this node across all layers.
         int node_total_links = 0;
         for (uint32_t layer = 0; layer <= current->level; layer++)
@@ -2221,12 +2596,14 @@ void hnsw_print_stats(HNSW *index) {
         total_links += node_total_links;
 
         // Initialize or update minimum links.
-        if (min_links == -1 || node_total_links < min_links) {
+        if (min_links == -1 || node_total_links < min_links)
+        {
             min_links = node_total_links;
         }
 
         // Check if node is isolated (no links at all).
-        if (node_total_links == 0) isolated_nodes++;
+        if (node_total_links == 0)
+            isolated_nodes++;
 
         node_count++;
         current = current->next;
@@ -2236,9 +2613,10 @@ void hnsw_print_stats(HNSW *index) {
     printf("HNSW Graph Statistics:\n");
     printf("----------------------\n");
     printf("Total nodes: %u\n", node_count);
-    if (node_count > 0) {
+    if (node_count > 0)
+    {
         printf("Average links per node: %.2f\n",
-		(float)total_links / node_count);
+               (float)total_links / node_count);
         printf("Minimum links in a single node: %d\n", min_links);
         printf("Number of isolated nodes: %d (%.1f%%)\n",
                isolated_nodes,
@@ -2251,11 +2629,14 @@ void hnsw_print_stats(HNSW *index) {
  * - reciprocal_links: will contain 1 if all links are reciprocal, 0 otherwise.
  * Returns 0 on success, -1 on error (NULL parameters and such).
  */
-int hnsw_validate_graph(HNSW *index, uint64_t *connected_nodes, int *reciprocal_links) {
-    if (!index || !connected_nodes || !reciprocal_links) return -1;
-    if (!index->enter_point) {
+int hnsw_validate_graph(HNSW *index, uint64_t *connected_nodes, int *reciprocal_links)
+{
+    if (!index || !connected_nodes || !reciprocal_links)
+        return -1;
+    if (!index->enter_point)
+    {
         *connected_nodes = 0;
-        *reciprocal_links = 1;  // Empty graph is valid.
+        *reciprocal_links = 1; // Empty graph is valid.
         return 0;
     }
 
@@ -2266,8 +2647,9 @@ int hnsw_validate_graph(HNSW *index, uint64_t *connected_nodes, int *reciprocal_
 
     // Initialize node stack.
     uint64_t stack_size = index->node_count;
-    hnswNode **stack = hmalloc(sizeof(hnswNode*) * stack_size);
-    if (!stack) return -1;
+    hnswNode **stack = hmalloc(sizeof(hnswNode *) * stack_size);
+    if (!stack)
+        return -1;
     uint64_t stack_top = 0;
 
     // Start from entry point.
@@ -2276,33 +2658,43 @@ int hnsw_validate_graph(HNSW *index, uint64_t *connected_nodes, int *reciprocal_
     stack[stack_top++] = index->enter_point;
 
     // Process all reachable nodes.
-    while (stack_top > 0) {
+    while (stack_top > 0)
+    {
         hnswNode *current = stack[--stack_top];
 
         // Explore all neighbors at each level.
-        for (uint32_t level = 0; level <= current->level; level++) {
-            for (uint64_t i = 0; i < current->layers[level].num_links; i++) {
+        for (uint32_t level = 0; level <= current->level; level++)
+        {
+            for (uint64_t i = 0; i < current->layers[level].num_links; i++)
+            {
                 hnswNode *neighbor = current->layers[level].links[i];
 
                 // Check reciprocity.
                 int found_backlink = 0;
-                for (uint64_t j = 0; j < neighbor->layers[level].num_links; j++) {
-                    if (neighbor->layers[level].links[j] == current) {
+                for (uint64_t j = 0; j < neighbor->layers[level].num_links; j++)
+                {
+                    if (neighbor->layers[level].links[j] == current)
+                    {
                         found_backlink = 1;
                         break;
                     }
                 }
-                if (!found_backlink) {
+                if (!found_backlink)
+                {
                     *reciprocal_links = 0;
                 }
 
                 // If we haven't visited this neighbor yet.
-                if (neighbor->visited_epoch[0] != index->current_epoch[0]) {
+                if (neighbor->visited_epoch[0] != index->current_epoch[0])
+                {
                     neighbor->visited_epoch[0] = index->current_epoch[0];
                     (*connected_nodes)++;
-                    if (stack_top < stack_size) {
+                    if (stack_top < stack_size)
+                    {
                         stack[stack_top++] = neighbor;
-                    } else {
+                    }
+                    else
+                    {
                         // This should never happen in a valid graph.
                         hfree(stack);
                         return -1;
@@ -2319,32 +2711,37 @@ int hnsw_validate_graph(HNSW *index, uint64_t *connected_nodes, int *reciprocal_
     printf("=====================================\n");
 
     hnswNode *current = index->head;
-    while (current) {
-        if (current->visited_epoch[0] != index->current_epoch[0]) {
+    while (current)
+    {
+        if (current->visited_epoch[0] != index->current_epoch[0])
+        {
             printf("\nUnreachable node found:\n");
-            printf("- Node pointer: %p\n", (void*)current);
+            printf("- Node pointer: %p\n", (void *)current);
             printf("- Node ID: %llu\n", (unsigned long long)current->id);
             printf("- Node level: %u\n", current->level);
 
             // Print info about all its links at each level.
-            for (uint32_t level = 0; level <= current->level; level++) {
+            for (uint32_t level = 0; level <= current->level; level++)
+            {
                 printf("  Level %u links (%u):\n", level,
                        current->layers[level].num_links);
-                for (uint64_t i = 0; i < current->layers[level].num_links; i++) {
+                for (uint64_t i = 0; i < current->layers[level].num_links; i++)
+                {
                     hnswNode *neighbor = current->layers[level].links[i];
                     // Check reciprocity for this specific link
                     int found_backlink = 0;
-                    for (uint64_t j = 0; j < neighbor->layers[level].num_links; j++) {
-                        if (neighbor->layers[level].links[j] == current) {
+                    for (uint64_t j = 0; j < neighbor->layers[level].num_links; j++)
+                    {
+                        if (neighbor->layers[level].links[j] == current)
+                        {
                             found_backlink = 1;
                             break;
                         }
                     }
                     printf("    - Link %llu: pointer=%p, id=%llu, visited=%s,recpr=%s\n",
-                           (unsigned long long)i, (void*)neighbor,
+                           (unsigned long long)i, (void *)neighbor,
                            (unsigned long long)neighbor->id,
-                           neighbor->visited_epoch[0] == index->current_epoch[0] ?
-                           "yes" : "no",
+                           neighbor->visited_epoch[0] == index->current_epoch[0] ? "yes" : "no",
                            found_backlink ? "yes" : "no");
                 }
             }
@@ -2353,7 +2750,7 @@ int hnsw_validate_graph(HNSW *index, uint64_t *connected_nodes, int *reciprocal_
     }
 
     printf("Total connected nodes: %llu\n", (unsigned long long)*connected_nodes);
-    printf("All links are bi-directiona? %s\n", (*reciprocal_links)?"yes":"no");
+    printf("All links are bi-directiona? %s\n", (*reciprocal_links) ? "yes" : "no");
     return 0;
 }
 
@@ -2378,17 +2775,19 @@ int hnsw_validate_graph(HNSW *index, uint64_t *connected_nodes, int *reciprocal_
  * output, part of the implementation because this kind of functions
  * provide some visiblity on what happens inside the HNSW.
  */
-void hnsw_test_graph_recall(HNSW *index, int test_ef, int verbose) {
+void hnsw_test_graph_recall(HNSW *index, int test_ef, int verbose)
+{
     // Stats
     uint32_t total_nodes = 0;
     uint32_t unreachable_nodes = 0;
-    uint32_t perfectly_reachable = 0;  // Node finds itself as first result
+    uint32_t perfectly_reachable = 0; // Node finds itself as first result
 
     // For storing search results
-    hnswNode **neighbors = hmalloc(sizeof(hnswNode*) * test_ef);
+    hnswNode **neighbors = hmalloc(sizeof(hnswNode *) * test_ef);
     float *distances = hmalloc(sizeof(float) * test_ef);
     float *test_vector = hmalloc(sizeof(float) * index->vector_dim);
-    if (!neighbors || !distances || !test_vector) {
+    if (!neighbors || !distances || !test_vector)
+    {
         hfree(neighbors);
         hfree(distances);
         hfree(test_vector);
@@ -2398,7 +2797,8 @@ void hnsw_test_graph_recall(HNSW *index, int test_ef, int verbose) {
     // Get a read slot for searching (even if it's highly unlikely that
     // this test will be run threaded...).
     int slot = hnsw_acquire_read_slot(index);
-    if (slot < 0) {
+    if (slot < 0)
+    {
         hfree(neighbors);
         hfree(distances);
         return;
@@ -2409,62 +2809,78 @@ void hnsw_test_graph_recall(HNSW *index, int test_ef, int verbose) {
 
     // Process one node at a time using the linked list
     hnswNode *current = index->head;
-    while (current) {
+    while (current)
+    {
         total_nodes++;
 
         // If using quantization, we need to reconstruct the normalized vector
-        if (index->quant_type == HNSW_QUANT_Q8) {
+        if (index->quant_type == HNSW_QUANT_Q8)
+        {
             int8_t *quants = current->vector;
             // Reconstruct normalized vector from quantized data
-            for (uint32_t j = 0; j < index->vector_dim; j++) {
+            for (uint32_t j = 0; j < index->vector_dim; j++)
+            {
                 test_vector[j] = (quants[j] * current->quants_range) / 127;
             }
-        } else if (index->quant_type == HNSW_QUANT_NONE) {
-            memcpy(test_vector,current->vector,sizeof(float)*index->vector_dim);
-        } else {
+        }
+        else if (index->quant_type == HNSW_QUANT_NONE)
+        {
+            memcpy(test_vector, current->vector, sizeof(float) * index->vector_dim);
+        }
+        else
+        {
             assert(0 && "Quantization type not supported.");
         }
 
         // Search using the node's own vector with high ef
         int found = hnsw_search(index, test_vector, test_ef, neighbors,
-                              distances, slot, 1);
+                                distances, slot, 1);
 
-        if (found == 0) continue; // Empty HNSW?
+        if (found == 0)
+            continue; // Empty HNSW?
 
         // Look for the node itself in the results
         int found_self = 0;
         int self_position = -1;
-        for (int i = 0; i < found; i++) {
-            if (neighbors[i] == current) {
+        for (int i = 0; i < found; i++)
+        {
+            if (neighbors[i] == current)
+            {
                 found_self = 1;
                 self_position = i;
                 break;
             }
         }
 
-        if (!found_self || self_position != 0) {
+        if (!found_self || self_position != 0)
+        {
             unreachable_nodes++;
-            if (verbose) {
+            if (verbose)
+            {
                 if (!found_self)
-                    printf("\nNode %s cannot find itself:\n", (char*)current->value);
+                    printf("\nNode %s cannot find itself:\n", (char *)current->value);
                 else
-                    printf("\nNode %s is not top result:\n", (char*)current->value);
+                    printf("\nNode %s is not top result:\n", (char *)current->value);
                 printf("- Node ID: %llu\n", (unsigned long long)current->id);
                 printf("- Node level: %u\n", current->level);
                 printf("- Found %d neighbors but self not among them\n", found);
                 printf("- Closest neighbor distance: %f\n", distances[0]);
                 printf("- Neighbors: ");
-                for (uint32_t i = 0; i < current->layers[0].num_links; i++) {
-                    printf("%s ", (char*)current->layers[0].links[i]->value);
+                for (uint32_t i = 0; i < current->layers[0].num_links; i++)
+                {
+                    printf("%s ", (char *)current->layers[0].links[i]->value);
                 }
                 printf("\n");
                 printf("\nFound instead: ");
-                for (int j = 0; j < found && j < 10; j++) {
-                    printf("%s ", (char*)neighbors[j]->value);
+                for (int j = 0; j < found && j < 10; j++)
+                {
+                    printf("%s ", (char *)neighbors[j]->value);
                 }
                 printf("\n");
             }
-        } else {
+        }
+        else
+        {
             perfectly_reachable++;
         }
         current = current->next;

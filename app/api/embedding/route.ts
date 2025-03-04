@@ -718,7 +718,7 @@ export async function POST(request: NextRequest) {
         const embedding = await getEmbedding(input, config, isImage)
         const duration = Date.now() - startTime
         console.log(`[Embedding] Request completed in ⏱️ ${duration}ms`)
-        return NextResponse.json({ success: true, embedding })
+        return NextResponse.json({ success: true, result: embedding })
     } catch (error) {
         const duration = Date.now() - startTime
         console.error(

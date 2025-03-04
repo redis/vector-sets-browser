@@ -6,6 +6,9 @@ import { VectorSetMetadata } from "../types/embedding"
 import { AlertCircle, CheckCircle2 } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { fileOperations } from "@/app/api/file-operations"
+import { ApiError } from "@/app/api/client"
+import type { ImportConfig } from "@/app/api/file-operations"
 
 interface ImportFromCSVProps {
     onClose: () => void
@@ -29,6 +32,7 @@ export default function ImportFromCSV({
         fileName: string
     } | null>(null)
     const fileInputRef = useRef<HTMLInputElement | null>(null)
+    const [selectedFile, setSelectedFile] = useState<File | null>(null)
 
     const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
         if (!event.target.files || event.target.files.length === 0) {
@@ -36,6 +40,7 @@ export default function ImportFromCSV({
         }
 
         const file = event.target.files[0]
+        setSelectedFile(file)
 
         try {
             // Reset states
@@ -100,52 +105,31 @@ export default function ImportFromCSV({
         }
     }
 
-    const handleStartImport = async () => {
-        if (!csvPreview || !vectorSetName) {
-            setError("Please select a vector set before importing")
-            return
-        }
+    const handleImport = async () => {
+        if (!selectedFile || !vectorSetName || !csvPreview) return;
+
+        setIsImporting(true)
+        
+        const config: ImportConfig = {
+            delimiter: ",",
+            hasHeader: true,
+            skipRows: 0,
+            textColumn: "plot_synopsis",
+            imageColumn: undefined,
+            metadata: metadata || undefined
+        };
 
         try {
-            setIsImporting(true)
-            setError(null)
-
-            // Start the import
-            const formData = new FormData()
-            if (fileInputRef.current?.files?.[0]) {
-                const file = fileInputRef.current.files[0]
-                formData.append("file", file)
-                formData.append("vectorSetName", vectorSetName)
-
-                const response = await fetch(`/api/vectorset/${vectorSetName}/importData`, {
-                    method: "POST",
-                    body: formData,
-                    duplex: 'half'
-                })
-
-                const data = await response.json()
-                
-                if (!response.ok) {
-                    console.error('Import request failed:', data)
-                    throw new Error(data.error || "Failed to start import")
-                }
-
-                if (!data.success || !data.jobId) {
-                    console.error('Invalid response:', data)
-                    throw new Error("Invalid response from server")
-                }
-
-                setImportStarted(true)
-                setShowSuccessDialog(true)
-            } else {
-                throw new Error("No file selected")
-            }
+            const result = await fileOperations.importFile(vectorSetName, selectedFile, config);
+            setImportStarted(true)
+            setShowSuccessDialog(true)
+            setIsImporting(false)
         } catch (error) {
-            console.error('Import error:', error)
-            setError((error as Error).message)
+            console.error("Error importing file:", error);
+            setError(error instanceof ApiError ? error.message : "Error importing file");
             setIsImporting(false)
         }
-    }
+    };
 
     return (
         <>
@@ -256,7 +240,7 @@ export default function ImportFromCSV({
                         <Button
                             type="button"
                             variant="default"
-                            onClick={handleStartImport}
+                            onClick={handleImport}
                             disabled={isImporting || !metadata?.embedding}
                         >
                             {isImporting ? "Starting Import..." : "Start Import"}

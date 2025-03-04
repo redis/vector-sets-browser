@@ -11,27 +11,20 @@ function getRedisUrl(): string | null {
 // Type definitions for the request body
 interface VsimRequestBody {
     keyName: string
-    searchInput: number[] | string
+    searchVector?: number[]
+    searchElement?: string
     count: number
+    withEmbeddings?: boolean
 }
 
 export async function POST(request: Request) {
     try {
-        const body = await request.json() as VsimRequestBody
-        const { keyName, searchInput, count } = body
+        const body = (await request.json()) as VsimRequestBody
+        const { keyName, searchVector, searchElement, count, withEmbeddings = false } = body
 
-        if (!keyName) {
-            console.error("[vsim] Key name is required")
+        if (!keyName || (!searchVector && !searchElement)) {
             return NextResponse.json(
-                { success: false, error: "Key name is required" },
-                { status: 400 }
-            )
-        }
-
-        if (!searchInput) {
-            console.error("[vsim] Search input in required")
-            return NextResponse.json(
-                { success: false, error: "Search input is required" },
+                { success: false, error: "Key name and either searchVector or searchElement are required" },
                 { status: 400 }
             )
         }
@@ -44,47 +37,50 @@ export async function POST(request: Request) {
             )
         }
 
-        // Construct params based on searchInput type
         const params = {
-            searchVector: Array.isArray(searchInput) ? searchInput : undefined,
-            searchElement: typeof searchInput === 'string' ? searchInput : undefined,
+            searchVector,
+            searchElement,
             count: count || 10
         }
-        console.log("[vsim] Calling redis.vsim ", url, keyName, params)   
-        const result = await redis.vsim(url, keyName, params)
 
-        if (!result.success) {
+        const data = await redis.vsim(url, keyName, params)
+
+        if (!data.success) {
             return NextResponse.json(
-                { success: false, error: result.error },
+                { success: false, error: data.error },
                 { status: 500 }
             )
         }
+        // Validate the result format
+        if (!Array.isArray(data.result.result)) {
+            console.error("Expected array result from Redis, got:", typeof data.result.result)
+            return NextResponse.json({
+                success: false,
+                error: "Invalid response format from Redis"
+            }, { status: 500 })
+        }
 
-        // Filter out any results with invalid IDs
-        const validResults = Array.isArray(result.result) 
-            ? result.result.filter((item) => {
-                if (!Array.isArray(item) || item.length !== 2) return false
-                const [id, score] = item
-                if (!id || typeof id !== "string") return false
-                if (typeof score !== "number" && typeof score !== "string") return false
-                return true
-              })
-            : []
+        // Type assertion for the result array
+        let validResults = data.result.result as [string, number, number[]][]
 
-        // Return just the IDs and scores
-        const formattedResults = validResults.map(([id, score]) => [id, Number(score)])
+        // If embeddings are requested, fetch them
+        if (withEmbeddings && validResults.length > 0) {
+            const embeddingsPromises = validResults.map(async ([id, score]) => {
+                const embResult = await redis.vemb(url, keyName, id)
+                return [id, score, embResult.success ? embResult.result : []] as [string, number, number[]]
+            })
+
+            validResults = await Promise.all(embeddingsPromises)
+        }
 
         return NextResponse.json({
             success: true,
-            result: formattedResults
+            result: validResults
         })
     } catch (error) {
-        console.error("Error in VSIM API:", error)
+        console.error("Error in VSIM route:", error)
         return NextResponse.json(
-            { 
-                success: false,
-                error: error instanceof Error ? error.message : String(error) 
-            },
+            { success: false, error: String(error) },
             { status: 500 }
         )
     }

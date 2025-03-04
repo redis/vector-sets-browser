@@ -42,13 +42,13 @@ export class JobProcessor {
             throw new Error(`Failed to get embedding: ${data.error}`);
         }
 
-        if (!Array.isArray(data.embedding)) {
+        if (!Array.isArray(data.result)) {
             console.error('[JobProcessor] Invalid embedding response:', data);
             throw new Error('Invalid response from embedding API: expected array');
         }
 
-        console.log(`[JobProcessor] Got embedding of length ${data.embedding.length}`);
-        return data.embedding;
+        console.log(`[JobProcessor] Got embedding of length ${data.result.length}`);
+        return data.result;
     }
 
     private async updateProgress(progress: Partial<JobProgress>): Promise<void> {

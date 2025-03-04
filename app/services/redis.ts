@@ -8,19 +8,6 @@ const getBaseUrl = () => {
     return ""
 }
 
-interface RedisApiParams {
-    keyName?: string
-    vector?: number[]
-    element?: string
-    searchVector?: number[]
-    searchElement?: string
-    count?: number
-    metadata?: Record<string, unknown>
-    dimensions?: number
-    url?: string
-    withscores?: boolean
-}
-
 export async function connect(url: string): Promise<void> {
     try {
         const baseUrl = getBaseUrl()
@@ -141,19 +128,20 @@ export async function vadd(
     }
 }
 
-export async function vlink(
+export async function vlinks(
     keyName: string,
     element: string,
-    count: number
-): Promise<[string, number][]> {
+    count: number, 
+    withEmbeddings: boolean = false,
+): Promise<[string, number, number[]][]> {
     try {
         const baseUrl = getBaseUrl()
-        const response = await fetch(`${baseUrl}/api/redis/command/vlink`, {
+        const response = await fetch(`${baseUrl}/api/redis/command/vlinks`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
             },
-            body: JSON.stringify({ keyName, element, count }),
+            body: JSON.stringify({ keyName, element, count, withEmbeddings }),
         })
 
         if (!response.ok) {
@@ -169,10 +157,10 @@ export async function vlink(
         }
         
         // Flatten the per-level results into a single array
-        const result: [string, number][] = []
+        const result: [string, number, number[]][] = []
         for (const level of data.result) {
-            for (const [neighbor, score] of level) {
-                result.push([neighbor, score])
+            for (const [neighbor, score, vector] of level) {
+                result.push([neighbor, score, vector])
             }
         }
         return result
@@ -185,8 +173,9 @@ export async function vlink(
 export async function vsim(
     keyName: string,
     searchInput: number[] | string,
-    count: number
-): Promise<[string, number][]> {
+    count: number,
+    withEmbeddings: boolean
+): Promise<[string, number, number[]][]> {
     try {
         const baseUrl = getBaseUrl()
         const response = await fetch(`${baseUrl}/api/redis/command/vsim`, {
@@ -194,7 +183,7 @@ export async function vsim(
             headers: {
                 "Content-Type": "application/json",
             },
-            body: JSON.stringify({ keyName, searchInput, count }),
+            body: JSON.stringify({ keyName, searchInput, count, withEmbeddings }),
         })
 
         if (!response.ok) {

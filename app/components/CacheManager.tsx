@@ -12,6 +12,9 @@ import {
 } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Loader2, AlertTriangle, Info, PowerOff } from "lucide-react"
+import { cache } from "@/app/api/cache"
+import { ApiError } from "@/app/api/client"
+import type { CacheInfo } from "@/app/api/cache"
 
 interface CacheConfig {
     maxSize: number
@@ -20,12 +23,12 @@ interface CacheConfig {
 }
 
 export default function CacheManager() {
-    const [loading, setLoading] = useState(true)
+    const [cacheInfo, setCacheInfo] = useState<CacheInfo | null>(null)
+    const [loading, setLoading] = useState(false)
     const [saving, setSaving] = useState(false)
     const [clearing, setClearing] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const [success, setSuccess] = useState<string | null>(null)
-    const [cacheSize, setCacheSize] = useState<number>(0)
     const [noConnection, setNoConnection] = useState(false)
     const [config, setConfig] = useState<CacheConfig>({
         maxSize: 1000,
@@ -33,36 +36,18 @@ export default function CacheManager() {
         useCache: true,
     })
 
-    // Load cache info on component mount
-    useEffect(() => {
-        fetchCacheInfo()
-    }, [])
-
-    const fetchCacheInfo = async () => {
-        setLoading(true)
-        setError(null)
-        setNoConnection(false)
+    const loadCacheInfo = async () => {
         try {
-            const response = await fetch("/api/cache")
-
-            if (response.status === 401) {
-                setNoConnection(true)
-                return
-            }
-
-            if (!response.ok) {
-                throw new Error("Failed to fetch cache information")
-            }
-
-            const data = await response.json()
-            if (data.success) {
-                setConfig(data.config)
-                setCacheSize(data.size)
-            } else {
-                throw new Error(data.error || "Unknown error")
-            }
-        } catch (err) {
-            setError(err instanceof Error ? err.message : "An error occurred")
+            setLoading(true)
+            setError(null)
+            setNoConnection(false)
+            const info = await cache.getInfo()
+            setCacheInfo(info)
+            setConfig(info.config)
+        } catch (error) {
+            console.error("Error loading cache info:", error)
+            setError(error instanceof ApiError ? error.message : "Error loading cache info")
+            setNoConnection(true)
         } finally {
             setLoading(false)
         }
@@ -97,7 +82,7 @@ export default function CacheManager() {
             if (data.success) {
                 setSuccess("Cache configuration saved successfully")
                 // Refresh cache info
-                fetchCacheInfo()
+                await loadCacheInfo()
             } else {
                 throw new Error(data.error || "Unknown error")
             }
@@ -109,45 +94,36 @@ export default function CacheManager() {
     }
 
     const handleClearCache = async () => {
-        setClearing(true)
-        setError(null)
-        setSuccess(null)
         try {
-            const response = await fetch("/api/cache", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                    action: "clear",
-                }),
-            })
-
-            if (response.status === 401) {
-                setNoConnection(true)
-                return
-            }
-
-            if (!response.ok) {
-                throw new Error("Failed to clear cache")
-            }
-
-            const data = await response.json()
-            if (data.success) {
-                setSuccess(
-                    `Cache cleared successfully (${data.cleared} entries removed)`
-                )
-                // Refresh cache info
-                fetchCacheInfo()
-            } else {
-                throw new Error(data.error || "Unknown error")
-            }
-        } catch (err) {
-            setError(err instanceof Error ? err.message : "An error occurred")
+            setLoading(true)
+            setError(null)
+            await cache.clear()
+            await loadCacheInfo()
+        } catch (error) {
+            console.error("Error clearing cache:", error)
+            setError(error instanceof ApiError ? error.message : "Error clearing cache")
         } finally {
-            setClearing(false)
+            setLoading(false)
         }
     }
+
+    const handleClearItem = async (key: string) => {
+        try {
+            setLoading(true)
+            setError(null)
+            await cache.clearItem(key)
+            await loadCacheInfo()
+        } catch (error) {
+            console.error("Error clearing cache item:", error)
+            setError(error instanceof ApiError ? error.message : "Error clearing cache item")
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    useEffect(() => {
+        loadCacheInfo()
+    }, [])
 
     if (noConnection) {
         return (
@@ -244,7 +220,7 @@ export default function CacheManager() {
                                 <div className="text-sm font-medium">
                                     Current Cache Size:
                                 </div>
-                                <div className="text-sm">{cacheSize} entries</div>
+                                <div className="text-sm">{cacheInfo?.size} entries</div>
                             </div>
 
                             <div className="space-y-4">

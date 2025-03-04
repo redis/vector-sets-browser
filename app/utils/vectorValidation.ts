@@ -25,92 +25,86 @@ export function validateAndNormalizeVector(
         sampleValues?: any[]
     }
 } {
-    // TODO DEBUG - return what we passed in
-    return {
-        vector: vector,
-        isValid: true,
-        error: undefined,
-        debug: {
-            originalType: typeof vector,
-            isArray: Array.isArray(vector),
-            originalLength: Array.isArray(vector) ? vector.length : undefined,
-            containsNonNumbers: undefined,
-            sampleValues: undefined,
-        },
-    }
     // Debug information
     const debug = {
         originalType: typeof vector,
         isArray: Array.isArray(vector),
         originalLength: Array.isArray(vector) ? vector.length : undefined,
-        containsNonNumbers: undefined,
-        sampleValues: undefined,
+        containsNonNumbers: undefined as boolean | undefined,
+        sampleValues: undefined as any[] | undefined,
     }
 
     // Handle different vector formats based on source
     let normalizedVector: number[] = []
 
     try {
-        // Handle TensorFlow.js specific format
-        if (source === "tensorflow") {
-            // TensorFlow.js might return nested arrays or tensor objects
-            if (Array.isArray(vector)) {
-                // If it's already an array, check if it's nested
-                if (vector.length > 0 && Array.isArray(vector[0])) {
-                    // It's a nested array, take the first element
-                    normalizedVector = vector[0].map(Number)
-                    debug.sampleValues = vector[0].slice(0, 5)
+        switch (source) {
+            case "tensorflow":
+                // TensorFlow.js might return nested arrays or tensor objects
+                if (Array.isArray(vector)) {
+                    // If it's already an array, check if it's nested
+                    if (vector.length > 0 && Array.isArray(vector[0])) {
+                        // It's a nested array, take the first element
+                        normalizedVector = vector[0].map(Number)
+                        debug.sampleValues = vector[0].slice(0, 5)
+                    } else {
+                        // It's a flat array
+                        normalizedVector = vector.map(Number)
+                        debug.sampleValues = vector.slice(0, 5)
+                    }
+                } else if (typeof vector === "object" && vector !== null) {
+                    // It might be a TensorFlow.js tensor or other object
+                    // Try to convert to array if possible
+                    if (typeof vector.arraySync === "function") {
+                        const arrayData = vector.arraySync()
+                        normalizedVector = Array.isArray(arrayData[0])
+                            ? arrayData[0].map(Number)
+                            : arrayData.map(Number)
+                        debug.sampleValues = normalizedVector.slice(0, 5)
+                    } else {
+                        throw new Error(
+                            "Unsupported TensorFlow.js vector format"
+                        )
+                    }
                 } else {
-                    // It's a flat array
+                    throw new Error(
+                        `Invalid TensorFlow.js vector format: ${typeof vector}`
+                    )
+                }
+                break
+            case "ollama":
+                // Handle Ollama specific format
+                // Ollama typically returns a flat array
+                if (Array.isArray(vector)) {
                     normalizedVector = vector.map(Number)
                     debug.sampleValues = vector.slice(0, 5)
+                } else {
+                    throw new Error(
+                        `Invalid Ollama vector format: ${typeof vector}`
+                    )
                 }
-            } else if (typeof vector === "object" && vector !== null) {
-                // It might be a TensorFlow.js tensor or other object
-                // Try to convert to array if possible
-                if (typeof vector.arraySync === "function") {
-                    const arrayData = vector.arraySync()
-                    normalizedVector = Array.isArray(arrayData[0])
-                        ? arrayData[0].map(Number)
-                        : arrayData.map(Number)
+                break
+            default:
+                // Generic handling for unknown sources
+                if (Array.isArray(vector)) {
+                    // If it's already an array, check if it's nested
+                    if (vector.length > 0 && Array.isArray(vector[0])) {
+                        // It's a nested array, take the first element
+                        normalizedVector = vector[0].map(Number)
+                        debug.sampleValues = vector[0].slice(0, 5)
+                    } else {
+                        // It's a flat array
+                        normalizedVector = vector.map(Number)
+                        debug.sampleValues = vector.slice(0, 5)
+                    }
+                } else if (typeof vector === "string") {
+                    // If it's a string, convert to a number[]
+                    normalizedVector = vector.split(",").map(Number)
                     debug.sampleValues = normalizedVector.slice(0, 5)
                 } else {
-                    throw new Error("Unsupported TensorFlow.js vector format")
+                    throw new Error(`Invalid vector format: ${typeof vector}`)
                 }
-            } else {
-                throw new Error(
-                    `Invalid TensorFlow.js vector format: ${typeof vector}`
-                )
-            }
-        }
-        // Handle Ollama specific format
-        else if (source === "ollama") {
-            // Ollama typically returns a flat array
-            if (Array.isArray(vector)) {
-                normalizedVector = vector.map(Number)
-                debug.sampleValues = vector.slice(0, 5)
-            } else {
-                throw new Error(
-                    `Invalid Ollama vector format: ${typeof vector}`
-                )
-            }
-        }
-        // Generic handling for unknown sources
-        else {
-            if (Array.isArray(vector)) {
-                // If it's already an array, check if it's nested
-                if (vector.length > 0 && Array.isArray(vector[0])) {
-                    // It's a nested array, take the first element
-                    normalizedVector = vector[0].map(Number)
-                    debug.sampleValues = vector[0].slice(0, 5)
-                } else {
-                    // It's a flat array
-                    normalizedVector = vector.map(Number)
-                    debug.sampleValues = vector.slice(0, 5)
-                }
-            } else {
-                throw new Error(`Invalid vector format: ${typeof vector}`)
-            }
+                break
         }
 
         // Check for non-numeric values

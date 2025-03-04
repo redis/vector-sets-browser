@@ -1,6 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { VectorSetMetadata } from '../types/embedding';
 import { formatBytes } from "@/app/utils/vectorSetMemory"
+import { redisCommands } from '@/app/api/redis-commands';
+import { vectorSets } from '@/app/api/vector-sets';
+import { ApiError } from '@/app/api/client';
+import { VinfoResponse } from '@/app/api/types';
 
 interface VectorSetDetailsProps {
     vectorSetName: string | null;
@@ -9,7 +13,7 @@ interface VectorSetDetailsProps {
 export default function VectorSetDetails({ vectorSetName }: VectorSetDetailsProps) {
     const [memoryUsage, setMemoryUsage] = useState<number | null>(null);
     const [metadata, setMetadata] = useState<VectorSetMetadata | null>(null);
-    const [vectorInfo, setVectorInfo] = useState<Record<string, any> | null>(null);
+    const [vectorInfo, setVectorInfo] = useState<VinfoResponse | null>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -17,23 +21,15 @@ export default function VectorSetDetails({ vectorSetName }: VectorSetDetailsProp
         if (!vectorSetName) return;
         
         try {
-            const response = await fetch(`/api/vectorset/${vectorSetName}/memoryUsage`, {
-                method: "GET",
-            });
-
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-
-            const data = await response.json();
-            if (!data.success) {
-                throw new Error(data.error || "Failed to fetch memory usage");
-            }
-
-            setMemoryUsage(data.result);
+            const result = await vectorSets.getMemoryUsage(vectorSetName);
+            setMemoryUsage(result.bytes);
         } catch (error) {
             console.error("Error fetching memory usage:", error);
-            setError(error instanceof Error ? error.message : "Failed to fetch memory usage");
+            if (error instanceof ApiError) {
+                setError(error.message);
+            } else {
+                setError("Failed to fetch memory usage");
+            }
         }
     };
 
@@ -41,23 +37,15 @@ export default function VectorSetDetails({ vectorSetName }: VectorSetDetailsProp
         if (!vectorSetName) return;
         
         try {
-            const response = await fetch(`/api/vectorset/${vectorSetName}/metadata`, {
-                method: "GET",
-            });
-
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-
-            const data = await response.json();
-            if (!data.success) {
-                throw new Error(data.error || "Failed to fetch metadata");
-            }
-
-            setMetadata(data.result);
+            const result = await vectorSets.getMetadata(vectorSetName);
+            setMetadata(result);
         } catch (error) {
             console.error("Error fetching metadata:", error);
-            setError(error instanceof Error ? error.message : "Failed to fetch metadata");
+            if (error instanceof ApiError) {
+                setError(error.message);
+            } else {
+                setError("Failed to fetch metadata");
+            }
         }
     };
 
@@ -65,29 +53,15 @@ export default function VectorSetDetails({ vectorSetName }: VectorSetDetailsProp
         if (!vectorSetName) return;
         
         try {
-            const response = await fetch("/api/redis/command/vinfo", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                    keyName: vectorSetName,
-                }),
-            });
-
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-
-            const data = await response.json();
-            if (!data.success) {
-                throw new Error(data.error || "Failed to fetch vector info");
-            }
-
-            setVectorInfo(data.result);
+            const result = await redisCommands.vinfo(vectorSetName);
+            setVectorInfo(result);
         } catch (error) {
             console.error("Error fetching vector info:", error);
-            setError(error instanceof Error ? error.message : "Failed to fetch vector info");
+            if (error instanceof ApiError) {
+                setError(error.message);
+            } else {
+                setError("Failed to fetch vector info");
+            }
         }
     };
 

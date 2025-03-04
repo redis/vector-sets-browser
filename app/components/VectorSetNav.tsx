@@ -1,7 +1,11 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { VectorSetMetadata } from "@/app/types/embedding"
 import EditEmbeddingConfigModal from "./EditEmbeddingConfigModal"
 import CreateVectorSetModal from "./CreateVectorSetModal"
+import { vectorSets } from "@/app/api/vector-sets"
+import { redisCommands } from "@/app/api/redis-commands"
+import { jobs, type Job } from "@/app/api/jobs"
+import { ApiError } from "@/app/api/client"
 
 import {
     estimateVectorSetMemoryUsage,
@@ -29,32 +33,15 @@ interface VectorSetInfo {
     activeJobs: number
 }
 
-interface Job {
-    jobId: string
-    status: {
-        status: 'processing' | 'paused' | 'pending' | 'completed' | 'failed' | 'cancelled'
-        current: number
-        total: number
-        message?: string
-        error?: string
-    }
-    metadata: {
-        vectorSetName: string
-        filename: string
-    }
-}
-
 export default function VectorSetNav({
     redisUrl,
     redisName,
     selectedVectorSet,
     onVectorSetSelect,
-    onRedisUrlChange,
-    onConnect,
     onBack,
     isConnected
 }: VectorSetNavProps) {
-    const [vectorSets, setVectorSets] = useState<string[]>([])
+    const [vectorSetList, setVectorSetList] = useState<string[]>([])
     const [vectorSetInfo, setVectorSetInfo] = useState<Record<string, VectorSetInfo>>({})
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
@@ -64,27 +51,7 @@ export default function VectorSetNav({
     const [editingVectorSet, setEditingVectorSet] = useState<string | null>(null)
     const [isInitialLoad, setIsInitialLoad] = useState(true)
 
-    // Function to fetch jobs for a vector set
-    const fetchVectorSetJobs = async (set: string): Promise<number> => {
-        try {
-            const response = await fetch(`/api/jobs?vectorSetName=${encodeURIComponent(set)}`)
-            if (!response.ok) {
-                console.error('Failed to fetch jobs:', response.statusText)
-                return 0
-            }
-            const jobs = await response.json() as Job[]
-            return jobs.filter((job) => 
-                job.status.status === 'processing' || 
-                job.status.status === 'paused' || 
-                job.status.status === 'pending'
-            ).length
-        } catch (error) {
-            console.error('Error fetching jobs:', error)
-            return 0
-        }
-    }
-
-    const loadVectorSets = async () => {
+    const loadVectorSets = useCallback(async () => {
         if (!isConnected) {
             console.error("Not connected, can't load vector sets")
             return
@@ -93,84 +60,39 @@ export default function VectorSetNav({
         setLoading(true)
         setError(null)
         try {
-            let response = await fetch("/api/vectorset", {
-                method: "GET",
-            })
-            
-            // Handle 401 specifically
-            if (response.status === 401) {
-                console.error('Not authorized, connection might not be ready');
-                // Retry after a delay
-                await new Promise(resolve => setTimeout(resolve, 1000));
-                response = await fetch("/api/vectorset", {
-                    method: "GET",
-                })
-            }
-
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`)
-            }
-
-            const data = await response.json()
-            if (!data.success) {
-                throw new Error(data.error || "Failed to fetch vector sets")
-            }
-            
-            const sets = Array.isArray(data.result) ? data.result : []
-            setVectorSets(sets)
+            const sets = await vectorSets.list();
+            setVectorSetList(sets as unknown as Array<string>);
 
             // Fetch info for each vector set
             const info: Record<string, VectorSetInfo> = {}
             
             const fetchVectorSetInfo = async (set: string, retryCount = 0): Promise<void> => {
                 try {
-                    const [dimResponse, cardResponse] = await Promise.all([
-                        fetch("/api/redis/command/vdim", {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({
-                                keyName: set,
-                            }),
-                        }),
-                        fetch("/api/redis/command/vcard", {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({
-                                keyName: set,
-                            }),
-                        }),
-                    ])
-
-                    const [dimData, cardData] = await Promise.all([
-                        dimResponse.json(),
-                        cardResponse.json(),
-                    ])
-
-                    if (!dimResponse.ok || !cardResponse.ok) {
-                        throw new Error("Failed to fetch vector set info")
-                    }
-
-                    if (!dimData.success || !cardData.success) {
-                        throw new Error(dimData.error || cardData.error || "Failed to fetch vector set info")
-                    }
-
-                    const dimensions = dimData.result
-                    const vectorCount = cardData.result
-
-                    // Validate the results
-                    if (typeof dimensions !== 'number' || typeof vectorCount !== 'number') {
-                        console.error('Invalid dimensions or vector count:', { dimensions, vectorCount });
-                        throw new Error('Invalid vector set info returned from server')
-                    }
+                    // First get the basic vector set info
+                    const [dimensions, vectorCount] = await Promise.all([
+                        redisCommands.vdim(set),
+                        redisCommands.vcard(set),
+                    ]);
 
                     // Calculate estimated memory usage
                     const memoryBytes = estimateVectorSetMemoryUsage(
                         dimensions,
                         vectorCount
-                    )
+                    );
 
-                    // Fetch active jobs count
-                    const activeJobs = await fetchVectorSetJobs(set)
+                    // Then try to get the jobs info, but don't let it block if it fails
+                    let activeJobs = 0;
+                    try {
+                        const jobsList = await jobs.getJobsByVectorSet(set);
+                        activeJobs = jobsList.filter((job) => 
+                            job.status.status === 'processing' || 
+                            job.status.status === 'paused' || 
+                            job.status.status === 'pending'
+                        ).length;
+                    } catch (jobError) {
+                        console.warn(`Warning: Could not fetch jobs for vector set ${set}:`, jobError);
+                        // Continue with activeJobs as 0
+                    }
 
                     info[set] = {
                         name: set,
@@ -198,18 +120,18 @@ export default function VectorSetNav({
             }
 
             // Fetch info for all sets with retries
-            await Promise.all(sets.map((set: string) => fetchVectorSetInfo(set)));
+            await Promise.all(sets.map(set => fetchVectorSetInfo(set)));
 
             setVectorSetInfo(info)
         } catch (error) {
             console.error("Error fetching vector sets:", error)
-            setError(error instanceof Error ? error.message : "Failed to fetch vector sets")
-            setVectorSets([])
+            setError(error instanceof ApiError ? error.message : "Failed to fetch vector sets")
+            setVectorSetList([])
             setVectorSetInfo({})
         } finally {
             setLoading(false)
         }
-    }
+    }, [isConnected])
 
     useEffect(() => {
         if (isConnected && redisUrl) {
@@ -221,18 +143,18 @@ export default function VectorSetNav({
             
             return () => clearTimeout(timer)
         } else {
-            setVectorSets([])
+            setVectorSetList([])
             setVectorSetInfo({})
             setIsInitialLoad(true)
         }
-    }, [redisUrl, isConnected])
+    }, [redisUrl, isConnected, loadVectorSets])
 
     useEffect(() => {
-        if (isInitialLoad && vectorSets.length > 0 && !selectedVectorSet) {
-            onVectorSetSelect(vectorSets[0])
+        if (isInitialLoad && vectorSetList.length > 0 && !selectedVectorSet) {
+            onVectorSetSelect(vectorSetList[0])
             setIsInitialLoad(false)
         }
-    }, [vectorSets, selectedVectorSet, onVectorSetSelect, isInitialLoad])
+    }, [vectorSetList, selectedVectorSet, onVectorSetSelect, isInitialLoad])
 
     // Clear status message after delay
     useEffect(() => {
@@ -251,66 +173,31 @@ export default function VectorSetNav({
         metadata: VectorSetMetadata,
         customData?: { element: string; vector: number[] }
     ) => {
-        setStatusMessage("Creating vector set...")
         try {
-            const response = await fetch(`/api/vectorset/${name}`, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                    dimensions,
-                    metadata,
-                    customData,
-                }),
-            })
-
-            if (!response.ok) {
-                throw new Error("Failed to create vector set")
-            }
-
-            const data = await response.json()
-            if (!data.success) {
-                throw new Error(data.error || "Failed to create vector set")
-            }
-
-            setStatusMessage("Vector set created successfully")
-            setIsCreateModalOpen(false)
-            loadVectorSets()
+            await vectorSets.create(name, {
+                dimensions,
+                metadata,
+                customData
+            });
+            setStatusMessage(`Created vector set ${name}`)
+            await loadVectorSets()
         } catch (error) {
             console.error("Error creating vector set:", error)
-            setStatusMessage(error instanceof Error ? error.message : "Failed to create vector set")
+            setError(error instanceof ApiError ? error.message : "Failed to create vector set")
         }
     }
 
     const handleDeleteVectorSet = async (name: string) => {
-        if (!confirm(`Are you sure you want to delete the vector set "${name}"?`)) {
-            return
-        }
-
-        setStatusMessage("Deleting vector set...")
         try {
-            const response = await fetch(`/api/vectorset/${name}`, {
-                method: "DELETE",
-            })
-
-            if (!response.ok) {
-                throw new Error("Failed to delete vector set")
-            }
-
-            const data = await response.json()
-            if (!data.success) {
-                throw new Error(data.error || "Failed to delete vector set")
-            }
-
-            setStatusMessage("Vector set deleted successfully")
+            await vectorSets.delete(name);
+            setStatusMessage(`Deleted vector set ${name}`)
             if (selectedVectorSet === name) {
                 onVectorSetSelect(null)
             }
-            loadVectorSets()
+            await loadVectorSets()
         } catch (error) {
             console.error("Error deleting vector set:", error)
-            setStatusMessage(error instanceof Error ? error.message : "Failed to delete vector set")
+            setError(error instanceof ApiError ? error.message : "Failed to delete vector set")
         }
     }
 
@@ -318,34 +205,16 @@ export default function VectorSetNav({
         name: string,
         metadata: VectorSetMetadata
     ) => {
-        setStatusMessage("Saving metadata...")
         try {
-            const metadataResponse = await fetch(`/api/vectorset/${name}/metadata`, {
-                method: "PUT",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                    metadata,
-                }),
-            })
-
-            if (!metadataResponse.ok) {
-                throw new Error("Failed to save metadata")
-            }
-
-            const data = await metadataResponse.json()
-            if (!data.success) {
-                throw new Error(data.error || "Failed to save metadata")
-            }
-
-            setStatusMessage("Metadata saved successfully")
-            setIsEditConfigModalOpen(false)
-            setEditingVectorSet(null)
-            loadVectorSets()
+            await vectorSets.create(name, {
+                dimensions: vectorSetInfo[name]?.dimensions || 0,
+                metadata
+            });
+            setStatusMessage(`Updated metadata for ${name}`)
+            await loadVectorSets()
         } catch (error) {
-            console.error("Error saving metadata:", error)
-            setStatusMessage(error instanceof Error ? error.message : "Failed to save metadata")
+            console.error("Error updating metadata:", error)
+            setError(error instanceof ApiError ? error.message : "Failed to update metadata")
         }
     }
 
@@ -406,18 +275,18 @@ export default function VectorSetNav({
                             {error}
                         </div>
                     )}
-                    {!loading && !error && vectorSets.length === 0 && (
+                    {!loading && !error && vectorSetList.length === 0 && (
                         <div className="text-sm text-gray-500">
                             No vector sets found
                         </div>
                     )}
-                    {vectorSets.map((vectorSet, index) => {
-                        const info = vectorSetInfo[vectorSet]
+                    {vectorSetList.map((setName, index) => {
+                        const info = vectorSetInfo[setName]
                         return (
                             <div
-                                key={vectorSet}
+                                key={setName}
                                 className={`group list-item relative ${
-                                    selectedVectorSet === vectorSet
+                                    selectedVectorSet === setName
                                         ? "list-item-selected"
                                         : index % 2 === 0
                                         ? "list-item-alt"
@@ -425,15 +294,15 @@ export default function VectorSetNav({
                                 }`}
                             >
                                 <div
-                                    onClick={() => onVectorSetSelect(vectorSet)}
+                                    onClick={() => onVectorSetSelect(setName)}
                                     className="list-item-content truncate"
                                 >
                                     <div className="flex items-center gap-2">
                                         <span
                                             className="truncate overflow-hidden whitespace-nowrap min-w-0"
-                                            title={vectorSet}
+                                            title={setName}
                                         >
-                                            {vectorSet}
+                                            {setName}
                                         </span>
                                         {info?.activeJobs > 0 && (
                                             <span className="inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white bg-blue-600 rounded">
@@ -441,16 +310,20 @@ export default function VectorSetNav({
                                             </span>
                                         )}
                                     </div>
-                                    
-                                        <div className="flex w-full justify-between text-xs">
-                                            <span>
-                                                {info && info.vectorCount.toLocaleString()}{" "}
-                                                vectors ({info && (info.dimensions)} Dim)
-                                            </span>
-                                            <span>
-                                            {formatBytes(info ? info.memoryBytes : 0)}
-                                            </span>
-                                        </div>
+
+                                    <div className="flex w-full justify-between text-xs">
+                                        <span>
+                                            {info &&
+                                                info.vectorCount.toLocaleString()}{" "}
+                                            vectors ({info && info.dimensions}{" "}
+                                            Dim)
+                                        </span>
+                                        <span>
+                                            {formatBytes(
+                                                info ? info.memoryBytes : 0
+                                            )}
+                                        </span>
+                                    </div>
                                 </div>
                                 <div className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100">
                                     <Button
@@ -458,7 +331,7 @@ export default function VectorSetNav({
                                         size="icon"
                                         onClick={(e) => {
                                             e.stopPropagation()
-                                            handleDeleteVectorSet(vectorSet)
+                                            handleDeleteVectorSet(setName)
                                         }}
                                         className=""
                                         title="Delete Vector Set"

@@ -1,6 +1,9 @@
 import { useState, useRef, useCallback, useEffect } from "react"
-import { vsim, vdim, vemb } from "../services/redis"
 import { VectorSetMetadata } from "../types/embedding"
+import { redisCommands } from "@/app/api/redis-commands"
+import { embeddings } from "@/app/api/embeddings"
+import { ApiError } from "@/app/api/client"
+import { VectorTuple } from "@/app/api/types"
 
 export interface VectorSetSearchState {
     searchType: "Vector" | "Element" | "Image"
@@ -14,7 +17,7 @@ export interface VectorSetSearchState {
 interface UseVectorSearchProps {
     vectorSetName: string | null
     metadata: VectorSetMetadata | null
-    onSearchResults: (results: [string, number, number[]][]) => void
+    onSearchResults: (results: VectorTuple[]) => void
     onStatusChange: (status: string) => void
     searchState: VectorSetSearchState
     onSearchStateChange: (state: Partial<VectorSetSearchState>) => void
@@ -77,59 +80,18 @@ export function useVectorSearch({
         return [result, duration];
     }, []);
 
-    // Helper function to process search results and fetch vectors if needed
-    const processSearchResults = useCallback(async (
-        results: SearchResult[],
-        dimension: number
-    ): Promise<SearchResultWithVector[]> => {
-        if (!vectorSetName) {
-            return [];
-        }
-
-        if (needVectors()) {
-            // Fetch vectors for each result
-            return Promise.all(
-                results.map(async ([id, score]) => {
-                    try {
-                        const vector = await vemb(vectorSetName, id);
-                        return [id, score, vector] as SearchResultWithVector;
-                    } catch (error) {
-                        console.error(`Failed to fetch vector for ${id}:`, error);
-                        // Return a zero vector as fallback
-                        return [id, score, Array(dimension).fill(0)] as SearchResultWithVector;
-                    }
-                })
-            );
-        } else {
-            // Just pass IDs and scores with empty vectors
-            return results.map(([id, score]) => 
-                [id, score, []] as SearchResultWithVector
-            );
-        }
-    }, [vectorSetName, needVectors]);
-
     // Helper function to handle search errors
     const handleSearchError = useCallback((error: unknown) => {
         console.error("Search error:", error);
-        const errorMessage = error instanceof Error ? error.message : String(error);
         
-        try {
-            // Try to parse as JSON error
-            const errorJson = JSON.parse(errorMessage);
-            const parsedError = errorJson.error?.replace("Error: ", "") || errorMessage;
-            
-            if (parsedError.includes("ERR element not found in set")) {
+        if (error instanceof ApiError) {
+            if (error.message.includes("element not found in set")) {
                 onStatusChange("Element not found");
             } else {
-                onStatusChange(parsedError);
+                onStatusChange(error.message);
             }
-        } catch {
-            // If JSON parsing fails, check for specific error strings
-            if (errorMessage.includes("ERR element not found in set")) {
-                onStatusChange("Element not found");
-            } else {
-                onStatusChange(errorMessage);
-            }
+        } else {
+            onStatusChange(error instanceof Error ? error.message : String(error));
         }
         
         onSearchResults([]);
@@ -143,20 +105,19 @@ export function useVectorSearch({
             setIsSearching(true);
             
             // Get dimension from Redis
-            const dim = await vdim(vectorSetName);
+            const dim = await redisCommands.vdim(vectorSetName);
             const zeroVector = Array(dim).fill(0);
             
             // Perform search and measure time
             const [vsimResults, duration] = await measureSearchTime(
-                () => vsim(vectorSetName!, zeroVector, count)
+                () => redisCommands.vsim(vectorSetName!, zeroVector, count, needVectors())
             );
             
             // Store search time in state
             onSearchStateChange({ searchTime: duration });
             
             // Process results
-            const processedResults = await processSearchResults(vsimResults, dim);
-            onSearchResults(processedResults);
+            onSearchResults(vsimResults);
             
         } catch (error) {
             console.error("Zero vector search error:", error);
@@ -165,7 +126,7 @@ export function useVectorSearch({
         } finally {
             setIsSearching(false);
         }
-    }, [vectorSetName, measureSearchTime, processSearchResults, onSearchStateChange, onSearchResults, onStatusChange]);
+    }, [vectorSetName, measureSearchTime, onSearchStateChange, onSearchResults, onStatusChange, needVectors]);
 
     // Function to get vector from text using embedding API
     const getVectorFromText = useCallback(async (text: string): Promise<number[]> => {
@@ -175,26 +136,91 @@ export function useVectorSearch({
             );
         }
         
-        const response = await fetch("/api/embedding", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                text: text,
-                config: metadata.embedding,
-            }),
-        });
-        
-        if (!response.ok) {
-            throw new Error("Failed to get embedding for search text");
+        const embedding = await embeddings.getEmbedding(metadata.embedding, text);
+        if(!embedding) {
+            console.error("Error getting embedding");
+            return []
+        } else {
+            return embedding
         }
 
-        const data = await response.json();
-        if (!data.success) {
-            throw new Error(data.error || "Failed to get embedding for search text");
-        }
-
-        return data.embedding;
     }, [metadata]);
+
+    // Handle Vector type search
+    const handleVectorSearch = useCallback(async (count: number) => {
+        if (!vectorSetName) return;
+        
+        let searchVector: number[];
+        
+        // Try to parse as raw vector first
+        const vectorData = searchState.searchQuery
+            .split(",")
+            .map((n) => parseFloat(n.trim()));
+            
+        if (!vectorData.some(isNaN)) {
+            // Valid vector data
+            searchVector = vectorData;
+            // Set status message to show the first 3 numbers of the vector
+            const firstThreeNumbers = searchVector.slice(0, 3).join(', ');
+            onStatusChange(`Vector [${firstThreeNumbers}${searchVector.length > 3 ? '...' : ''}]`);
+        } else {
+            // Not a valid vector, try to convert text to vector
+            onStatusChange(`"${searchState.searchQuery}"`);
+            searchVector = await getVectorFromText(searchState.searchQuery);
+        }
+
+        // Get and validate vector dimension
+        const expectedDim = await redisCommands.vdim(vectorSetName);
+        if (searchVector.length !== expectedDim) {
+            throw new Error(`Vector dimension mismatch - expected ${expectedDim} but got ${searchVector.length}`);
+        }
+
+        // Perform vector-based search and measure time
+        const [vsimResults, duration] = await measureSearchTime(
+            () => redisCommands.vsim(vectorSetName!, searchVector, count, needVectors())
+        );
+        
+        // Store search time in state
+        onSearchStateChange({ searchTime: duration });
+        
+        // Process results
+        onSearchResults(vsimResults);
+    }, [
+        vectorSetName, 
+        searchState.searchQuery, 
+        getVectorFromText, 
+        measureSearchTime, 
+        onSearchStateChange, 
+        onSearchResults, 
+        onStatusChange,
+        needVectors
+    ]);
+
+    // Handle Element type search
+    const handleElementSearch = useCallback(async (count: number) => {
+        if (!vectorSetName) return;
+        
+        onStatusChange(`Element: "${searchState.searchQuery}"`);
+        
+        // Perform element-based search and measure time
+        const [vsimResults, duration] = await measureSearchTime(
+            () => redisCommands.vsim(vectorSetName!, searchState.searchQuery, count, needVectors())
+        );
+        
+        // Store search time in state
+        onSearchStateChange({ searchTime: duration });
+        
+        // Process results
+        onSearchResults(vsimResults);
+    }, [
+        vectorSetName, 
+        searchState.searchQuery, 
+        measureSearchTime, 
+        onSearchStateChange, 
+        onSearchResults, 
+        onStatusChange,
+        needVectors
+    ]);
 
     // Main search function
     const performSearch = useCallback(async () => {
@@ -232,88 +258,9 @@ export function useVectorSearch({
         vectorSetName, 
         searchState, 
         parseCount, 
-        handleSearchError
-    ]);
-
-    // Handle Vector type search
-    const handleVectorSearch = useCallback(async (count: number) => {
-        if (!vectorSetName) return;
-        
-        let searchVector: number[];
-        
-        // Try to parse as raw vector first
-        const vectorData = searchState.searchQuery
-            .split(",")
-            .map((n) => parseFloat(n.trim()));
-            
-        if (!vectorData.some(isNaN)) {
-            // Valid vector data
-            searchVector = vectorData;
-            // Set status message to show the first 3 numbers of the vector
-            const firstThreeNumbers = searchVector.slice(0, 3).join(', ');
-            onStatusChange(`Vector [${firstThreeNumbers}${searchVector.length > 3 ? '...' : ''}]`);
-        } else {
-            // Not a valid vector, try to convert text to vector
-            onStatusChange(`"${searchState.searchQuery}"`);
-            searchVector = await getVectorFromText(searchState.searchQuery);
-        }
-
-        // Get and validate vector dimension
-        const expectedDim = await vdim(vectorSetName);
-        if (searchVector.length !== expectedDim) {
-            throw new Error(`Vector dimension mismatch - expected ${expectedDim} but got ${searchVector.length}`);
-        }
-
-        // Perform vector-based search and measure time
-        const [vsimResults, duration] = await measureSearchTime(
-            () => vsim(vectorSetName!, searchVector, count)
-        );
-        
-        // Store search time in state
-        onSearchStateChange({ searchTime: duration });
-        
-        // Process results
-        const processedResults = await processSearchResults(vsimResults, expectedDim);
-        onSearchResults(processedResults);
-    }, [
-        vectorSetName, 
-        searchState.searchQuery, 
-        getVectorFromText, 
-        measureSearchTime, 
-        processSearchResults, 
-        onSearchStateChange, 
-        onSearchResults, 
-        onStatusChange
-    ]);
-
-    // Handle Element type search
-    const handleElementSearch = useCallback(async (count: number) => {
-        if (!vectorSetName) return;
-        
-        onStatusChange(`Element: "${searchState.searchQuery}"`);
-        
-        // Perform element-based search and measure time
-        const [vsimResults, duration] = await measureSearchTime(
-            () => vsim(vectorSetName!, searchState.searchQuery, count)
-        );
-        
-        // Store search time in state
-        onSearchStateChange({ searchTime: duration });
-        
-        // Get dimension for fallback
-        const dim = await vdim(vectorSetName);
-        
-        // Process results
-        const processedResults = await processSearchResults(vsimResults, dim);
-        onSearchResults(processedResults);
-    }, [
-        vectorSetName, 
-        searchState.searchQuery, 
-        measureSearchTime, 
-        processSearchResults, 
-        onSearchStateChange, 
-        onSearchResults, 
-        onStatusChange
+        handleSearchError,
+        handleVectorSearch,
+        handleElementSearch
     ]);
 
     // Perform initial search when vector set changes
