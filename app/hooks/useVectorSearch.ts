@@ -157,16 +157,17 @@ export function useVectorSearch({
             .split(",")
             .map((n) => parseFloat(n.trim()));
             
+        let searchString = ""
         if (!vectorData.some(isNaN)) {
             // Valid vector data
             searchVector = vectorData;
             // Set status message to show the first 3 numbers of the vector
             const firstThreeNumbers = searchVector.slice(0, 3).join(', ');
-            onStatusChange(`Vector [${firstThreeNumbers}${searchVector.length > 3 ? '...' : ''}]`);
+            searchString = `Results for Vector [${firstThreeNumbers}${searchVector.length > 3 ? '...' : ''}]`
         } else {
             // Not a valid vector, try to convert text to vector
-            onStatusChange(`"${searchState.searchQuery}"`);
             searchVector = await getVectorFromText(searchState.searchQuery);
+            searchString = `Results for "${searchState.searchQuery}"`
         }
 
         // Get and validate vector dimension
@@ -185,6 +186,9 @@ export function useVectorSearch({
         
         // Process results
         onSearchResults(vsimResults);
+
+        onStatusChange(searchString)
+
     }, [
         vectorSetName, 
         searchState.searchQuery, 

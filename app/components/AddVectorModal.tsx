@@ -157,10 +157,11 @@ export default function AddVectorModal({
                             onValueChange={setActiveTab}
                             className="mb-4"
                         >
-                            <TabsList className="mb-2">
+                            <TabsList className="mb-2 w-full">
                                 <TabsTrigger
                                     value="text"
                                     disabled={!useTextEmbedding}
+                                    className="w-full"
                                 >
                                     Text
                                 </TabsTrigger>
@@ -169,8 +170,18 @@ export default function AddVectorModal({
                                     disabled={
                                         !useImageEmbedding && useTextEmbedding
                                     }
+                                    className="w-full"
                                 >
                                     Image
+                                </TabsTrigger>
+                                <TabsTrigger
+                                    value="image"
+                                    disabled={
+                                        !useImageEmbedding && useTextEmbedding
+                                    }
+                                    className="w-full"
+                                >
+                                    Audio
                                 </TabsTrigger>
                             </TabsList>
 
@@ -180,7 +191,7 @@ export default function AddVectorModal({
                                         htmlFor="elementData"
                                         className="block text-sm font-medium mb-1"
                                     >
-                                        Text Content
+                                        Data
                                     </label>
                                     <Textarea
                                         id="elementData"

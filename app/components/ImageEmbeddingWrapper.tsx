@@ -30,7 +30,7 @@ export default function ImageEmbeddingWrapper({
       try {
         onStatusChange('Getting embedding from server...');
         
-        const response = await fetch('/api/embedding', {
+        const response = await fetch('/api/embed', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

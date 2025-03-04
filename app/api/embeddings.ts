@@ -5,7 +5,7 @@ import { EmbeddingConfig } from '../types/embedding';
 export const embeddings = {
     async getEmbedding(config: EmbeddingConfig, text?: string, imageData?: string) {
         return apiClient.post<EmbeddingResponse, EmbeddingRequest>(
-            '/api/embedding',
+            '/api/embeddings',
             {
                 text,
                 imageData,

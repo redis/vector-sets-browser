@@ -24,6 +24,7 @@ import HNSWVizPure from "../components/vizualizer/HNSWVizPure"
 import type { VLinkResponse } from "../components/vizualizer/types"
 import * as redis from "../services/redis"
 import { toast } from "sonner"
+import StatusMessage from "../components/StatusMessage"
 
 /**
  * VectorSetPage handles the display and management of vector sets.
@@ -492,7 +493,13 @@ export default function VectorSetPage() {
                                                     results
                                                 </span>
                                             </div>
-                                            {searchQuery && (
+                                            <StatusMessage
+                                                message={
+                                                    fileOperationStatus ||
+                                                    vectorSetStatus
+                                                }
+                                            />
+                                            {/* {searchQuery && !isSearching && (
                                                 <span className="text-xs whitespace-nowrap">
                                                     Searched for &ldquo;
                                                     <span className="font-bold">
@@ -503,7 +510,7 @@ export default function VectorSetPage() {
                                                     </span>
                                                     &rdquo;
                                                 </span>
-                                            )}
+                                            )} */}
                                             {(vectorSetStates[
                                                 vectorSetName || ""
                                             ]?.searchState?.searchTime ||

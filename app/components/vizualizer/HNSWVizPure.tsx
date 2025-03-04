@@ -76,6 +76,9 @@ let COLORS: ColorScheme = COLORS_REDIS_DARK
 // Local storage key for color scheme
 const COLOR_SCHEME_STORAGE_KEY = "hnsw_color_scheme"
 
+// Add userSettings import at the top
+import { userSettings } from "@/app/api/userSettings"
+
 //
 // Type Definitions
 //
@@ -1117,9 +1120,9 @@ function useLayoutManager(
             if (currentLayout !== layoutType) {
                 setCurrentLayout(layoutType)
                 // Store the layout preference
-                if (typeof window !== "undefined") {
-                    localStorage.setItem("hnswVizLayout", layoutType)
-                }
+                userSettings.set("hnswVizLayout", layoutType).catch(error => {
+                    console.error("Error saving layout preference:", error)
+                })
             }
 
             // If switching to a projection method, show a toast with instructions
@@ -1495,13 +1498,34 @@ const HNSWVizPure: React.FC<HNSWVizPureProps> = ({
 }) => {
     // Add color scheme state
     const [isDarkMode, setIsDarkMode] = useState(() => {
-        // Try to get the stored value
-        if (typeof window !== "undefined") {
-            const stored = localStorage.getItem(COLOR_SCHEME_STORAGE_KEY)
-            return stored ? stored === "dark" : false // Default to dark if not set
-        }
-        return true // Default to dark mode
+        // Default to dark mode until we load from settings
+        return true
     })
+
+    // Load color scheme preference
+    useEffect(() => {
+        const loadColorScheme = async () => {
+            try {
+                const colorScheme = await userSettings.get<string>(COLOR_SCHEME_STORAGE_KEY)
+                setIsDarkMode(colorScheme ? colorScheme === "dark" : true)
+            } catch (error) {
+                console.error("Error loading color scheme:", error)
+            }
+        }
+        loadColorScheme()
+    }, [])
+
+    // Save color scheme preference
+    useEffect(() => {
+        const saveColorScheme = async () => {
+            try {
+                await userSettings.set(COLOR_SCHEME_STORAGE_KEY, isDarkMode ? "dark" : "light")
+            } catch (error) {
+                console.error("Error saving color scheme:", error)
+            }
+        }
+        saveColorScheme()
+    }, [isDarkMode])
 
     const [selectedNode, setSelectedNode] = useState<THREE.Mesh | null>(null)
 
@@ -1589,20 +1613,39 @@ const HNSWVizPure: React.FC<HNSWVizPureProps> = ({
         new Set()
     )
     // Get stored line visibility or default to false
-    const storedShowLines =
-        typeof window !== "undefined"
-            ? localStorage.getItem("hnswVizShowLines")
-            : null
-    const [showLines, setShowLines] = useState<boolean>(
-        storedShowLines === "true" ? true : false
-    )
+    const [showLines, setShowLines] = useState<boolean>(false)
+
+    // Load line visibility preference
+    useEffect(() => {
+        const loadLineVisibility = async () => {
+            try {
+                const visibility = await userSettings.get<boolean>("hnswVizShowLines")
+                setShowLines(visibility ?? false)
+            } catch (error) {
+                console.error("Error loading line visibility:", error)
+            }
+        }
+        loadLineVisibility()
+    }, [])
+
+    // Save line visibility preference
+    useEffect(() => {
+        const saveLineVisibility = async () => {
+            try {
+                await userSettings.set("hnswVizShowLines", showLines)
+            } catch (error) {
+                console.error("Error saving line visibility:", error)
+            }
+        }
+        saveLineVisibility()
+    }, [showLines])
 
     // State for reset confirmation dialog
     const [isResetDialogOpen, setIsResetDialogOpen] = useState(false)
 
     // References for hover and selection effects
     const hoverHighlightRef = useRef<THREE.Mesh | null>(null)
-    const _hoverLabelRef = useRef<THREE.Sprite | null>(null) // Prefixed with _ to indicate it's intentionally unused
+    const _hoverLabelRef = useRef<THREE.Sprite | null>(null)
     const pulseAnimationRef = useRef<number>(0)
     const pulseDirectionRef = useRef<number>(1)
     const pulseScaleRef = useRef<number>(1)
@@ -1622,22 +1665,37 @@ const HNSWVizPure: React.FC<HNSWVizPureProps> = ({
 
     // State for card collapse
     const [isCardCollapsed, setIsCardCollapsed] = useState<boolean>(true)
-    // Get stored pin state or default to false
-    // const storedPinState =
-    //     typeof window !== "undefined"
-    //         ? localStorage.getItem("hnswVizCardPinned")
-    //         : null
-    const [isCardPinned, setIsCardPinned] = useState<boolean>(
-        false
-    )
+    const [isCardPinned, setIsCardPinned] = useState<boolean>(false)
+
+    // Load card pin state
+    useEffect(() => {
+        const loadCardPinState = async () => {
+            try {
+                const pinned = await userSettings.get<boolean>("hnswVizCardPinned")
+                setIsCardPinned(pinned ?? false)
+            } catch (error) {
+                console.error("Error loading card pin state:", error)
+            }
+        }
+        loadCardPinState()
+    }, [])
+
+    // Save card pin state
+    useEffect(() => {
+        const saveCardPinState = async () => {
+            try {
+                await userSettings.set("hnswVizCardPinned", isCardPinned)
+            } catch (error) {
+                console.error("Error saving card pin state:", error)
+            }
+        }
+        saveCardPinState()
+    }, [isCardPinned])
 
     // Handle pin toggle
     const togglePin = useCallback(() => {
         const newPinState = !isCardPinned
         setIsCardPinned(newPinState)
-        if (typeof window !== "undefined") {
-            localStorage.setItem("hnswVizCardPinned", newPinState.toString())
-        }
         // If unpinning, collapse the card
         if (!newPinState) {
             setIsCardCollapsed(true)
