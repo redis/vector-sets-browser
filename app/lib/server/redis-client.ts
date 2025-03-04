@@ -378,14 +378,33 @@ export async function getMetadata(
     keyName: string
 ): Promise<VectorOperationResult> {
     return RedisClient.withConnection(url, async (client) => {
-        const metadataKey = `${keyName}_metadata`
-        const storedData = await client.hGetAll(metadataKey)
+        const configKey = 'vector-set-browser:config'
+        const hashKey = `vset:${keyName}:metadata`
+        const oldMetadataKey = `${keyName}_metadata`
+
+        // First try to get data from the new location
+        let storedData = await client.hGet(configKey, hashKey)
+
+        // If no data in new location, check old location
+        if (!storedData) {
+            const oldData = await client.hGetAll(oldMetadataKey)
+            if (oldData && oldData.data) {
+                console.log(`Migrating metadata for ${keyName} from old key structure`)
+                storedData = oldData.data
+                
+                // Migrate the data to new location
+                await client.hSet(configKey, {
+                    [hashKey]: storedData
+                })
+                
+                // Delete the old key
+                await client.del(oldMetadataKey)
+            }
+        }
 
         try {
             // Parse the stored data
-            const parsedData = storedData.data
-                ? JSON.parse(storedData.data)
-                : null
+            const parsedData = storedData ? JSON.parse(storedData) : null
 
             // Validate and correct the metadata
             const validatedMetadata = validateAndCorrectMetadata(parsedData)
@@ -396,8 +415,8 @@ export async function getMetadata(
                 JSON.stringify(validatedMetadata) !== JSON.stringify(parsedData)
             ) {
                 console.log(`Correcting metadata for ${keyName}`)
-                await client.hSet(metadataKey, {
-                    data: JSON.stringify(validatedMetadata),
+                await client.hSet(configKey, {
+                    [hashKey]: JSON.stringify(validatedMetadata),
                 })
             }
 
@@ -406,8 +425,8 @@ export async function getMetadata(
             console.error(`Error processing metadata for ${keyName}:`, error)
             // Return a default metadata object in case of error
             const defaultMetadata = validateAndCorrectMetadata(null)
-            await client.hSet(metadataKey, {
-                data: JSON.stringify(defaultMetadata),
+            await client.hSet(configKey, {
+                [hashKey]: JSON.stringify(defaultMetadata),
             })
             return defaultMetadata
         }
@@ -423,9 +442,10 @@ export async function setMetadata(
         // Validate and correct the metadata before storing
         const validatedMetadata = validateAndCorrectMetadata(metadata)
 
-        const metadataKey = `${keyName}_metadata`
-        await client.hSet(metadataKey, {
-            data: JSON.stringify(validatedMetadata),
+        const configKey = 'vector-set-browser:config'
+        const hashKey = `vset:${keyName}:metadata`
+        await client.hSet(configKey, {
+            [hashKey]: JSON.stringify(validatedMetadata),
         })
         return true
     })
@@ -588,9 +608,10 @@ export async function createVectorSet(
 
             // Store metadata if provided
             if (metadata) {
-                const metadataKey = `${keyName}_metadata`
-                await client.hSet(metadataKey, {
-                    data: JSON.stringify(metadata),
+                const configKey = 'vector-set-browser:config'
+                const hashKey = `vset:${keyName}:metadata`
+                await client.hSet(configKey, {
+                    [hashKey]: JSON.stringify(metadata),
                 })
             }
 
@@ -621,9 +642,10 @@ export async function deleteVectorSet(
             throw new Error(`Failed to delete vector set '${keyName}'`)
         }
 
-        // Also delete metadata
-        const metadataKey = `${keyName}_metadata`
-        await client.del(metadataKey)
+        // Also delete metadata from the consolidated config
+        const configKey = 'vector-set-browser:config'
+        const hashKey = `vset:${keyName}:metadata`
+        await client.hDel(configKey, hashKey)
 
         return "deleted"
     })
