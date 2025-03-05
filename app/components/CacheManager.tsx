@@ -12,14 +12,18 @@ import {
 } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Loader2, AlertTriangle, Info, PowerOff } from "lucide-react"
-import { cache } from "@/app/api/cache"
 import { ApiError } from "@/app/api/client"
-import type { CacheInfo } from "@/app/api/cache"
+import { EmbeddingConfig } from "@/app/types/embedding"
+
+interface CacheInfo {
+    size: number
+}
 
 interface CacheConfig {
     maxSize: number
     defaultTTL: number
     useCache: boolean
+    embeddingConfig?: EmbeddingConfig
 }
 
 export default function CacheManager() {
@@ -34,6 +38,13 @@ export default function CacheManager() {
         maxSize: 1000,
         defaultTTL: 86400,
         useCache: true,
+        embeddingConfig: {
+            provider: "none",
+            none: {
+                model: "default",
+                dimensions: 1536
+            }
+        }
     })
 
     const loadCacheInfo = async () => {
@@ -41,9 +52,23 @@ export default function CacheManager() {
             setLoading(true)
             setError(null)
             setNoConnection(false)
-            const info = await cache.getInfo()
-            setCacheInfo(info)
-            setConfig(info.config)
+            
+            const response = await fetch("/api/embeddings/cache")
+            if (response.status === 401) {
+                setNoConnection(true)
+                return
+            }
+            
+            if (!response.ok) {
+                throw new Error("Failed to load cache info")
+            }
+            
+            const data = await response.json()
+            if (data.success) {
+                setCacheInfo(data)
+            } else {
+                throw new Error(data.error || "Unknown error")
+            }
         } catch (error) {
             console.error("Error loading cache info:", error)
             setError(error instanceof ApiError ? error.message : "Error loading cache info")
@@ -65,7 +90,10 @@ export default function CacheManager() {
                 },
                 body: JSON.stringify({
                     action: "setConfig",
-                    params: config,
+                    params: {
+                        ...config,
+                        embeddingConfig: config.embeddingConfig
+                    },
                 }),
             })
 
@@ -95,29 +123,28 @@ export default function CacheManager() {
 
     const handleClearCache = async () => {
         try {
-            setLoading(true)
+            setClearing(true)
             setError(null)
-            await cache.clear()
-            await loadCacheInfo()
+            const response = await fetch("/api/embeddings/cache", {
+                method: "DELETE",
+            })
+
+            if (!response.ok) {
+                throw new Error("Failed to clear cache")
+            }
+
+            const data = await response.json()
+            if (data.success) {
+                setSuccess("Cache cleared successfully")
+                await loadCacheInfo()
+            } else {
+                throw new Error(data.error || "Unknown error")
+            }
         } catch (error) {
             console.error("Error clearing cache:", error)
             setError(error instanceof ApiError ? error.message : "Error clearing cache")
         } finally {
-            setLoading(false)
-        }
-    }
-
-    const handleClearItem = async (key: string) => {
-        try {
-            setLoading(true)
-            setError(null)
-            await cache.clearItem(key)
-            await loadCacheInfo()
-        } catch (error) {
-            console.error("Error clearing cache item:", error)
-            setError(error instanceof ApiError ? error.message : "Error clearing cache item")
-        } finally {
-            setLoading(false)
+            setClearing(false)
         }
     }
 
@@ -270,6 +297,8 @@ export default function CacheManager() {
                                         is handled by the LRU mechanism.
                                     </p>
                                 </div>
+
+                            
                             </div>
 
                             {error && (

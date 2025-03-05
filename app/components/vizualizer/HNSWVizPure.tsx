@@ -23,7 +23,7 @@ import { ZoomIn, ZoomOut, Search } from "lucide-react"
 // Projection libraries
 import { UMAP } from "umap-js"
 import { PCA } from "ml-pca"
-import { VLinkResponse } from "./types"
+import { ForceNode, ForceEdge, VLinkResponse, type SimilarityItem } from "./types"
 
 // Dynamic import for TSNE
 let TSNE: any = null
@@ -92,22 +92,7 @@ interface HNSWVizPureProps {
         element: string,
         count: number,
         withEmbeddings?: boolean
-    ) => Promise<VLinkResponse>
-}
-
-interface ForceNode {
-    mesh: THREE.Mesh
-    velocity: THREE.Vector2
-    force: THREE.Vector2
-    vector: number[] | undefined // Make vector an explicit part of the interface
-}
-
-interface ForceEdge {
-    source: ForceNode
-    target: ForceNode
-    line: THREE.Line
-    strength: number
-    isParentChild?: boolean
+    ) => Promise<SimilarityItem[]>
 }
 
 //
@@ -129,7 +114,7 @@ interface LayoutAlgorithm {
 //
 // Three.js Scene Manager Hook
 //
-function useThreeScene() {
+export function useThreeScene() {
     const canvasRef = useRef<HTMLCanvasElement>(null)
     const [scene, setScene] = useState<THREE.Scene | null>(null)
     const [camera, setCamera] = useState<THREE.OrthographicCamera | null>(null)
@@ -509,7 +494,7 @@ function useThreeScene() {
 //
 // Force Simulation Hook
 //
-function useForceSimulator(
+export function useForceSimulator(
     scene: THREE.Scene | null,
     fitCameraToNodes: () => void
 ) {
@@ -664,7 +649,7 @@ function useForceSimulator(
 //
 // Layout Manager Hook
 //
-function useLayoutManager(
+export function useLayoutManager(
     nodesRef: React.MutableRefObject<ForceNode[]>,
     edgesRef: React.MutableRefObject<ForceEdge[]>,
     scene: THREE.Scene | null,
@@ -1229,7 +1214,7 @@ function useLayoutManager(
 //
 // Node Management Hook (Data fetching and expansion)
 //
-function useNodeManager(
+export function useNodeManager(
     keyName: string,
     maxNodes: number,
     getNeighbors: (
@@ -1237,34 +1222,24 @@ function useNodeManager(
         element: string,
         count: number,
         withEmbeddings?: boolean
-    ) => Promise<VLinkResponse>
+    ) => Promise<SimilarityItem[]>
 ) {
     const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
     const fetchNeighbors = useCallback(
-        async (element: string): Promise<VLinkResponse> => {
+        async (element: string): Promise<SimilarityItem[]> => {
             try {
+                if (!element) {
+                    setErrorMessage("No element provided")
+                    return []
+                }
                 const response = await getNeighbors(
                     keyName,
                     element,
                     maxNodes,
                     true
                 )
-                if (!element) {
-                    setErrorMessage("No element provided")
-                    return {
-                        success: false,
-                        result: [],
-                    }
-                }
-                if (!response.success) {
-                    setErrorMessage("Failed to fetch neighbors")
-                    return {
-                        success: false,
-                        result: [],
-                    }
-                }
-                setErrorMessage(null)
+                console.log("[useNodeManager] Fetching neighbors:", response)
                 return response
             } catch (error) {
                 console.error("Error fetching neighbors:", error)
@@ -1273,10 +1248,7 @@ function useNodeManager(
                         ? error.message
                         : "Failed to fetch neighbors"
                 )
-                return {
-                    success: false,
-                    result: [],
-                }
+                return []
             }
         },
         [keyName, maxNodes, getNeighbors]
@@ -2014,8 +1986,10 @@ const HNSWVizPure: React.FC<HNSWVizPureProps> = ({
                 const response = await fetchNeighbors(current.userData.element)
                 console.log("[HNSWVizPure] fetchNeighbors RESPONSE:", response)
 
-                if (!response.success) continue
-
+                if (!response) {
+                    console.warn("[HNSWVizPure] No neighbors found for node:", current.userData.element)
+                    continue
+                }
                 expanded.add(current.userData.element)
 
                 // Initialize childNodes array if it doesn't exist
@@ -2024,28 +1998,28 @@ const HNSWVizPure: React.FC<HNSWVizPureProps> = ({
                 }
 
                 let count = 0
-                const nodesToProcess = response.result.slice(
+                const nodesToProcess = response.slice(
                     0,
-                    Math.min(response.result.length, targetCount - totalNodes)
+                    Math.min(response.length, targetCount - totalNodes)
                 )
 
                 // Batch create nodes without immediate layout updates
-                for (const [element, similarity, vector] of nodesToProcess) {
+                for (const item of nodesToProcess) {
                     console.log(
-                        `[HNSWVizPure] Processing node: ${element}, similarity: ${similarity}, vector: ${vector.length}`
+                        `[HNSWVizPure] Processing node: ${item.element}, similarity: ${item.similarity}, vector: ${item.vector.length}`
                     )
-                    if (!element || !vector) continue
+                    if (!item.element || !item.vector) continue
 
                     const angle = Math.random() * Math.PI * 2
                     const radius = 1 + Math.random() * 2
                     const x = current.position.x + Math.cos(angle) * radius
                     const y = current.position.y + Math.sin(angle) * radius
 
-                    const neighbor = createNode(element, x, y, current, vector)
+                    const neighbor = createNode(item.element, x, y, current, item.vector)
 
                     if (neighbor) {
-                        neighbor.userData.similarity = similarity
-                        createEdge(current, neighbor, similarity, true)
+                        neighbor.userData.similarity = item.similarity
+                        createEdge(current, neighbor, item.similarity, true)
                         queue.push(neighbor)
                         totalNodes++
                         count++

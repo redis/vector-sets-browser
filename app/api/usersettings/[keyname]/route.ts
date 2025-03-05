@@ -13,7 +13,7 @@ async function getRedisClient() {
 
 // Helper function to get the full Redis key for user settings
 function getUserSettingsKey(userId: string = DEFAULT_USER) {
-    return `${REDIS_CONFIG_KEY}:user:${userId}:settings`;
+    return `${REDIS_CONFIG_KEY}`;
 }
 
 export async function GET(
@@ -25,7 +25,7 @@ export async function GET(
         const settingsKey = getUserSettingsKey();
         
         // Get the specific setting if keyname is provided
-        const value = await client.hGet(settingsKey, params.keyname);
+        const value = await client.hGet(settingsKey, `setting:${params.keyname}`);
         await client.quit();
 
         if (!value) {
@@ -63,13 +63,16 @@ export async function POST(
                 { status: 400 }
             );
         }
-
         const client = await getRedisClient();
         const settingsKey = getUserSettingsKey();
         
         // Store the value, converting objects/arrays to JSON strings
-        const valueToStore = typeof value === 'object' ? JSON.stringify(value) : value;
-        await client.hSet(settingsKey, params.keyname, valueToStore);
+        const valueToStore = JSON.stringify(value);
+        
+        console.log("[UserSettingsRoute] Setting value:", settingsKey, params.keyname, value)
+        
+        await client.hSet(settingsKey, `setting:${params.keyname}`, valueToStore);
+        
         await client.quit();
 
         return NextResponse.json({ success: true });
@@ -90,7 +93,7 @@ export async function DELETE(
         const client = await getRedisClient();
         const settingsKey = getUserSettingsKey();
         
-        const deleted = await client.hDel(settingsKey, params.keyname);
+        const deleted = await client.hDel(settingsKey, `setting:${params.keyname}`);
         await client.quit();
 
         if (!deleted) {

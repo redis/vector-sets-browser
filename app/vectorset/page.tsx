@@ -15,16 +15,25 @@ import { useVectorSet } from "../hooks/useVectorSet"
 import { useVectorSearch, VectorSetSearchState } from "../hooks/useVectorSearch"
 import { useFileOperations } from "../hooks/useFileOperations"
 import { Button } from "@/components/ui/button"
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select"
 import ImportTab from "../components/ImportTab"
 import { getConnection, removeConnection } from "../lib/connectionManager"
 import { EmbeddingConfig, VectorSetMetadata } from "../types/embedding"
 import { Input } from "@/components/ui/input"
 import SearchTimeIndicator from "../components/SearchTimeIndicator"
 import HNSWVizPure from "../components/vizualizer/HNSWVizPure"
-import type { VLinkResponse } from "../components/vizualizer/types"
+import VectorViz3D from "../components/VectorViz3D"
 import * as redis from "../services/redis"
 import { toast } from "sonner"
 import StatusMessage from "../components/StatusMessage"
+import VectorViz2D from "../components/VectorViz2D"
+import type { SimilarityItem } from "../components/VectorViz2D"
 
 /**
  * VectorSetPage handles the display and management of vector sets.
@@ -47,6 +56,7 @@ export default function VectorSetPage() {
     const connectionId = searchParams.get("cid")
     const [isRestoring, setIsRestoring] = useState(true)
     const [redisName, setRedisName] = useState<string | null>(null)
+    const [vizType, setVizType] = useState<"2d" | "3d">("2d")
 
     // Combined state for each vector set's data
     const [vectorSetStates, setVectorSetStates] = useState<
@@ -54,7 +64,7 @@ export default function VectorSetPage() {
             string,
             {
                 searchState: VectorSetSearchState
-                results: [string, number, number[]][]
+                results: [string, number, number[] | null][]
             }
         >
     >({})
@@ -157,6 +167,8 @@ export default function VectorSetPage() {
         },
     })
 
+    const [activeView, setActiveView] = useState<"Table" | "2D">("Table")
+
     // Initialize or restore vector set state when switching sets
     useEffect(() => {
         if (!vectorSetName) return
@@ -221,13 +233,16 @@ export default function VectorSetPage() {
     // Event handler wrappers for vector operations
     const handleDeleteClick = (e: React.MouseEvent, element: string) => {
         e.stopPropagation()
-        
+
         if (confirm("Are you sure you want to delete this vector?")) {
             handleDeleteVector(element)
         }
     }
 
-    const handleShowVectorClick = async (e: React.MouseEvent, element: string) => {
+    const handleShowVectorClick = async (
+        e: React.MouseEvent,
+        element: string
+    ) => {
         e.stopPropagation()
         try {
             // Get the vector either from results or Redis
@@ -382,16 +397,87 @@ export default function VectorSetPage() {
         }
     }
 
-    // Callbacks for HNSWVizPure
-    const getNeighbors = async (keyName: string, element: string, count: number, withEmbeddings?: boolean): Promise<VLinkResponse> => {
+    const onExpandNode = async (
+        keyName: string,
+        element: string,
+        mode: "NeighborExpansion" | "SimilarityArray",
+        count: number
+    ): Promise<SimilarityItem[]> => {
+        console.log(
+            "[VectorSetPage] Expanding node:",
+            keyName,
+            element,
+            mode,
+            count
+        )
         try {
-            console.log("[VectorSetPage] Getting neighbors for:", keyName, element, count)
-            const data = await redis.vlinks(keyName, element, count, withEmbeddings ?? false )
+            switch (mode) {
+                case "NeighborExpansion":
+                    return await getNeighbors(keyName, element, count, true)
+                case "SimilarityArray":
+                    return await getSimilarity(keyName, element, count)
+            }
+        } catch (error) {
+            console.error("Error expanding node:", error)
+            return []
+        }
+    }
+
+    const getNeighbors = async (
+        keyName: string,
+        element: string,
+        count: number,
+        withEmbeddings?: boolean
+    ): Promise<SimilarityItem[]> => {
+        try {
+            const data = await redis.vlinks(
+                keyName,
+                element,
+                count,
+                withEmbeddings ?? false
+            )
             console.log("[VectorSetPage] Neighbors:", data)
-            return { success: true, result: data }
+            // convert to SimilarityItem[]
+            return data.map((item) => ({
+                element: item[0],
+                similarity: item[1],
+                vector: item[2],
+            }))
         } catch (error) {
             console.error("Error fetching neighbors:", error)
-            return { success: false, result: [] }
+            return []
+        }
+    }
+
+    // Callbacks for HNSWVizPure
+    const getSimilarity = async (
+        keyName: string,
+        element: string,
+        count: number,
+        withEmbeddings?: boolean
+    ): Promise<SimilarityItem[]> => {
+        try {
+            console.log(
+                "[VectorSetPage] Getting neighbors for:",
+                keyName,
+                element,
+                count
+            )
+            const data = await redis.vsim(
+                keyName,
+                element,
+                count,
+                withEmbeddings ?? false
+            )
+            console.log("[VectorSetPage] Neighbors:", data)
+            return data.map((item) => ({
+                element: item[0],
+                similarity: item[1],
+                vector: item[2],
+            }))
+        } catch (error) {
+            console.error("Error fetching neighbors:", error)
+            return []
         }
     }
 
@@ -473,24 +559,66 @@ export default function VectorSetPage() {
                             <section>
                                 <div className="bg-white p-4 rounded shadow-md">
                                     <div className="flex mb-4 items-center space-x-2">
-                                        <div className="flex items-center gap-2 justify-between w-full">
+                                        <div className="flex items-center gap-2 w-full">
                                             <div className="flex items-center gap-2">
                                                 {/* <span className="text-xs whitespace-nowrap">
                                                     Show top
                                                 </span> */}
-                                                <Input
-                                                    type="number"
-                                                    value={searchCount}
-                                                    onChange={(e) =>
-                                                        setSearchCount(
-                                                            e.target.value
-                                                        )
-                                                    }
-                                                    className="border rounded p-1 w-16 h-8 text-center"
-                                                    min="1"
-                                                />
-                                                <span className="text-xs whitespace-nowrap">
-                                                    results
+                                                {!isSearching &&
+                                                    results &&
+                                                    results.length > 0 && (
+                                                        <Input
+                                                            type="number"
+                                                            value={searchCount}
+                                                            onChange={(e) =>
+                                                                setSearchCount(
+                                                                    e.target
+                                                                        .value
+                                                                )
+                                                            }
+                                                            className="border rounded p-1 w-16 h-8 text-center"
+                                                            min="1"
+                                                        />
+                                                    )}
+
+                                                <span className="flex text-gray-500 text-sm items-center space-x-2 whitespace-nowrap">
+                                                    {!isSearching &&
+                                                        results &&
+                                                        results.length > 0 && (
+                                                            <div>
+                                                                results in
+                                                            </div>
+                                                        )}
+                                                    <div>
+                                                        {(vectorSetStates[
+                                                            vectorSetName || ""
+                                                        ]?.searchState
+                                                            ?.searchTime ||
+                                                            isSearching) && (
+                                                            <SearchTimeIndicator
+                                                                searchTime={
+                                                                    vectorSetStates[
+                                                                        vectorSetName ||
+                                                                            ""
+                                                                    ]
+                                                                        ?.searchState
+                                                                        ?.searchTime
+                                                                        ? Number(
+                                                                              vectorSetStates[
+                                                                                  vectorSetName ||
+                                                                                      ""
+                                                                              ]
+                                                                                  ?.searchState
+                                                                                  ?.searchTime
+                                                                          )
+                                                                        : undefined
+                                                                }
+                                                                isSearching={
+                                                                    isSearching
+                                                                }
+                                                            />
+                                                        )}
+                                                    </div>
                                                 </span>
                                             </div>
                                             <StatusMessage
@@ -499,42 +627,36 @@ export default function VectorSetPage() {
                                                     vectorSetStatus
                                                 }
                                             />
-                                            {/* {searchQuery && !isSearching && (
-                                                <span className="text-xs whitespace-nowrap">
-                                                    Searched for &ldquo;
-                                                    <span className="font-bold">
-                                                        {searchQuery.slice(
-                                                            0,
-                                                            25
-                                                        )}
-                                                    </span>
-                                                    &rdquo;
-                                                </span>
-                                            )} */}
-                                            {(vectorSetStates[
-                                                vectorSetName || ""
-                                            ]?.searchState?.searchTime ||
-                                                isSearching) && (
-                                                <SearchTimeIndicator
-                                                    searchTime={
-                                                        vectorSetStates[
-                                                            vectorSetName || ""
-                                                        ]?.searchState
-                                                            ?.searchTime
-                                                            ? Number(
-                                                                  vectorSetStates[
-                                                                      vectorSetName ||
-                                                                          ""
-                                                                  ]?.searchState
-                                                                      ?.searchTime
-                                                              )
-                                                            : undefined
-                                                    }
-                                                    isSearching={isSearching}
-                                                />
-                                            )}
                                         </div>
-
+                                        <div className="grow"></div>
+                                        <div className="text-sm text-gray-500 whitespace-nowrap">
+                                            Choose View
+                                        </div>
+                                        <div className="flex items-center gap-2 w-[300px]">
+                                            <Select
+                                                value={activeView}
+                                                onValueChange={(
+                                                    value: "Table" | "2D"
+                                                ) => setActiveView(value)}
+                                            >
+                                                <SelectTrigger className="">
+                                                    <SelectValue
+                                                        placeholder={
+                                                            "View as " +
+                                                            activeView
+                                                        }
+                                                    />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="Table">
+                                                        Table
+                                                    </SelectItem>
+                                                    <SelectItem value="2D">
+                                                        2D Vizualization
+                                                    </SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
                                         <Button
                                             variant="default"
                                             onClick={() =>
@@ -554,21 +676,36 @@ export default function VectorSetPage() {
                                                     d="M12 4v16m8-8H4"
                                                 />
                                             </svg>
-                                            Add
+                                            Add Vector
                                         </Button>
                                     </div>
-                                    <VectorResults
-                                        results={results}
-                                        onRowClick={handleRowClick}
-                                        onDeleteClick={handleDeleteClick}
-                                        onShowVectorClick={
-                                            handleShowVectorClick
-                                        }
-                                        searchTime={
-                                            vectorSetStates[vectorSetName || ""]
-                                                ?.searchState?.searchTime
-                                        }
-                                    />
+                                    {activeView === "Table" ? (
+                                        <VectorResults
+                                            results={results}
+                                            onRowClick={handleRowClick}
+                                            onDeleteClick={handleDeleteClick}
+                                            onShowVectorClick={
+                                                handleShowVectorClick
+                                            }
+                                            searchTime={
+                                                vectorSetStates[
+                                                    vectorSetName || ""
+                                                ]?.searchState?.searchTime
+                                            }
+                                        />
+                                    ) : (
+                                        <div>
+                                            {results.length}
+                                            <VectorViz2D
+                                                mode="SimilarityArray"
+                                                keyName={vectorSetName || ""}
+                                                initialItems={
+                                                    results as unknown as SimilarityItem[]
+                                                }
+                                                onExpandNode={onExpandNode}
+                                            />
+                                        </div>
+                                    )}
                                 </div>
                             </section>
                         </TabsContent>
@@ -602,46 +739,68 @@ export default function VectorSetPage() {
                                                     results
                                                 </span>
                                             </div>
-                                            {searchQuery && (
-                                                <span>
-                                                    Searched for &ldquo;
-                                                    {searchQuery.slice(0, 25)}
-                                                    &rdquo;
-                                                </span>
-                                            )}
+                                            {
+                                                <StatusMessage
+                                                    message={
+                                                        fileOperationStatus ||
+                                                        vectorSetStatus
+                                                    }
+                                                />
+                                            }
                                             <div className="grow"></div>
-                                            {/* <StatusMessage
-                                                message={
-                                                    fileOperationStatus ||
-                                                    vectorSetStatus
-                                                }
-                                            /> */}
+
                                             {(vectorSetStates[
                                                 vectorSetName || ""
                                             ]?.searchState?.searchTime ||
                                                 isSearching) && (
                                                 <div className="text-sm text-gray-500 mb-4">
-                                                    <SearchTimeIndicator
-                                                        searchTime={
-                                                            vectorSetStates[
-                                                                vectorSetName ||
-                                                                    ""
-                                                            ]?.searchState
-                                                                ?.searchTime
-                                                                ? Number(
-                                                                      vectorSetStates[
-                                                                          vectorSetName ||
-                                                                              ""
-                                                                      ]
-                                                                          ?.searchState
-                                                                          ?.searchTime
-                                                                  )
-                                                                : undefined
-                                                        }
-                                                        isSearching={
-                                                            isSearching
-                                                        }
-                                                    />
+                                                    <div className="flex items-center gap-4">
+                                                        <SearchTimeIndicator
+                                                            searchTime={
+                                                                vectorSetStates[
+                                                                    vectorSetName ||
+                                                                        ""
+                                                                ]?.searchState
+                                                                    ?.searchTime
+                                                                    ? Number(
+                                                                          vectorSetStates[
+                                                                              vectorSetName ||
+                                                                                  ""
+                                                                          ]
+                                                                              ?.searchState
+                                                                              ?.searchTime
+                                                                      )
+                                                                    : undefined
+                                                            }
+                                                            isSearching={
+                                                                isSearching
+                                                            }
+                                                        />
+                                                        <Select
+                                                            value={vizType}
+                                                            onValueChange={(
+                                                                value:
+                                                                    | "2d"
+                                                                    | "3d"
+                                                            ) =>
+                                                                setVizType(
+                                                                    value
+                                                                )
+                                                            }
+                                                        >
+                                                            <SelectTrigger className="w-[100px]">
+                                                                <SelectValue placeholder="Visualization" />
+                                                            </SelectTrigger>
+                                                            <SelectContent>
+                                                                <SelectItem value="2d">
+                                                                    2D View
+                                                                </SelectItem>
+                                                                <SelectItem value="3d">
+                                                                    3D View
+                                                                </SelectItem>
+                                                            </SelectContent>
+                                                        </Select>
+                                                    </div>
                                                 </div>
                                             )}
                                         </div>
@@ -653,22 +812,44 @@ export default function VectorSetPage() {
                                         }}
                                     >
                                         {results[0] ? (
-                                            <HNSWVizPure
-                                                key={`${vectorSetName}-${searchCount}-${
-                                                    results[0]?.[0] || ""
-                                                }`}
-                                                keyName={vectorSetName || ""}
-                                                initialElement={
-                                                    results.length > 0
-                                                        ? results[0][0]
-                                                        : vectorSetName
-                                                }
-                                                maxNodes={500}
-                                                initialNodes={Number(
-                                                    searchCount
-                                                )}
-                                                getNeighbors={getNeighbors}
-                                            />
+                                            vizType === "2d" ? (
+                                                <HNSWVizPure
+                                                    key={`${vectorSetName}-${searchCount}-${
+                                                        results[0]?.[0] || ""
+                                                    }`}
+                                                    keyName={
+                                                        vectorSetName || ""
+                                                    }
+                                                    initialElement={
+                                                        results.length > 0
+                                                            ? results[0][0]
+                                                            : vectorSetName
+                                                    }
+                                                    maxNodes={500}
+                                                    initialNodes={Number(
+                                                        searchCount
+                                                    )}
+                                                    getNeighbors={getNeighbors}
+                                                />
+                                            ) : (
+                                                <VectorViz3D
+                                                    data={results.map(
+                                                        ([
+                                                            label,
+                                                            score,
+                                                            vector,
+                                                        ]) => ({
+                                                            label: `${label} (${score.toFixed(
+                                                                3
+                                                            )})`,
+                                                            vector,
+                                                        })
+                                                    )}
+                                                    onVectorSelect={
+                                                        handleRowClick
+                                                    }
+                                                />
+                                            )
                                         ) : (
                                             "No Results Found"
                                         )}
