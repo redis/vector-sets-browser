@@ -175,12 +175,44 @@ function useThreeScene() {
         }
     }, [scene, camera, zoomLevel, isAutoZoom])
 
+    const setManualZoom = useCallback((level: number) => {
+        setZoomLevel(level)
+
+        // Apply zoom immediately
+        if (camera) {
+            const newSize = 20 / level // Base frustum size divided by zoom level
+            targetFrustumSizeRef.current = newSize
+
+            if (canvasRef.current && canvasRef.current.parentElement) {
+                const width = canvasRef.current.parentElement.clientWidth
+                const height = canvasRef.current.parentElement.clientHeight
+                const aspect = width / height
+
+                camera.left = (-newSize * aspect) / 2
+                camera.right = (newSize * aspect) / 2
+                camera.top = newSize / 2
+                camera.bottom = -newSize / 2
+                camera.updateProjectionMatrix()
+            }
+        }
+    }, [camera])
+
     return {
         canvasRef,
         scene,
         camera,
         renderer,
         fitCameraToNodes,
+        _zoomLevel: zoomLevel,
+        _setManualZoom: setManualZoom,
+        _isAutoZoom: isAutoZoom,
+        _toggleAutoZoom: () => setIsAutoZoom(prev => !prev),
+        resetView: useCallback(() => {
+            setZoomLevel(1)
+            setIsAutoZoom(true)
+            isInitialZoomRef.current = true
+            fitCameraToNodes()
+        }, [fitCameraToNodes]),
     }
 }
 
@@ -336,7 +368,19 @@ const VectorViz2D: React.FC<VectorViz2DProps> = ({
     initialNodes = 20,
     onExpandNode,
 }) => {
-    const { scene, camera, renderer, canvasRef, fitCameraToNodes } = useThreeScene()
+    // Get all the zoom-related values from useThreeScene
+    const { 
+        scene, 
+        camera, 
+        renderer, 
+        canvasRef, 
+        fitCameraToNodes,
+        _zoomLevel: zoomLevel,
+        _setManualZoom: setManualZoom,
+        _isAutoZoom: isAutoZoom,
+        _toggleAutoZoom: toggleAutoZoom,
+        resetView,
+    } = useThreeScene()
 
     const nodesRef = useRef<ForceNode[]>([])
     const edgesRef = useRef<ForceEdge[]>([])
@@ -480,6 +524,59 @@ const VectorViz2D: React.FC<VectorViz2DProps> = ({
         [mode, scene, createNode, createEdge, updateNodePositions, keyName, initialNodes, maxNodes, onExpandNode]
     )
 
+    // Handle wheel zoom
+    const handleWheel = useCallback(
+        (e: WheelEvent) => {
+            e.preventDefault()
+            if (!camera || !canvasRef.current) return
+
+            // Disable auto zoom when manually zooming
+            if (isAutoZoom) {
+                toggleAutoZoom()
+            }
+
+            // Get mouse position in normalized device coordinates (-1 to +1)
+            const rect = canvasRef.current.getBoundingClientRect()
+            const mouseX = ((e.clientX - rect.left) / rect.width) * 2 - 1
+            const mouseY = -((e.clientY - rect.top) / rect.height) * 2 + 1
+
+            // Calculate world position before zoom
+            const worldPosBeforeZoom = new THREE.Vector3(mouseX, mouseY, 0)
+            worldPosBeforeZoom.unproject(camera)
+
+            // Calculate new zoom level
+            const zoomSpeed = 0.1
+            const delta = e.deltaY > 0 ? 1 + zoomSpeed : 1 - zoomSpeed
+            const newZoom = Math.max(0.1, Math.min(5, zoomLevel * delta))
+            setManualZoom(newZoom)
+
+            // Calculate world position after zoom
+            const worldPosAfterZoom = new THREE.Vector3(mouseX, mouseY, 0)
+            worldPosAfterZoom.unproject(camera)
+
+            // Adjust camera position to keep mouse position fixed
+            camera.position.x += worldPosBeforeZoom.x - worldPosAfterZoom.x
+            camera.position.y += worldPosBeforeZoom.y - worldPosAfterZoom.y
+
+            // Render the scene
+            if (renderer && scene) {
+                renderer.render(scene, camera)
+            }
+        },
+        [camera, renderer, scene, zoomLevel, isAutoZoom, toggleAutoZoom, setManualZoom, canvasRef]
+    )
+
+    // Add wheel event listener
+    useEffect(() => {
+        const canvas = canvasRef.current
+        if (!canvas) return
+
+        canvas.addEventListener('wheel', handleWheel, { passive: false })
+        return () => {
+            canvas.removeEventListener('wheel', handleWheel)
+        }
+    }, [canvasRef, handleWheel])
+
     return (
         <div className="relative w-full h-full">
             <canvas
@@ -503,6 +600,48 @@ const VectorViz2D: React.FC<VectorViz2DProps> = ({
                     }
                 }}
             />
+            {/* Zoom controls */}
+            <div className="absolute bottom-4 right-4 flex flex-col gap-2">
+                <div className="flex items-center gap-2 text-sm">
+                    <label className="text-gray-600">Auto-zoom</label>
+                    <button
+                        className={`px-2 py-1 rounded ${
+                            isAutoZoom 
+                                ? 'bg-blue-500 text-white' 
+                                : 'bg-gray-200 text-gray-700'
+                        }`}
+                        onClick={toggleAutoZoom}
+                    >
+                        {isAutoZoom ? 'On' : 'Off'}
+                    </button>
+                </div>
+                <div className="flex gap-2">
+                    <button
+                        className="bg-white hover:bg-gray-100 p-2 rounded shadow text-gray-700"
+                        onClick={() => {
+                            const newZoom = Math.min(5, zoomLevel * 1.2)
+                            setManualZoom(newZoom)
+                        }}
+                    >
+                        <span className="text-lg">+</span>
+                    </button>
+                    <button
+                        className="bg-white hover:bg-gray-100 p-2 rounded shadow text-gray-700"
+                        onClick={() => {
+                            const newZoom = Math.max(0.1, zoomLevel / 1.2)
+                            setManualZoom(newZoom)
+                        }}
+                    >
+                        <span className="text-lg">−</span>
+                    </button>
+                    <button
+                        className="bg-white hover:bg-gray-100 px-3 py-2 rounded shadow text-sm text-gray-700"
+                        onClick={resetView}
+                    >
+                        Reset
+                    </button>
+                </div>
+            </div>
         </div>
     )
 }

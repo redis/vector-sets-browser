@@ -19,11 +19,11 @@ import {
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { toast } from "sonner"
-import { ZoomIn, ZoomOut, Search } from "lucide-react"
+import { ZoomIn, ZoomOut } from "lucide-react"
 // Projection libraries
 import { UMAP } from "umap-js"
 import { PCA } from "ml-pca"
-import { ForceNode, ForceEdge, VLinkResponse, type SimilarityItem } from "./types"
+import { ForceNode, ForceEdge, type SimilarityItem } from "./types"
 
 // Dynamic import for TSNE
 let TSNE: any = null
@@ -2607,11 +2607,21 @@ const HNSWVizPure: React.FC<HNSWVizPureProps> = ({
     }, [camera, renderer, scene]);
 
     return (
-        <div className="relative w-full h-full">
+        <div
+            className="relative w-full"
+            style={{
+                minHeight: "calc(100vh - 400px)",
+                maxHeight: "calc(100vh - 400px)",
+            }}
+        >
             {errorMessage && (
                 <div className="error-message">{errorMessage}</div>
             )}
-            <canvas ref={canvasRef} className="hnsw-viz-canvas" />
+            <canvas
+                ref={canvasRef}
+                className="w-full h-full"
+                style={{ display: "block", height: "100%" }}
+            />
             {hoverLabel.visible && (
                 <div
                     className="hover-label"
@@ -2774,7 +2784,6 @@ const HNSWVizPure: React.FC<HNSWVizPureProps> = ({
                                                 </Button>
                                             )}
 
-                                            
                                             {selectedNode.userData.expanded &&
                                                 selectedNode.userData
                                                     .displayState ===
@@ -2817,7 +2826,6 @@ const HNSWVizPure: React.FC<HNSWVizPureProps> = ({
                                             >
                                                 Copy Vector
                                             </Button>
-
                                         </div>
                                     </div>
                                 </CardContent>
@@ -2951,12 +2959,7 @@ const HNSWVizPure: React.FC<HNSWVizPureProps> = ({
                 </AlertDialogContent>
             </AlertDialog>
             <style jsx global>{`
-                /* Ensure parent containers can pass down height */
-                :root {
-                    --hnsw-viz-height: 100%;
-                }
-
-                /* When HNSWViz is used in a page, ensure the page container has full height */
+                /* Ensure all parent containers pass down height */
                 html,
                 body,
                 #__next,
@@ -2964,20 +2967,17 @@ const HNSWVizPure: React.FC<HNSWVizPureProps> = ({
                     height: 100%;
                     min-height: 100%;
                 }
+
+                /* Remove the variable as it's not needed */
+                :root {
+                    --hnsw-viz-height: 100%;
+                }
             `}</style>
             <style jsx>{`
-                .hnsw-viz-container {
-                    position: relative;
-                    width: 100%;
-                    height: var(--hnsw-viz-height, 100%);
-                    min-height: 100%;
-                    display: flex;
-                    flex-direction: column;
-                }
+                /* Remove the container class styles and simplify */
                 .hnsw-viz-canvas {
-                    display: block;
                     width: 100%;
-                    flex: 1 1 auto;
+                    height: 100%;
                 }
                 .error-message {
                     position: absolute;
