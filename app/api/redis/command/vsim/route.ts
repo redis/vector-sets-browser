@@ -59,6 +59,7 @@ export async function POST(request: Request) {
                 error: "Invalid response format from Redis"
             }, { status: 500 })
         }
+        //console.log("[vsim] data.result.result: ", data.result.result)
 
         // Type assertion for the result array
         let validResults = data.result.result as [string, number, number[]][]
@@ -67,11 +68,15 @@ export async function POST(request: Request) {
         if (withEmbeddings && validResults.length > 0) {
             const embeddingsPromises = validResults.map(async ([id, score]) => {
                 const embResult = await redis.vemb(url, keyName, id)
-                return [id, score, embResult.success ? embResult.result : []] as [string, number, number[]]
+                return [id, score, embResult.success ? embResult.result.result : []] as [string, number, number[]]
             })
 
             validResults = await Promise.all(embeddingsPromises)
+            //console.log("[vsim] validResults (with embeddings): ", validResults)
+        } else { 
+            //console.log("[vsim] validResults (without embeddings): ", validResults)
         }
+
 
         return NextResponse.json({
             success: true,

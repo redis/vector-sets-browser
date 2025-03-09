@@ -12,9 +12,12 @@ export interface VembResponse {
 
 export interface ForceNode {
     mesh: THREE.Mesh
-    velocity: THREE.Vector2
-    force: THREE.Vector2
-    vector: number[] | undefined
+    label?: THREE.Sprite
+    vector?: number[]
+    x: number
+    y: number
+    vx?: number
+    vy?: number
 }
 
 export interface ForceEdge {
@@ -30,3 +33,40 @@ export interface SimilarityItem {
     similarity: number
     vector: number[]
 }
+
+export interface FetchNeighborsResponse {
+    success: boolean
+    result: Array<{ element: string; similarity: number; vector?: number[] }>
+}
+
+export interface HNSWVizPureProps {
+    initialElement: SimilarityItem
+    maxNodes?: number
+    initialNodes?: number
+    getNeighbors: (
+        element: string,
+        count: number,
+        withEmbeddings?: boolean
+    ) => Promise<SimilarityItem[]>
+}
+
+export interface LayoutAlgorithm {
+    name: string
+    description: string
+    apply: (
+        nodes: ForceNode[],
+        edges: ForceEdge[],
+        rootNode?: ForceNode
+    ) => void
+    animate: boolean
+}
+
+export type LayoutAlgorithmType = "force" | "umap" | "pca"
+
+// Window augmentation for TypeScript
+declare global {
+    interface Window {
+        lastLayoutChange?: number
+        [key: string]: any // For dynamic layout attempt flags
+    }
+} 

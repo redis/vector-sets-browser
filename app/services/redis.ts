@@ -143,7 +143,7 @@ export async function vlinks(
             },
             body: JSON.stringify({ keyName, element, count, withEmbeddings }),
         })
-
+        
         if (!response.ok) {
             const errorText = await response.text()
             throw new Error(

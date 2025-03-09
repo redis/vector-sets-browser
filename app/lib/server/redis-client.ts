@@ -309,10 +309,16 @@ export async function vemb(
                 return num
             })
 
-            return vector
+            return {
+                success: true,
+                result: vector
+            }
         } catch (error) {
             console.error("VEMB operation error:", error)
-            throw new Error(`Failed to get vector for element`)
+            return {
+                success: false,
+                error: error instanceof Error ? error.message : String(error)
+            }
         }
     })
 }

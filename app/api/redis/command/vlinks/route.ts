@@ -48,8 +48,8 @@ export async function POST(request: Request) {
         // lets output it for debugging
         // output the first element of the first sub-array
         for (const subArray of result.result) { 
-            for (const element of subArray) {
-                console.log("VLINKS result", element)
+            for (const el of subArray) {
+                //console.log(`VLINKS result (${element})`, el)
             }
         }
 
@@ -77,6 +77,8 @@ export async function POST(request: Request) {
                     )
                 );
                 links = processedLinks;
+            } else {
+                console.log("EMBEDDINGS FAILURE")
             }
         }
 

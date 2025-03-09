@@ -10,7 +10,6 @@ export interface VectorSetSearchState {
     searchQuery: string
     searchCount: string
     resultsTitle: string
-    activeTab?: string // Add activeTab to track which tab is active
     searchTime?: string // Add searchTime to store the search duration
 }
 
@@ -21,6 +20,7 @@ interface UseVectorSearchProps {
     onStatusChange: (status: string) => void
     searchState: VectorSetSearchState
     onSearchStateChange: (state: Partial<VectorSetSearchState>) => void
+    fetchEmbeddings?: boolean // Renamed from embeddings
 }
 
 interface UseVectorSearchReturn {
@@ -33,19 +33,17 @@ interface UseVectorSearchReturn {
     isSearching: boolean
     resultsTitle: string
     setResultsTitle: (title: string) => void
+    searchTime?: string
 }
-
-// Helper types to make the code more readable
-type SearchResult = [string, number]; // [id, score]
-type SearchResultWithVector = [string, number, number[]]; // [id, score, vector]
 
 export function useVectorSearch({
     vectorSetName,
     metadata,
     onSearchResults,
     onStatusChange,
-    searchState,
-    onSearchStateChange
+    searchState: initialSearchState,
+    onSearchStateChange,
+    fetchEmbeddings = false
 }: UseVectorSearchProps): UseVectorSearchReturn {
     const [isSearching, setIsSearching] = useState(false)
     const searchTimeoutRef = useRef<NodeJS.Timeout>()
@@ -56,20 +54,89 @@ export function useVectorSearch({
         count: string
     }>({ query: "", type: "Vector", count: "10" });
 
-    // Reset initialSearchDone when vectorSetName changes
+    // Internal search state management
+    const [internalSearchState, setInternalSearchState] = useState<VectorSetSearchState>({
+        searchType: "Vector",
+        searchQuery: "",
+        searchCount: "10",
+        resultsTitle: "Search Results"
+    });
+
+    // Reset when vectorSetName changes
     useEffect(() => {
+        // Clear any pending searches
+        if (searchTimeoutRef.current) {
+            clearTimeout(searchTimeoutRef.current);
+        }
+
+        // Reset internal state
         initialSearchDone.current = false;
-    }, [vectorSetName]);
+        lastSearchRef.current = { query: "", type: "Vector", count: "10" };
+        setInternalSearchState({
+            searchType: "Vector",
+            searchQuery: "",
+            searchCount: "10",
+            resultsTitle: "Search Results"
+        });
+        onSearchStateChange({
+            searchType: "Vector",
+            searchQuery: "",
+            searchCount: "10",
+            resultsTitle: "Search Results"
+        });
+        
+        // Clear results and status
+        onSearchResults([]);
+        onStatusChange("");
+
+        // Only perform zero vector search if we have a valid vector set
+        if (vectorSetName && metadata) {
+            setIsSearching(true);
+            performZeroVectorSearch(10)
+                .catch(error => {
+                    console.error("Zero vector search error:", error);
+                    onStatusChange("Error performing initial search");
+                })
+                .finally(() => {
+                    setIsSearching(false);
+                });
+        }
+    }, [vectorSetName, metadata]);
+
+    // Handle search state updates
+    const updateSearchState = useCallback((update: Partial<VectorSetSearchState>) => {
+        setInternalSearchState(prev => {
+            const next = { ...prev, ...update };
+            onSearchStateChange(next);
+            return next;
+        });
+    }, [onSearchStateChange]);
+
+    // Debounced search effect
+    useEffect(() => {
+        if (!vectorSetName || !metadata) return;
+
+        if (searchTimeoutRef.current) {
+            clearTimeout(searchTimeoutRef.current);
+        }
+
+        if (internalSearchState.searchQuery.trim()) {
+            searchTimeoutRef.current = setTimeout(() => {
+                performSearch();
+            }, 300);
+        }
+
+        return () => {
+            if (searchTimeoutRef.current) {
+                clearTimeout(searchTimeoutRef.current);
+            }
+        };
+    }, [vectorSetName, metadata, internalSearchState.searchQuery, internalSearchState.searchType, internalSearchState.searchCount]);
 
     // Helper function to parse count from string
     const parseCount = useCallback((countStr: string): number => {
         return parseInt(countStr, 10) || 10;
     }, []);
-
-    // Helper function to check if vectors need to be fetched
-    const needVectors = useCallback((): boolean => {
-        return searchState.activeTab === "visualize";
-    }, [searchState.activeTab]);
 
     // Helper function to measure search time
     const measureSearchTime = useCallback(async <T>(searchFn: () => Promise<T>): Promise<[T, string]> => {
@@ -110,9 +177,8 @@ export function useVectorSearch({
             
             // Perform search and measure time
             const [vsimResults, duration] = await measureSearchTime(
-                () => redisCommands.vsim(vectorSetName!, zeroVector, count, needVectors())
+                () => redisCommands.vsim(vectorSetName!, zeroVector, count, fetchEmbeddings)
             );
-            
             // Store search time in state
             onSearchStateChange({ searchTime: duration });
             
@@ -126,7 +192,7 @@ export function useVectorSearch({
         } finally {
             setIsSearching(false);
         }
-    }, [vectorSetName, measureSearchTime, onSearchStateChange, onSearchResults, onStatusChange, needVectors]);
+    }, [vectorSetName, measureSearchTime, onSearchStateChange, onSearchResults, onStatusChange, fetchEmbeddings]);
 
     // Function to get vector from text using embedding API
     const getVectorFromText = useCallback(async (text: string): Promise<number[]> => {
@@ -153,7 +219,7 @@ export function useVectorSearch({
         let searchVector: number[];
         
         // Try to parse as raw vector first
-        const vectorData = searchState.searchQuery
+        const vectorData = internalSearchState.searchQuery
             .split(",")
             .map((n) => parseFloat(n.trim()));
             
@@ -166,8 +232,8 @@ export function useVectorSearch({
             searchString = `Results for Vector [${firstThreeNumbers}${searchVector.length > 3 ? '...' : ''}]`
         } else {
             // Not a valid vector, try to convert text to vector
-            searchVector = await getVectorFromText(searchState.searchQuery);
-            searchString = `Results for "${searchState.searchQuery}"`
+            searchVector = await getVectorFromText(internalSearchState.searchQuery);
+            searchString = `Results for "${internalSearchState.searchQuery}"`
         }
 
         // Get and validate vector dimension
@@ -178,9 +244,9 @@ export function useVectorSearch({
 
         // Perform vector-based search and measure time
         const [vsimResults, duration] = await measureSearchTime(
-            () => redisCommands.vsim(vectorSetName!, searchVector, count, needVectors())
+            () => redisCommands.vsim(vectorSetName!, searchVector, count, fetchEmbeddings)
         );
-        
+        console.log("[useVectorSearch] Vector-based search = embeddings: ", fetchEmbeddings);
         // Store search time in state
         onSearchStateChange({ searchTime: duration });
         
@@ -191,26 +257,26 @@ export function useVectorSearch({
 
     }, [
         vectorSetName, 
-        searchState.searchQuery, 
+        internalSearchState.searchQuery, 
         getVectorFromText, 
         measureSearchTime, 
         onSearchStateChange, 
         onSearchResults, 
         onStatusChange,
-        needVectors
+        fetchEmbeddings
     ]);
 
     // Handle Element type search
     const handleElementSearch = useCallback(async (count: number) => {
         if (!vectorSetName) return;
         
-        onStatusChange(`Element: "${searchState.searchQuery}"`);
+        onStatusChange(`Element: "${internalSearchState.searchQuery}"`);
         
-        // Perform element-based search and measure time
         const [vsimResults, duration] = await measureSearchTime(
-            () => redisCommands.vsim(vectorSetName!, searchState.searchQuery, count, needVectors())
+            () => redisCommands.vsim(vectorSetName!, internalSearchState.searchQuery, count, fetchEmbeddings)
         );
-        
+        console.log("[useVectorSearch] Element-based search = embeddings: ", fetchEmbeddings);
+
         // Store search time in state
         onSearchStateChange({ searchTime: duration });
         
@@ -218,37 +284,37 @@ export function useVectorSearch({
         onSearchResults(vsimResults);
     }, [
         vectorSetName, 
-        searchState.searchQuery, 
+        internalSearchState.searchQuery, 
         measureSearchTime, 
         onSearchStateChange, 
         onSearchResults, 
         onStatusChange,
-        needVectors
+        fetchEmbeddings
     ]);
 
     // Main search function
     const performSearch = useCallback(async () => {
         // Skip if nothing has changed or no valid input
-        if (!vectorSetName || !searchState.searchQuery.trim() ||
-            (lastSearchRef.current.query === searchState.searchQuery &&
-             lastSearchRef.current.type === searchState.searchType &&
-             lastSearchRef.current.count === searchState.searchCount)) {
+        if (!vectorSetName || !internalSearchState.searchQuery.trim() ||
+            (lastSearchRef.current.query === internalSearchState.searchQuery &&
+             lastSearchRef.current.type === internalSearchState.searchType &&
+             lastSearchRef.current.count === internalSearchState.searchCount)) {
             return;
         }
 
         // Update last search state
         lastSearchRef.current = {
-            query: searchState.searchQuery,
-            type: searchState.searchType,
-            count: searchState.searchCount
+            query: internalSearchState.searchQuery,
+            type: internalSearchState.searchType,
+            count: internalSearchState.searchCount
         };
 
         setIsSearching(true);
-        const count = parseCount(searchState.searchCount);
+        const count = parseCount(internalSearchState.searchCount);
 
         try {
             // Handle different search types
-            if (searchState.searchType === "Vector") {
+            if (internalSearchState.searchType === "Vector") {
                 await handleVectorSearch(count);
             } else {
                 await handleElementSearch(count);
@@ -260,122 +326,23 @@ export function useVectorSearch({
         }
     }, [
         vectorSetName, 
-        searchState, 
+        internalSearchState, 
         parseCount, 
         handleSearchError,
         handleVectorSearch,
         handleElementSearch
     ]);
 
-    // Perform initial search when vector set changes
-    useEffect(() => {
-        const performInitialSearch = async () => {
-            // Skip if no vector set selected or already done
-            if (!vectorSetName || !metadata || initialSearchDone.current) {
-                return;
-            }
-
-            // Mark as done immediately to prevent retries
-            initialSearchDone.current = true;
-
-            // Skip initial zero vector search if there's an existing search query
-            if (!searchState.searchQuery.trim()) {
-                await performZeroVectorSearch(parseCount(searchState.searchCount));
-            } else {
-                // If there's an existing search query, trigger the search directly
-                await performSearch();
-            }
-        };
-        
-        performInitialSearch();
-    }, [
-        vectorSetName, 
-        metadata, 
-        searchState.searchQuery, 
-        searchState.searchCount, 
-        performZeroVectorSearch, 
-        performSearch, 
-        parseCount
-    ]);
-
-    // Debounced search effect for query changes
-    useEffect(() => {
-        // Skip if no vector set selected
-        if (!vectorSetName) return;
-
-        // Skip if nothing has changed
-        if (lastSearchRef.current.query === searchState.searchQuery &&
-            lastSearchRef.current.count === searchState.searchCount) {
-            return;
-        }
-
-        // Clear any existing timeout
-        if (searchTimeoutRef.current) {
-            clearTimeout(searchTimeoutRef.current);
-        }
-
-        // If there's a search query, trigger the search with debounce
-        if (searchState.searchQuery.trim()) {
-            searchTimeoutRef.current = setTimeout(() => {
-                performSearch();
-            }, 300); // 300ms debounce delay
-        }
-
-        return () => {
-            if (searchTimeoutRef.current) {
-                clearTimeout(searchTimeoutRef.current);
-            }
-        };
-    }, [vectorSetName, searchState.searchQuery, searchState.searchCount, performSearch]);
-
-    // Wrapper functions to update both local and parent state
-    const setSearchType = (type: "Vector" | "Element" | "Image") => {
-        onSearchStateChange({ searchType: type });
-    };
-
-    const setSearchQuery = (query: string) => {
-        onSearchStateChange({ searchQuery: query });
-    };
-
-    const setSearchCount = (count: string) => {
-        onSearchStateChange({ searchCount: count });
-        
-        // Trigger a search immediately when count changes
-        if (vectorSetName) {
-            // Clear any existing timeout
-            if (searchTimeoutRef.current) {
-                clearTimeout(searchTimeoutRef.current);
-            }
-            
-            // If there's an existing search query, use performSearch
-            if (searchState.searchQuery.trim()) {
-                searchTimeoutRef.current = setTimeout(() => {
-                    performSearch();
-                }, 10); // Very short delay to ensure state is updated
-            } 
-            // Otherwise, perform a zero vector search with the new count
-            // but only if we've already done the initial search
-            else if (initialSearchDone.current) {
-                searchTimeoutRef.current = setTimeout(() => {
-                    performZeroVectorSearch(parseCount(count));
-                }, 10);
-            }
-        }
-    };
-
-    const setResultsTitle = (title: string) => {
-        onSearchStateChange({ resultsTitle: title });
-    };
-
     return {
-        searchType: searchState.searchType,
-        setSearchType,
-        searchQuery: searchState.searchQuery,
-        setSearchQuery,
-        searchCount: searchState.searchCount,
-        setSearchCount,
+        searchType: internalSearchState.searchType,
+        setSearchType: (type) => updateSearchState({ searchType: type }),
+        searchQuery: internalSearchState.searchQuery,
+        setSearchQuery: (query) => updateSearchState({ searchQuery: query }),
+        searchCount: internalSearchState.searchCount,
+        setSearchCount: (count) => updateSearchState({ searchCount: count }),
         isSearching,
-        resultsTitle: searchState.resultsTitle,
-        setResultsTitle
+        resultsTitle: internalSearchState.resultsTitle,
+        setResultsTitle: (title) => updateSearchState({ resultsTitle: title }),
+        searchTime: internalSearchState.searchTime
     };
 } 
