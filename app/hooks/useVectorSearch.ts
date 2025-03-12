@@ -72,19 +72,11 @@ export function useVectorSearch({
     // Handle search state updates
     const updateSearchState = useCallback(
         (update: Partial<VectorSetSearchState>) => {
-            console.log(
-                "[useVectorSearch] updateSearchState called with:",
-                update
-            )
+
             setInternalSearchState((prev) => {
                 const next = { ...prev, ...update }
-                console.log(
-                    "[useVectorSearch] About to call onSearchStateChange from updateSearchState"
-                )
                 onSearchStateChange(next)
-                console.log(
-                    "[useVectorSearch] After onSearchStateChange from updateSearchState"
-                )
+
                 return next
             })
         },
@@ -116,10 +108,6 @@ export function useVectorSearch({
                 const zeroVector = Array(dim).fill(0)
 
                 // Perform search and measure time
-                console.log(
-                    "[useVectorSearch] Performing zero vector search for vector set:",
-                    vectorSetName
-                )
                 const [vsimResults, duration] = await measureSearchTime(() =>
                     redisCommands.vsim(
                         vectorSetName!,
@@ -156,14 +144,8 @@ export function useVectorSearch({
 
     // Reset when vectorSetName changes
     useEffect(() => {
-        console.log("[useVectorSearch] useEffect triggered with:", {
-            vectorSetName,
-            initialSearchDone: initialSearchDone.current,
-        })
-
         // Skip if this vectorSetName is already being processed
         if (vectorSetName && currentSearchVectorSetRef.current === vectorSetName) {
-            console.log(`[useVectorSearch] Skipping duplicate search for: ${vectorSetName}`)
             return;
         }
 
@@ -192,7 +174,6 @@ export function useVectorSearch({
             searchTime: undefined,
         })
 
-        console.log("[useVectorSearch] About to call onSearchStateChange")
         onSearchStateChange({
             searchType: "Vector",
             searchQuery: "",
@@ -201,7 +182,6 @@ export function useVectorSearch({
             resultsTitle: "Search Results",
             searchTime: undefined,
         })
-        console.log("[useVectorSearch] After onSearchStateChange")
 
         // Clear results and status
         onSearchResults([])
@@ -210,10 +190,6 @@ export function useVectorSearch({
         // Only perform zero vector search if we have a valid vector set
         if (vectorSetName) {
             setIsSearching(true)
-            console.log(
-                "[useVectorSearch] Starting zero vector search for:",
-                vectorSetName
-            )
 
             performZeroVectorSearch(10)
                 .catch((error) => {
@@ -222,9 +198,6 @@ export function useVectorSearch({
                 })
                 .finally(() => {
                     setIsSearching(false)
-                    console.log(
-                        "[useVectorSearch] Zero vector search completed"
-                    )
                     // Clear the current search vector set when done
                     currentSearchVectorSetRef.current = null;
                 })
@@ -356,10 +329,6 @@ export function useVectorSearch({
             // }
 
             // Perform vector-based search and measure time
-            console.log(
-                "[useVectorSearch] Performing vector-based search with count:",
-                count
-            )
             const [vsimResults, duration] = await measureSearchTime(() =>
                 redisCommands.vsim(
                     vectorSetName!,
@@ -410,10 +379,6 @@ export function useVectorSearch({
                     fetchEmbeddings,
                     internalSearchState.searchFilter
                 )
-            )
-            console.log(
-                "[useVectorSearch] Element-based search = embeddings: ",
-                fetchEmbeddings
             )
 
             // Store search time in state
