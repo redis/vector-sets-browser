@@ -88,6 +88,7 @@ export default function VectorResults({
         setShowAttributes,
         showOnlyFilteredAttributes,
         setShowOnlyFilteredAttributes,
+        isLoaded
     } = useVectorResultsSettings()
     const [filterText, setFilterText] = useState("")
     const [sortColumn, setSortColumn] = useState<SortColumn>("none")
@@ -446,7 +447,7 @@ export default function VectorResults({
     }
 
     // Update the early return to handle both empty results and loading state
-    if (isLoading || isSearching) {
+    if (!isLoaded || isLoading || isSearching) {
         return (
             <div className="flex flex-col items-center justify-center py-12 space-y-4 text-gray-500">
                 <SearchTimeIndicator 
@@ -454,7 +455,7 @@ export default function VectorResults({
                     searchTime={searchTime ? parseFloat(searchTime) : undefined} 
                 />
                 <p className="text-sm">
-                    {isLoading ? "Loading vector set..." : "Searching for vectors..."}
+                    {!isLoaded ? "Loading settings..." : isLoading ? "Loading vector set..." : "Searching for vectors..."}
                 </p>
             </div>
         );
@@ -633,19 +634,23 @@ export default function VectorResults({
                             </DropdownMenuCheckboxItem>
                             <DropdownMenuCheckboxItem
                                 checked={showAttributes}
-                                onCheckedChange={setShowAttributes}
+                                onCheckedChange={(checked) => {
+                                    console.log("Setting showAttributes to:", checked);
+                                    setShowAttributes(checked);
+                                }}
                             >
-                                Show Attributes
+                                Show Attributes (Persisted)
                             </DropdownMenuCheckboxItem>
                             {showAttributes && (
                                 <DropdownMenuCheckboxItem
                                     checked={showOnlyFilteredAttributes}
-                                    onCheckedChange={
-                                        setShowOnlyFilteredAttributes
-                                    }
+                                    onCheckedChange={(checked) => {
+                                        console.log("Setting showOnlyFilteredAttributes to:", checked);
+                                        setShowOnlyFilteredAttributes(checked);
+                                    }}
                                     disabled={!showAttributes}
                                 >
-                                    Show Only Filtered Attributes
+                                    Show Only Filtered Attributes (Persisted)
                                 </DropdownMenuCheckboxItem>
                             )}
                             <DropdownMenuSeparator />

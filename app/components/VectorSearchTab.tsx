@@ -1,10 +1,9 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useCallback } from "react"
 import SearchBox from "./SearchBox"
 import VectorResults from "./VectorResults"
-import StatusMessage from "./StatusMessage"
-import { useVectorSearch } from "../hooks/useVectorSearch"
+import { useVectorSearch, VectorSetSearchState } from "../hooks/useVectorSearch"
 import { VectorSetMetadata } from "../types/embedding"
 import { VectorTuple } from "../api/types"
 import { toast } from "sonner"
@@ -30,10 +29,10 @@ export default function VectorSearchTab({
     onDeleteVector,
     isLoading,
     results,
-    setResults,
+    setResults
 }: VectorSearchTabProps) {
     const [fileOperationStatus, setFileOperationStatus] = useState("")
-    const [searchState, setSearchState] = useState({
+    const [searchState, setSearchState] = useState<VectorSetSearchState>({
         searchType: "Vector" as const,
         searchQuery: "",
         searchCount: "10",
@@ -41,6 +40,21 @@ export default function VectorSearchTab({
         resultsTitle: "Search Results",
         searchTime: undefined as string | undefined
     })
+
+    const handleSearchResults = useCallback((newResults: VectorTuple[]) => {
+        setResults(newResults)
+    }, [setResults])
+
+    const handleStatusChange = useCallback((status: string) => {
+        setFileOperationStatus(status)
+    }, [])
+
+    const handleSearchStateChange = useCallback((newState: Partial<VectorSetSearchState>) => {
+        setSearchState(prevState => ({
+            ...prevState,
+            ...newState
+        }))
+    }, [])
 
     const {
         searchType,
@@ -56,16 +70,15 @@ export default function VectorSearchTab({
     } = useVectorSearch({
         vectorSetName,
         metadata,
-        onSearchResults: setResults,
-        onStatusChange: setFileOperationStatus,
+        onSearchResults: handleSearchResults,
+        onStatusChange: handleStatusChange,
         searchState,
-        onSearchStateChange: (newState) => {
-            setSearchState(prev => ({ ...prev, ...newState }))
-        }
+        onSearchStateChange: handleSearchStateChange,
+        fetchEmbeddings: false
     })
 
     const handleSearchQueryChange = (query: string) => {
-        setSearchQuery(query);
+        setSearchQuery(query)
     }
 
     const handleRowClick = async (element: string) => {
@@ -113,11 +126,6 @@ export default function VectorSearchTab({
                 metadata={metadata}
             />
             <div className="bg-white p-4 rounded shadow-md">
-                {/* <div className="flex mb-4 items-center space-x-2">
-                    <div className="flex items-center gap-2 w-full">
-                        <StatusMessage message={fileOperationStatus} />
-                    </div>
-                </div> */}
                 <VectorResults
                     results={results}
                     onRowClick={handleRowClick}

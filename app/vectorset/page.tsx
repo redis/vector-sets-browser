@@ -53,7 +53,6 @@ export default function VectorSetPage() {
     const [isEditConfigModalOpen, setIsEditConfigModalOpen] = useState(false)
     const [activeTab, setActiveTab] = useState("search")
     // Keep track of search state per vector set
-    const [vectorSetSearchStates, setVectorSetSearchStates] = useState<Record<string, VectorSetSearchState>>({})
     const [isVectorSetChanging, setIsVectorSetChanging] = useState(false)
 
     const {
@@ -75,22 +74,8 @@ export default function VectorSetPage() {
         handleDeleteVector,
         handleShowVector,
         results,
-        setResults
+        setResults,
     } = useVectorSet()
-
-    // Update search state for current vector set
-    const handleSearchStateChange = (searchState: VectorSetSearchState) => {
-        if (!vectorSetName) return
-        setVectorSetSearchStates(prev => ({
-            ...prev,
-            [vectorSetName]: searchState
-        }))
-    }
-
-    // Get the current vector set's search state
-    const currentSearchState = vectorSetName ? (
-        vectorSetSearchStates[vectorSetName] || DEFAULT_SEARCH_STATE
-    ) : null
 
     const { handleSaveConfig } = useFileOperations({
         vectorSetName,
@@ -134,7 +119,7 @@ export default function VectorSetPage() {
                     if (savedConnections) {
                         const connections = JSON.parse(savedConnections)
                         const matchingConnection = connections.find(
-                            (conn: any) =>
+                            (conn: { id: string; host: string; port: string; name: string }) =>
                                 conn.id === connection.url ||
                                 `redis://${conn.host}:${conn.port}` ===
                                     connection.url
@@ -295,13 +280,15 @@ export default function VectorSetPage() {
 
                         <TabsContent value="search">
                             {!isVectorSetChanging && (
-                            <VectorSearchTab
-                                vectorSetName={vectorSetName}
-                                dim={dim}
-                                metadata={metadata}
-                                onAddVector={() => setIsAddVectorModalOpen(true)}
-                                onShowVector={handleShowVector}
-                                onDeleteVector={handleDeleteVector}
+                                <VectorSearchTab
+                                    vectorSetName={vectorSetName}
+                                    dim={dim}
+                                    metadata={metadata}
+                                    onAddVector={() =>
+                                        setIsAddVectorModalOpen(true)
+                                    }
+                                    onShowVector={handleShowVector}
+                                    onDeleteVector={handleDeleteVector}
                                     isLoading={isVectorSetChanging}
                                     results={results}
                                     setResults={setResults}
@@ -310,7 +297,7 @@ export default function VectorSetPage() {
                         </TabsContent>
 
                         <TabsContent value="visualize">
-                            {!isVectorSetChanging && (
+                            {/* {!isVectorSetChanging && (
                                 <VectorSetVisualization 
                                     vectorSetName={vectorSetName}
                                     dim={dim || 0}
@@ -318,7 +305,7 @@ export default function VectorSetPage() {
                                     searchState={currentSearchState}
                                     onSearchStateChange={handleSearchStateChange}
                                 />
-                            )}
+                            )} */}
                         </TabsContent>
                     </Tabs>
                 ) : (
