@@ -60,12 +60,11 @@ export function ControlPanel({
             <Card>
                 {selectedNode && (
                     <div>
-                        <CardHeader className="py-2">
-                            <div className="flex justify-between items-center">
-                                <div className="flex space-x-2 items-center">
-                                    <h3 className="">
-                                        Controls
-                                    </h3>
+                        <CardHeader className="py-0 px-2">
+                            <div className="flex items-center">
+                                <div className="grow"></div>
+                                <div className="">
+                                    Controls
                                 </div>
                                 <Button
                                     variant={isCardPinned ? "default" : "ghost"}
@@ -239,10 +238,10 @@ export function ControlPanel({
             <style jsx>{`
                 .node-info-card {
                     position: absolute;
-                    top: -56px;
-                    right: 0px;
+                    top: 2px;
+                    right: 2px;
                     background: rgba(255, 255, 255, 0.95);
-                    border-radius: 8px;
+                    border-radius: 4px;
                     box-shadow: 0;
                     z-index: 10;
                     max-height: 80vh;

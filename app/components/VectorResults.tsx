@@ -1,23 +1,29 @@
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
 } from "@/components/ui/table"
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuCheckboxItem,
-  DropdownMenuTrigger,
-  DropdownMenuSeparator,
-  DropdownMenuLabel,
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuCheckboxItem,
+    DropdownMenuTrigger,
+    DropdownMenuSeparator,
+    DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu"
 import { useState, useMemo, useEffect } from "react"
-import { ArrowDownUp, ArrowDownWideNarrow, ArrowUpNarrowWide, Settings } from "lucide-react"
+import {
+    ArrowDownUp,
+    ArrowDownWideNarrow,
+    ArrowUpNarrowWide,
+    Settings,
+    X,
+} from "lucide-react"
 import EditAttributesDialog from "./EditAttributesDialog"
 import { VectorTuple } from "../api/types"
 import { redisCommands } from "@/app/api/redis-commands"
@@ -43,28 +49,28 @@ type SortColumn = "element" | "score" | "none"
 type SortDirection = "asc" | "desc"
 
 type AttributeCache = {
-    [key: string]: string | null;
+    [key: string]: string | null
 }
 
-type AttributeValue = string | number | boolean | any[];
-type ParsedAttributes = Record<string, AttributeValue>;
+type AttributeValue = string | number | boolean | any[]
+type ParsedAttributes = Record<string, AttributeValue>
 
 interface ColumnConfig {
-    name: string;
-    visible: boolean;
-    type: "system" | "attribute"; // system columns are Element and Score
+    name: string
+    visible: boolean
+    type: "system" | "attribute" // system columns are Element and Score
 }
 
 // Add this new type and function after the existing type definitions
 type FieldFilter = {
-    field: string;
-    expression: string;
+    field: string
+    expression: string
 }
 
-export default function VectorResults({ 
-    results, 
-    onRowClick, 
-    onDeleteClick, 
+export default function VectorResults({
+    results,
+    onRowClick,
+    onDeleteClick,
     onShowVectorClick,
     keyName,
     searchFilter,
@@ -567,7 +573,7 @@ export default function VectorResults({
                                     onCheckedChange={
                                         setShowOnlyFilteredAttributes
                                     }
-                                    disabled={!searchFilter}
+                                    disabled={!showAttributes}
                                 >
                                     Show Only Filtered Attributes
                                 </DropdownMenuCheckboxItem>
@@ -655,9 +661,10 @@ export default function VectorResults({
                             {availableColumns
                                 .filter((col) => col.visible)
                                 .map((col) => {
-                                    const filter = parseFieldFilters(searchFilter)
-                                        .find(f => f.field === col.name);
-                                    
+                                    const filter = parseFieldFilters(
+                                        searchFilter
+                                    ).find((f) => f.field === col.name)
+
                                     return (
                                         <TableHead
                                             key={col.name}
@@ -668,7 +675,9 @@ export default function VectorResults({
                                             }`}
                                             onClick={() =>
                                                 col.type === "system"
-                                                    ? handleSort(col.name as SortColumn)
+                                                    ? handleSort(
+                                                          col.name as SortColumn
+                                                      )
                                                     : undefined
                                             }
                                         >
@@ -681,21 +690,32 @@ export default function VectorResults({
                                                         <div className="w-2 h-2 bg-red-500 rounded-full flex-shrink-0" />
                                                     )}
                                                     <span className="font-medium">
-                                                        {col.name.charAt(0).toUpperCase() + col.name.slice(1)}
+                                                        {col.name
+                                                            .charAt(0)
+                                                            .toUpperCase() +
+                                                            col.name.slice(1)}
                                                     </span>
                                                     {col.type === "system" && (
-                                                        <SortIcon column={col.name as SortColumn} />
+                                                        <SortIcon
+                                                            column={
+                                                                col.name as SortColumn
+                                                            }
+                                                        />
                                                     )}
                                                 </div>
                                                 {filter && (
-                                                    <div className="text-xs text-red-600 font-normal truncate" 
-                                                         title={filter.expression}>
+                                                    <div
+                                                        className="text-xs text-red-600 font-normal truncate"
+                                                        title={
+                                                            filter.expression
+                                                        }
+                                                    >
                                                         {filter.expression}
                                                     </div>
                                                 )}
                                             </div>
                                         </TableHead>
-                                    );
+                                    )
                                 })}
                             <TableHead className="text-right">
                                 Actions
@@ -836,12 +856,12 @@ export default function VectorResults({
                             key={index}
                             className="bg-white rounded-lg border p-4 hover:shadow-md group"
                         >
-                            <div className="flex items-start justify-between">
-                                <div className="flex items-start space-x-4">
+                            <div className="flex items-start justify-between w-full">
+                                <div className="flex items-start space-x-4 w-full">
                                     <div className="bg-gray-100 rounded-lg p-2 text-gray-600">
                                         {index + 1}
                                     </div>
-                                    <div className="flex flex-col gap-2">
+                                    <div className="flex flex-col gap-2 w-full">
                                         <div className="grow">
                                             <div className="text-sm text-gray-500 uppercase">
                                                 Element
@@ -860,71 +880,7 @@ export default function VectorResults({
                                                     : row[1]}
                                             </div>
                                         </div>
-                                        {showOnlyFilteredAttributes &&
-                                            filteredFields.map((field) => (
-                                                <div key={field}>
-                                                    <div className="text-sm text-gray-500 uppercase">
-                                                        {field}
-                                                    </div>
-                                                    <div className="font-medium">
-                                                        {filteredFieldValues[
-                                                            row[0]
-                                                        ]?.[field] || ""}
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        {showAttributes &&
-                                            !showOnlyFilteredAttributes && (
-                                                <div>
-                                                    <div className="text-sm text-gray-500">
-                                                        ATTRIBUTES
-                                                    </div>
-                                                    {isLoadingAttributes &&
-                                                    attributeCache[row[0]] ===
-                                                        undefined ? (
-                                                        <div className="text-sm text-gray-500">
-                                                            Loading...
-                                                        </div>
-                                                    ) : attributeCache[
-                                                          row[0]
-                                                      ] ? (
-                                                        <div className="flex flex-col gap-2">
-                                                            <div className="text-sm text-gray-700 font-mono overflow-hidden text-ellipsis">
-                                                                {
-                                                                    attributeCache[
-                                                                        row[0]
-                                                                    ]
-                                                                }
-                                                            </div>
-                                                            <Button
-                                                                variant="ghost"
-                                                                size="sm"
-                                                                onClick={() =>
-                                                                    setEditingAttributes(
-                                                                        row[0]
-                                                                    )
-                                                                }
-                                                            >
-                                                                Edit
-                                                            </Button>
-                                                        </div>
-                                                    ) : (
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="sm"
-                                                            onClick={() =>
-                                                                setEditingAttributes(
-                                                                    row[0]
-                                                                )
-                                                            }
-                                                        >
-                                                            Add Attributes
-                                                        </Button>
-                                                    )}
-                                                </div>
-                                            )}
                                     </div>
-                                    <div className="grow"></div>
                                 </div>
                                 <div className="flex flex-col items-end space-y--1 text-sm opacity-0 group-hover:opacity-100 transition-opacity">
                                     <Button
@@ -973,29 +929,31 @@ export default function VectorResults({
                                         </svg>
                                         Copy Vector
                                     </Button>
-                                    <Button
-                                        variant="ghost"
-                                        onClick={() =>
-                                            setEditingAttributes(row[0])
-                                        }
-                                        className="p-2 hover:bg-gray-100 rounded-full text-gray-500 flex items-center gap-2"
-                                        title="Edit attributes"
-                                    >
-                                        <svg
-                                            className="w-5 h-5"
-                                            fill="none"
-                                            stroke="currentColor"
-                                            viewBox="0 0 24 24"
+                                    {!showAttributes && (
+                                        <Button
+                                            variant="ghost"
+                                            onClick={() =>
+                                                setEditingAttributes(row[0])
+                                            }
+                                            className="p-2 hover:bg-gray-100 rounded-full text-gray-500 flex items-center gap-2"
+                                            title="Edit attributes"
                                         >
-                                            <path
-                                                strokeLinecap="round"
-                                                strokeLinejoin="round"
-                                                strokeWidth={2}
-                                                d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                                            />
-                                        </svg>
-                                        Edit Attributes
-                                    </Button>
+                                            <svg
+                                                className="w-5 h-5"
+                                                fill="none"
+                                                stroke="currentColor"
+                                                viewBox="0 0 24 24"
+                                            >
+                                                <path
+                                                    strokeLinecap="round"
+                                                    strokeLinejoin="round"
+                                                    strokeWidth={2}
+                                                    d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                                                />
+                                            </svg>
+                                            Edit Attributes
+                                        </Button>
+                                    )}
                                     <Button
                                         variant="ghost"
                                         onClick={(e) =>
@@ -1021,10 +979,91 @@ export default function VectorResults({
                                     </Button>
                                 </div>
                             </div>
+                            {showOnlyFilteredAttributes &&
+                                filteredFields.map((field) => (
+                                    <div key={field}>
+                                        <div className="text-sm text-gray-500 uppercase">
+                                            {field}
+                                        </div>
+                                        <div className="font-medium">
+                                            {filteredFieldValues[row[0]]?.[
+                                                field
+                                            ] || ""}
+                                        </div>
+                                    </div>
+                                ))}
+                            {showAttributes && !showOnlyFilteredAttributes && (
+                                <div className="w-full pl-10">
+                                    <div className="text-sm text-gray-500">
+                                        ATTRIBUTES
+                                    </div>
+                                    {isLoadingAttributes &&
+                                    attributeCache[row[0]] === undefined ? (
+                                        <div className="text-sm text-gray-500">
+                                            Loading...
+                                        </div>
+                                    ) : attributeCache[row[0]] ? (
+                                        <div className="flex gap-4 flex-wrap bg-gray-50 rounded-md p-2 w-full items-center">
+                                            {Object.entries(
+                                                parsedAttributeCache[row[0]] ||
+                                                    {}
+                                            ).map(([key, value]) => (
+                                                <div
+                                                    key={key}
+                                                    className="flex flex-col"
+                                                >
+                                                    <div className="text-xs text-gray-500 uppercase">
+                                                        {key}
+                                                    </div>
+                                                    <div className="">
+                                                        {formatAttributeValue(
+                                                            value
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                            <div className="grow"></div>
+                                            <Button
+                                                variant="ghost"
+                                                onClick={() =>
+                                                    setEditingAttributes(row[0])
+                                                }
+                                                className="h-8 w-8 text-gray-500 mr-2"
+                                                title="Edit attributes"
+                                            >
+                                                <svg
+                                                    className="w-4 h-4"
+                                                    fill="none"
+                                                    stroke="currentColor"
+                                                    viewBox="0 0 24 24"
+                                                >
+                                                    <path
+                                                        strokeLinecap="round"
+                                                        strokeLinejoin="round"
+                                                        strokeWidth={2}
+                                                        d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                                                    />
+                                                </svg>
+                                                Edit
+                                            </Button>
+                                        </div>
+                                    ) : (
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() =>
+                                                setEditingAttributes(row[0])
+                                            }
+                                        >
+                                            Add Attributes
+                                        </Button>
+                                    )}
+                                </div>
+                            )}
                         </div>
                     ))}
                 </div>
             )}
         </div>
     )
-} 
+}

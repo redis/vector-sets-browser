@@ -27,12 +27,12 @@ interface VectorSetVisualizationProps {
     onSearchStateChange: (state: VectorSetSearchState) => void
 }
 
-export default function VectorSetVisualization({ 
-    vectorSetName, 
-    dim, 
+export default function VectorSetVisualization({
+    vectorSetName,
+    dim,
     metadata,
     searchState: initialSearchState,
-    onSearchStateChange
+    onSearchStateChange,
 }: VectorSetVisualizationProps) {
     const [vizType, setVizType] = useState<"2d" | "3d">("2d")
     const [fileOperationStatus, setFileOperationStatus] = useState("")
@@ -60,7 +60,7 @@ export default function VectorSetVisualization({
             searchQuery: state.searchQuery ?? "",
             searchCount: state.searchCount ?? "10",
             searchFilter: state.searchFilter ?? "",
-            resultsTitle: state.resultsTitle ?? "Search Results"
+            resultsTitle: state.resultsTitle ?? "Search Results",
         }
         onSearchStateChange(completeState)
     }
@@ -87,9 +87,9 @@ export default function VectorSetVisualization({
             searchQuery: "",
             searchCount: "10",
             searchFilter: "",
-            resultsTitle: "Search Results"
+            resultsTitle: "Search Results",
         },
-        onSearchStateChange: handleSearchStateChange
+        onSearchStateChange: handleSearchStateChange,
     })
 
     const getNeighbors = async (
@@ -128,6 +128,8 @@ export default function VectorSetVisualization({
                 setSearchType={setSearchType}
                 searchQuery={searchQuery}
                 setSearchQuery={setSearchQuery}
+                searchCount={searchCount}
+                setSearchCount={setSearchCount}
                 searchFilter={searchFilter}
                 setSearchFilter={setSearchFilter}
                 dim={dim}
@@ -137,43 +139,42 @@ export default function VectorSetVisualization({
                 <div className="p-4 rounded shadow-md flex-1 flex flex-col">
                     <div className="flex mb-4 items-center">
                         <div className="flex items-center gap-4 w-full">
-                            <div className="flex items-center gap-2">
-                                <Input
-                                    type="number"
-                                    value={searchCount}
-                                    onChange={(e) => setSearchCount(e.target.value)}
-                                    className="border rounded p-1 w-16 h-8 text-center"
-                                    min="1"
-                                />
-                                <span className="text-xs">results</span>
-                            </div>
                             <StatusMessage message={fileOperationStatus} />
                             <div className="grow"></div>
                             {(searchTime || isSearching) && (
                                 <div className="text-sm text-gray-500 mb-4">
                                     <div className="flex items-center gap-4">
                                         <SearchTimeIndicator
-                                            searchTime={searchTime ? Number(searchTime) : undefined}
+                                            searchTime={
+                                                searchTime
+                                                    ? Number(searchTime)
+                                                    : undefined
+                                            }
                                             isSearching={isSearching}
                                         />
-                                        <Select
-                                            value={vizType}
-                                            onValueChange={(value: "2d" | "3d") => setVizType(value)}
-                                        >
-                                            <SelectTrigger className="w-[100px]">
-                                                <SelectValue placeholder="Visualization" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="2d">2D View</SelectItem>
-                                                <SelectItem value="3d">3D View</SelectItem>
-                                            </SelectContent>
-                                        </Select>
                                     </div>
                                 </div>
                             )}
+                            <Select
+                                value={vizType}
+                                onValueChange={(value: "2d" | "3d") =>
+                                    setVizType(value)
+                                }
+                            >
+                                <SelectTrigger className="w-[100px]">
+                                    <SelectValue placeholder="Visualization" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="2d">2D View</SelectItem>
+                                    <SelectItem value="3d">3D View</SelectItem>
+                                </SelectContent>
+                            </Select>
                         </div>
                     </div>
-                    <div className="flex-grow flex-1" style={{ minHeight: "calc(100vh - 400px)" }}>
+                    <div
+                        className="flex-grow flex-1"
+                        style={{ minHeight: "calc(100vh - 400px)" }}
+                    >
                         {results[0] && !isVectorSetChanging ? (
                             vizType === "2d" ? (
                                 <HNSWVizPure
@@ -181,7 +182,7 @@ export default function VectorSetVisualization({
                                     initialElement={{
                                         element: results[0][0],
                                         similarity: results[0][1],
-                                        vector: results[0][2] || []
+                                        vector: results[0][2] || [],
                                     }}
                                     maxNodes={500}
                                     initialNodes={Number(searchCount)}
@@ -189,10 +190,14 @@ export default function VectorSetVisualization({
                                 />
                             ) : (
                                 <VectorViz3D
-                                    data={results.map(([label, score, vector]) => ({
-                                        label: `${label} (${score.toFixed(3)})`,
-                                        vector,
-                                    }))}
+                                    data={results.map(
+                                        ([label, score, vector]) => ({
+                                            label: `${label} (${score.toFixed(
+                                                3
+                                            )})`,
+                                            vector,
+                                        })
+                                    )}
                                     onVectorSelect={handleRowClick}
                                 />
                             )
@@ -204,4 +209,4 @@ export default function VectorSetVisualization({
             </div>
         </div>
     )
-} 
+}

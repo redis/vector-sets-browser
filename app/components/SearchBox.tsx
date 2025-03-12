@@ -10,6 +10,7 @@ import {
     X,
     Check,
     Copy,
+    Filter,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
@@ -295,6 +296,14 @@ export default function SearchBox({
                                 </Button>
                             )}
                         </div>
+                        <Button
+                            variant="outline"
+                            size="icon"
+                            className={`h-9 ${showFilters ? 'bg-gray-500 hover:bg-gray-600 text-white' : 'bg-white hover:bg-gray-100'}`}
+                            onClick={() => setShowFilters(!showFilters)}
+                        >
+                            <Filter className="h-4 w-4" />
+                        </Button>
                     </div>
 
                     {showFilters && (
@@ -312,20 +321,12 @@ export default function SearchBox({
                                 <Button
                                     variant="ghost"
                                     size="icon"
-                                    className="absolute right-2 top-1/2 -translate-y-1/2"
+                                    className="absolute right-0 top-1/2 -translate-y-1/2"
                                     onClick={() => setShowFilterHelp(true)}
                                 >
-                                    <HelpCircle className="h-4 w-4" />
+                                    <HelpCircle className="h-8 w-8" />
                                 </Button>
                             </div>
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-6 w-6"
-                                onClick={() => setShowFilters(false)}
-                            >
-                                <X className="h-4 w-4 text-gray-500" />
-                            </Button>
                         </div>
                     )}
                 </div>
