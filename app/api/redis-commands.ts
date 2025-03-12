@@ -7,8 +7,10 @@ import {
     VremRequest,
     VembRequest,
     VaddRequest,
-    VlinksRequest,
+    VlinkRequest,
     VsimRequest,
+    VsetAttrRequest,
+    VgetAttrRequest,
     VectorTuple,
     VectorTupleLevels
 } from './types';
@@ -57,7 +59,7 @@ export const redisCommands = {
     },
 
     async vlinks(keyName: string, element: string, count?: number, withEmbeddings?: boolean) {
-        return apiClient.post<VectorTupleLevels, VlinksRequest>(
+        return apiClient.post<VectorTupleLevels, VlinkRequest>(
             '/api/redis/command/vlinks',
             { keyName, element, count, withEmbeddings }
         );
@@ -67,20 +69,41 @@ export const redisCommands = {
         keyName: string,
         searchVectorOrElement: number[] | string,
         count: number,
-        withEmbeddings?: boolean
+        withEmbeddings?: boolean,
+        filter?: string
     ) {
         const request: VsimRequest = {
             keyName,
             count,
             withEmbeddings,
+            filter,
             ...(Array.isArray(searchVectorOrElement)
                 ? { searchVector: searchVectorOrElement }
-                : { searchElement: searchVectorOrElement })
+                : { searchElement: searchVectorOrElement }),
         };
 
         return apiClient.post<VectorTuple[], VsimRequest>(
             '/api/redis/command/vsim',
             request
         );
+    },
+
+    async vsetattr(keyName: string, element: string, attributes: string) {
+        return apiClient.post<{ success: boolean; error?: string }, VsetAttrRequest>(
+            '/api/redis/command/vsetattr',
+            { keyName, element, attributes }
+        );
+    },
+
+    async vgetattr(keyName: string, element: string): Promise<string | null> {
+        try {
+            return await apiClient.post<string, VgetAttrRequest>(
+                '/api/redis/command/vgetattr',
+                { keyName, element }
+            );
+        } catch (error) {
+            console.error("[vgetattr] error: ", error)
+            return null;
+        }
     }
 }; 

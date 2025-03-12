@@ -42,6 +42,7 @@ export interface VaddRequest {
     keyName: string;
     element: string;
     vector: number[];
+    attributes?: string;
 }
 
 export interface VlinkRequest {
@@ -57,10 +58,11 @@ export interface VsimRequest {
     searchElement?: string;
     count: number;
     withEmbeddings?: boolean;
+    filter?: string;
 }
 
 // Common response types
-export type VectorTuple = [string, number, number[] | null]; // [element, score, vector?]
+export type VectorTuple = [string, number, number[] | null, string? ]; // [element, score, vector?, attributes?]
 export type VectorTupleLevel = VectorTuple[];
 export type VectorTupleLevels = VectorTupleLevel[];
 
@@ -77,27 +79,10 @@ export interface VectorSetOperationRequest {
     element: string;
 }
 
-export interface VectorSetAddRequest extends VectorSetOperationRequest {
-    vector: number[];
-}
-
-export interface VectorSetDeleteRequest extends VectorSetOperationRequest {}
-
-export interface VectorSetShowRequest extends VectorSetOperationRequest {}
-
-export interface VectorSetShowResponse {
-    vector: number[];
-}
-
 export interface VectorSetCreateRequest {
     dimensions: number;
     metadata?: VectorSetMetadata;
     customData?: { element: string; vector: number[] };
-}
-
-export interface VectorSetInfo {
-    dimensions: number;
-    vectorCount: number;
 }
 
 export interface VectorSetListResponse {
@@ -114,3 +99,14 @@ export interface EmbeddingRequest {
 }
 
 export type EmbeddingResponse = number[];
+
+export interface VsetAttrRequest {
+    keyName: string;
+    element: string;
+    attributes: string;  // Changed to string since we'll pass raw JSON string
+}
+
+export interface VgetAttrRequest {
+    keyName: string;
+    element: string;
+}

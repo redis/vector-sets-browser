@@ -32,9 +32,19 @@ export const apiClient = {
                 body: data instanceof FormData ? data : JSON.stringify(data),
             });
 
-            const responseData = await response.json() as ApiResponse<TResponse>;
+            let responseData;
+            try {
+                responseData = await response.json() as ApiResponse<TResponse>;
+            } catch (parseError) {
+                console.error("Failed to parse response:", parseError);
+                throw new ApiError(
+                    `Failed to parse response: ${parseError instanceof Error ? parseError.message : String(parseError)}`,
+                    response.status
+                );
+            }
 
             if (!response.ok) {
+                console.error("API error response:", responseData);
                 throw new ApiError(
                     responseData.error || `HTTP error ${response.status}`,
                     response.status,
@@ -43,6 +53,7 @@ export const apiClient = {
             }
 
             if (!responseData.success) {
+                console.error("Operation failed:", responseData);
                 throw new ApiError(responseData.error || 'Operation failed');
             }
 

@@ -3,6 +3,13 @@ import {
     validateAndCorrectMetadata,
 } from "@/app/types/embedding"
 import { createClient, RedisClientType } from "redis"
+import { cookies } from "next/headers"
+
+// Helper to get Redis URL from cookies
+export function getRedisUrl(): string | null {
+    const url = cookies().get("redis_url")?.value
+    return url || null
+}
 
 // Types for Redis operations
 export interface RedisVectorMetadata {
@@ -44,17 +51,29 @@ export class RedisClient {
 
         try {
             client = await RedisClient.createConnection(url)
+            console.log("[RedisClient] Connected successfully")
             const result = await operation(client)
+            console.log("[RedisClient] Operation result:", result)
             return { success: true, result }
         } catch (error) {
-            console.error("Operation failed:", error)
+            console.error("[RedisClient] Operation failed:", error)
+            console.error("[RedisClient] Error details:", {
+                name: error.name,
+                message: error.message,
+                stack: error.stack
+            })
             return {
                 success: false,
                 error: error instanceof Error ? error.message : String(error),
             }
         } finally {
             if (client) {
-                await client.quit().catch(console.error)
+                try {
+                    await client.quit()
+                    console.log("[RedisClient] Connection closed")
+                } catch (error) {
+                    console.error("[RedisClient] Error closing connection:", error)
+                }
             }
         }
     }
@@ -123,10 +142,58 @@ export async function vadd(
     })
 }
 
+export async function vgetattr(
+    url: string,
+    keyName: string,
+    element: string,
+): Promise<VectorOperationResult> {
+    return RedisClient.withConnection(url, async (client) => {
+
+        const command = [
+            "VGETATTR",
+            keyName,            
+            element,
+        ]
+
+        try {
+            return await client.sendCommand(command)
+        } catch (error) {
+            console.error("Error executing VGETATTR command:", error)
+            throw new Error(
+                `Failed to get vector: ${
+                    error instanceof Error ? error.message : String(error)
+                }`
+            )
+        }
+    })
+}
+export async function vsetattr(
+    url: string,
+    keyName: string,
+    element: string,
+    attribute: string,
+    value: string
+): Promise<VectorOperationResult> {
+    return RedisClient.withConnection(url, async (client) => {
+        const command = ["VSETATTR", keyName, element, value]
+
+        try {
+            const result = await client.sendCommand(command)
+            return result
+        } catch (error) {
+            console.error("Error executing VSETATTR command:", error)
+            throw new Error(
+                `Failed to set vector attributes: ${
+                    error instanceof Error ? error.message : String(error)
+                }`
+            )
+        }
+    })
+}
 export async function vsim(
     url: string,
     keyName: string,
-    params: { searchVector?: number[]; searchElement?: string; count: number; needVectors?: boolean }
+    params: { searchVector?: number[]; searchElement?: string; count: number; needVectors?: boolean; filter?: string }
 ): Promise<VectorOperationResult> {
     console.log("VSIM", url, keyName)
     if (!params.searchVector && !params.searchElement) {
@@ -148,6 +215,10 @@ export async function vsim(
                 )
             } else if (params.searchElement) {
                 baseCommand.push("ELE", params.searchElement)
+            }
+
+            if (params.filter && params.filter !== "") {
+                baseCommand.push("FILTER", params.filter)
             }
 
             baseCommand.push("WITHSCORES", "COUNT", String(params.count))

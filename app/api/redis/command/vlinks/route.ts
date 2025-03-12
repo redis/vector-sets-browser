@@ -1,24 +1,11 @@
 import { NextResponse } from "next/server"
 import { cookies } from "next/headers"
 import * as redis from "@/app/lib/server/redis-client"
-
-// Helper to get Redis URL from cookies
-function getRedisUrl(): string | null {
-    const url = cookies().get("redis_url")?.value
-    return url || null
-}
-
-// Type definitions for the request body
-interface VlinkRequestBody {
-    keyName: string
-    element: string
-    count?: number
-    withEmbeddings?: boolean
-}
-
+import { getRedisUrl } from "@/app/lib/server/redis-client"
+import { VlinkRequest } from "@/app/api/types"
 export async function POST(request: Request) {
     try {
-        const body = (await request.json()) as VlinkRequestBody
+        const body = (await request.json()) as VlinkRequest
         const { keyName, element, count = 10, withEmbeddings = false } = body
 
         if (!keyName || !element) {

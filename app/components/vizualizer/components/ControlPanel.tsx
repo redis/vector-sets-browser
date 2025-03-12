@@ -63,8 +63,8 @@ export function ControlPanel({
                         <CardHeader className="py-2">
                             <div className="flex justify-between items-center">
                                 <div className="flex space-x-2 items-center">
-                                    <h3 className="text-lg font-semibold">
-                                        Control Panel
+                                    <h3 className="">
+                                        Controls
                                     </h3>
                                 </div>
                                 <Button
@@ -239,11 +239,11 @@ export function ControlPanel({
             <style jsx>{`
                 .node-info-card {
                     position: absolute;
-                    top: 0px;
+                    top: -56px;
                     right: 0px;
                     background: rgba(255, 255, 255, 0.95);
                     border-radius: 8px;
-                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+                    box-shadow: 0;
                     z-index: 10;
                     max-height: 80vh;
                     overflow-y: auto;

@@ -176,8 +176,8 @@ export function useThreeScene() {
         // Get the maximum dimension to ensure all nodes fit
         const maxDim = Math.max(size.x, size.y)
 
-        // Add padding (10% instead of 20% to maximize node size)
-        const padding = 0.7
+        // Add minimal padding (10% instead of 70%)
+        const padding = 1.1
 
         // Calculate new frustum size
         // Use a minimum size to prevent excessive zoom when nodes are close together

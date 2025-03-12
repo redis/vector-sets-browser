@@ -59,6 +59,7 @@ export default function VectorSetVisualization({
             searchType: state.searchType ?? "Vector",
             searchQuery: state.searchQuery ?? "",
             searchCount: state.searchCount ?? "10",
+            searchFilter: state.searchFilter ?? "",
             resultsTitle: state.resultsTitle ?? "Search Results"
         }
         onSearchStateChange(completeState)
@@ -71,9 +72,10 @@ export default function VectorSetVisualization({
         setSearchQuery,
         searchCount,
         setSearchCount,
-        resultsTitle,
         isSearching,
         searchTime,
+        searchFilter,
+        setSearchFilter,
     } = useVectorSearch({
         vectorSetName,
         metadata,
@@ -84,6 +86,7 @@ export default function VectorSetVisualization({
             searchType: "Vector",
             searchQuery: "",
             searchCount: "10",
+            searchFilter: "",
             resultsTitle: "Search Results"
         },
         onSearchStateChange: handleSearchStateChange
@@ -120,10 +123,13 @@ export default function VectorSetVisualization({
     return (
         <div>
             <SearchBox
+                vectorSetName={vectorSetName}
                 searchType={searchType}
                 setSearchType={setSearchType}
                 searchQuery={searchQuery}
                 setSearchQuery={setSearchQuery}
+                searchFilter={searchFilter}
+                setSearchFilter={setSearchFilter}
                 dim={dim}
                 metadata={metadata}
             />
