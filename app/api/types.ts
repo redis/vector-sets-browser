@@ -62,7 +62,7 @@ export interface VsimRequest {
 }
 
 // Common response types
-export type VectorTuple = [string, number, number[] | null, string? ]; // [element, score, vector?, attributes?]
+export type VectorTuple = [string, number, number[] | null, string]; // [element, score, vector?, attributes?]
 export type VectorTupleLevel = VectorTuple[];
 export type VectorTupleLevels = VectorTupleLevel[];
 

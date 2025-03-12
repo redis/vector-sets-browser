@@ -28,9 +28,6 @@ export async function POST(request: NextRequest) {
         }
 
         const result = redisResult.result
-        console.log("[vgetattr] result: ", result)
-        console.log("[vgetattr] result type: ", typeof result)
-        console.log("[vgetattr] result stringified: ", JSON.stringify(result))
 
         // Handle null/empty response from Redis
         if (!result) {

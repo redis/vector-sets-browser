@@ -27,13 +27,33 @@ const SearchTimeIndicator: React.FC<SearchTimeIndicatorProps> = ({
         );
     }
 
-    if (!searchTime) return null;
+    if (!searchTime && searchTime !== 0) return null;
 
-    const formattedTime = searchTime < 1 
+    // Determine if the time is in milliseconds or seconds
+    const isMilliseconds = searchTime < 1;
+    
+    // Format the time appropriately
+    const formattedTime = isMilliseconds
         ? `${(searchTime * 1000).toFixed(2)} ms` 
-        : `${searchTime.toFixed(2)}ms`;
+        : `${searchTime.toFixed(2)} s`;
 
-    return <div className="-ml-1">{formattedTime}</div>;
+    // Determine color based on performance
+    let colorClass = "text-green-500"; // Fast
+    if (isMilliseconds) {
+        if (searchTime * 1000 > 1000) {
+            colorClass = "text-red-500"; // Slow
+        } else if (searchTime * 1000 > 500) {
+            colorClass = "text-yellow-500"; // Moderate
+        }
+    } else {
+        if (searchTime > 1) {
+            colorClass = "text-red-500"; // Slow
+        } else if (searchTime > 0.5) {
+            colorClass = "text-yellow-500"; // Moderate
+        }
+    }
+
+    return <div className={`-ml-1 ${colorClass}`}>{formattedTime}</div>;
 };
 
 export default SearchTimeIndicator; 

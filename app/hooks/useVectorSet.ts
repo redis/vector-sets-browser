@@ -5,7 +5,7 @@ import { redisCommands } from "../api/redis-commands"
 import { embeddings } from "../api/embeddings"
 import { validateAndNormalizeVector } from "../utils/vectorValidation"
 import { ApiError } from "../api/client"
-import { EmbeddingResponse } from "../api/types"
+import { EmbeddingResponse, VectorTuple } from "../api/types"
 
 interface UseVectorSetReturn {
     vectorSetName: string | null
@@ -14,8 +14,8 @@ interface UseVectorSetReturn {
     recordCount: number | null
     metadata: VectorSetMetadata | null
     statusMessage: string
-    results: [string, number, number[]][]
-    setResults: (results: [string, number, number[]][]) => void
+    results: VectorTuple[]
+    setResults: (results: VectorTuple[]) => void
     loadVectorSet: () => Promise<void>
     handleAddVector: (element: string, elementData: string | number[]) => Promise<void>
     handleDeleteVector: (element: string) => Promise<void>
@@ -36,7 +36,7 @@ export function useVectorSet(): UseVectorSetReturn {
     const [recordCount, setRecordCount] = useState<number | null>(null)
     const [metadata, setMetadata] = useState<VectorSetMetadata | null>(null)
     const [statusMessage, setStatusMessage] = useState("")
-    const [results, setResults] = useState<[string, number, number[]][]>([])
+    const [results, setResults] = useState<VectorTuple[]>([])
     
     // Cache for vector set data
     const vectorSetCacheRef = useRef<Record<string, VectorSetCache>>({})
@@ -145,7 +145,7 @@ export function useVectorSet(): UseVectorSetReturn {
             } else if (metadata?.embedding && metadata.embedding.provider === 'none') {
                 vector = validateAndNormalizeVector(elementData, 'unknown').vector;
                 console.log("[handleAddVector] Vector:", vector, typeof vector);
-            } else { 
+            } else {  
                 throw new Error("Error with Vector Set configuration.");
             }
 
@@ -155,7 +155,8 @@ export function useVectorSet(): UseVectorSetReturn {
 
             // Add the new vector to the results list
             const newVector = await redisCommands.vemb(vectorSetName, element);
-            setResults(prevResults => [...prevResults, [element, 1.0, newVector]]);
+            const attributes = await redisCommands.vgetattr(vectorSetName, element)
+            setResults(prevResults => [...prevResults, [element, 1.0, newVector, attributes || ""]]);
 
             // Update the record count
             const newRecordCount = await redisCommands.vcard(vectorSetName);
@@ -211,7 +212,7 @@ export function useVectorSet(): UseVectorSetReturn {
             const existingResult = results.find(result => result[0] === element);
             console.log("[handleShowVector] Existing result:", existingResult);
             
-            if (existingResult && Array.isArray(existingResult[2]) && existingResult[2].length > 0) {
+            if (existingResult && existingResult[2] !== null && Array.isArray(existingResult[2]) && existingResult[2].length > 0) {
                 console.log("[handleShowVector] Using existing vector:", existingResult[2]);
                 // Use the existing vector and update results to ensure it's at the top
                 setResults(prevResults => {
@@ -231,7 +232,9 @@ export function useVectorSet(): UseVectorSetReturn {
             let vector = null;
             if (response && typeof response === 'object' && 'success' in response) {
                 // Handle response in {success: true, result: [...]} format
-                vector = response.success && Array.isArray(response.result) ? response.result : null;
+                vector = response.success && 'result' in response && Array.isArray(response.result) 
+                    ? response.result 
+                    : null;
             } else if (Array.isArray(response)) {
                 // Handle direct array response
                 vector = response;
@@ -246,9 +249,8 @@ export function useVectorSet(): UseVectorSetReturn {
             
             // Add the vector to results without removing existing results
             setResults(prevResults => {
-                // Remove any existing entry for this element to avoid duplicates
                 const filteredResults = prevResults.filter(r => r[0] !== element);
-                return [...filteredResults, [element, 1.0, vector]];
+                return [...filteredResults, [element, 1.0, vector, ""]];
             });
             setStatusMessage("Vector retrieved successfully");
             return vector;

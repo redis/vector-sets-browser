@@ -25,14 +25,14 @@ import {
     X,
 } from "lucide-react"
 import EditAttributesDialog from "./EditAttributesDialog"
-import { VectorTuple } from "../api/types"
 import { redisCommands } from "@/app/api/redis-commands"
 import SearchTimeIndicator from "./SearchTimeIndicator"
 import { useVectorResultsSettings } from "@/app/hooks/useVectorResultsSettings"
 import { parseFieldFilters } from "@/app/utils/filterParser"
+import { VectorTuple } from "../api/types"
 
 interface VectorResultsProps {
-    results: VectorTuple[]
+    results: VectorTuple[];
     onRowClick: (element: string) => void
     onDeleteClick: (e: React.MouseEvent, element: string) => void
     onShowVectorClick: (e: React.MouseEvent, element: string) => void
@@ -43,6 +43,7 @@ interface VectorResultsProps {
     onClearFilter?: () => void
     onAddVector?: () => void
     isSearching?: boolean
+    isLoading?: boolean
 }
 
 type SortColumn = "element" | "score" | "none"
@@ -79,6 +80,7 @@ export default function VectorResults({
     onAddVector,
     isSearching,
     searchTime,
+    isLoading,
 }: VectorResultsProps) {
     const [isCompact, setIsCompact] = useState(true)
     const {
@@ -105,6 +107,24 @@ export default function VectorResults({
         { name: "element", visible: true, type: "system" },
         { name: "score", visible: true, type: "system" },
     ])
+
+    // Add this effect to reset states when vectorSet changes
+    useEffect(() => {
+        // Reset to default columns
+        setAvailableColumns([
+            { name: "element", visible: true, type: "system" },
+            { name: "score", visible: true, type: "system" },
+        ])
+        
+        // Reset other related states
+        setAttributeCache({})
+        setParsedAttributeCache({})
+        setFilteredFieldValues({})
+        setEditingAttributes(null)
+        setSortColumn("none")
+        setSortDirection("asc")
+        setFilterText("")
+    }, [keyName]) // Dependency on keyName (vectorSetName)
 
     // Fetch attributes when showAttributes is enabled
     useEffect(() => {
@@ -164,8 +184,9 @@ export default function VectorResults({
 
     // Unified effect to handle attribute parsing and column management
     useEffect(() => {
-        if (!showAttributes) {
+        if (!showAttributes || (showOnlyFilteredAttributes && !searchFilter)) {
             // Remove all attribute columns when showAttributes is off
+            // OR when showOnlyFilteredAttributes is on but there's no filter
             setAvailableColumns((prev) =>
                 prev.filter((col) => col.type === "system")
             )
@@ -415,8 +436,57 @@ export default function VectorResults({
         onRowClick(element)
     }
 
+    // Modify the Add Vector button click handler
+    const handleAddVector = async () => {
+        if (onAddVector) {
+            await onAddVector();
+            // The parent component should handle refreshing the results
+            // by updating the results prop after the vector is added
+        }
+    }
+
+    // Update the early return to handle both empty results and loading state
+    if (isLoading || isSearching) {
+        return (
+            <div className="flex flex-col items-center justify-center py-12 space-y-4 text-gray-500">
+                <SearchTimeIndicator 
+                    isSearching={true} 
+                    searchTime={searchTime ? parseFloat(searchTime) : undefined} 
+                />
+                <p className="text-sm">
+                    {isLoading ? "Loading vector set..." : "Searching for vectors..."}
+                </p>
+            </div>
+        );
+    }
+
     if (results.length === 0) {
-        return <p>No results to display.</p>
+        // Only show "No results" message if we're not in a loading state
+        // and we have a valid vector set name
+        if (!keyName) {
+            return null; // Don't show anything if no vector set is selected
+        }
+        return (
+            <div className="flex flex-col items-center justify-center py-12 space-y-4 text-gray-500">
+                <svg 
+                    className="w-8 h-8 text-gray-400" 
+                    fill="none" 
+                    stroke="currentColor" 
+                    viewBox="0 0 24 24"
+                >
+                    <path 
+                        strokeLinecap="round" 
+                        strokeLinejoin="round" 
+                        strokeWidth={1.5} 
+                        d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" 
+                    />
+                </svg>
+                <p className="text-sm">No results to display.</p>
+                {searchFilter && (
+                    <p className="text-xs">Try adjusting your search filter or query.</p>
+                )}
+            </div>
+        );
     }
 
     // Sort indicator icons
@@ -460,7 +530,7 @@ export default function VectorResults({
                             <span className="flex text-gray-500 text-sm items-center space-x-2 whitespace-nowrap">
                                 {searchQuery ? (
                                     <div className="flex items-center space-x-2">
-                                        <span>Results for "{searchQuery}"</span>
+                                        {/* <span>Results for "{searchQuery}"</span> */}
                                         {searchFilter && onClearFilter && (
                                             <span className="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">
                                                 <span>Filtered results</span>
@@ -518,7 +588,7 @@ export default function VectorResults({
                                         <SearchTimeIndicator
                                             searchTime={
                                                 searchTime
-                                                    ? Number(searchTime)
+                                                    ? parseFloat(searchTime)
                                                     : undefined
                                             }
                                             isSearching={isSearching}
@@ -531,7 +601,7 @@ export default function VectorResults({
                 </div>
                 <div className="flex items-center space-x-2">
                     {onAddVector && (
-                        <Button variant="default" onClick={onAddVector}>
+                        <Button variant="default" onClick={handleAddVector}>
                             <svg
                                 className="w-5 h-5"
                                 fill="none"
@@ -724,7 +794,7 @@ export default function VectorResults({
                     </TableHeader>
                     <TableBody>
                         {filteredAndSortedResults.map((row, index) => (
-                            <TableRow key={index}>
+                            <TableRow key={index} className="group">
                                 {availableColumns
                                     .filter((col) => col.visible)
                                     .map((col) => (
@@ -750,7 +820,7 @@ export default function VectorResults({
                                         </TableCell>
                                     ))}
                                 <TableCell className="text-right">
-                                    <div className="flex justify-end -space-x-1">
+                                    <div className="flex justify-end -space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                         <Button
                                             variant="ghost"
                                             size="icon"
@@ -793,7 +863,7 @@ export default function VectorResults({
                                                     strokeLinecap="round"
                                                     strokeLinejoin="round"
                                                     strokeWidth={2}
-                                                    d="M8 9l4-4 4 4m0 6l-4 4-4-4"
+                                                    d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
                                                 />
                                             </svg>
                                         </Button>
@@ -924,7 +994,7 @@ export default function VectorResults({
                                                 strokeLinecap="round"
                                                 strokeLinejoin="round"
                                                 strokeWidth={2}
-                                                d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2"
+                                                d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
                                             />
                                         </svg>
                                         Copy Vector

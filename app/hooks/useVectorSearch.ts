@@ -63,7 +63,8 @@ export function useVectorSearch({
         searchQuery: "",
         searchCount: "10",
         searchFilter: "",
-        resultsTitle: "Search Results"
+        resultsTitle: "Search Results",
+        searchTime: undefined
     });
 
     // Reset when vectorSetName changes
@@ -81,7 +82,8 @@ export function useVectorSearch({
             searchQuery: "",
             searchCount: "10",
             searchFilter: "",
-            resultsTitle: "Search Results"
+            resultsTitle: "Search Results",
+            searchTime: undefined
         });
 
         onSearchStateChange({
@@ -89,7 +91,8 @@ export function useVectorSearch({
             searchQuery: "",
             searchCount: "10",
             searchFilter: "",
-            resultsTitle: "Search Results"
+            resultsTitle: "Search Results",
+            searchTime: undefined
         });
         
         // Clear results and status
@@ -99,6 +102,7 @@ export function useVectorSearch({
         // Only perform zero vector search if we have a valid vector set
         if (vectorSetName && metadata) {
             setIsSearching(true);
+            console.log("[useVectorSearch] Performing zero vector search for vector set:", vectorSetName);
             performZeroVectorSearch(10)
                 .catch(error => {
                     console.error("Zero vector search error:", error);
@@ -148,7 +152,7 @@ export function useVectorSearch({
         const startTime = performance.now();
         const result = await searchFn();
         const endTime = performance.now();
-        const duration = (endTime - startTime).toFixed(2);
+        const duration = ((endTime - startTime) / 1000).toFixed(4); // Convert to seconds with 4 decimal places
         return [result, duration];
     }, []);
 
@@ -181,11 +185,12 @@ export function useVectorSearch({
             const zeroVector = Array(dim).fill(0);
             
             // Perform search and measure time
+            console.log("[useVectorSearch] Performing zero vector search for vector set:", vectorSetName);
             const [vsimResults, duration] = await measureSearchTime(
                 () => redisCommands.vsim(vectorSetName!, zeroVector, count, fetchEmbeddings, internalSearchState.searchFilter)
             );
             // Store search time in state
-            onSearchStateChange({ searchTime: duration });
+            updateSearchState({ searchTime: duration });
             
             onStatusChange("")
             // Process results
@@ -238,23 +243,28 @@ export function useVectorSearch({
             searchString = `Results for Vector [${firstThreeNumbers}${searchVector.length > 3 ? '...' : ''}]`
         } else {
             // Not a valid vector, try to convert text to vector
+            updateSearchState({ resultsTitle: "Getting embedding..." })
             searchVector = await getVectorFromText(internalSearchState.searchQuery);
             searchString = `Results for "${internalSearchState.searchQuery}"`
         }
 
         // Get and validate vector dimension
-        const expectedDim = await redisCommands.vdim(vectorSetName);
-        if (searchVector.length !== expectedDim) {
-            throw new Error(`Vector dimension mismatch - expected ${expectedDim} but got ${searchVector.length}`);
-        }
+        // const expectedDim = await redisCommands.vdim(vectorSetName);
+        // if (searchVector.length !== expectedDim) {
+        //     throw new Error(`Vector dimension mismatch - expected ${expectedDim} but got ${searchVector.length}`);
+        // }
 
         // Perform vector-based search and measure time
+        console.log("[useVectorSearch] Performing vector-based search with count:", count);
         const [vsimResults, duration] = await measureSearchTime(
             () => redisCommands.vsim(vectorSetName!, searchVector, count, fetchEmbeddings, internalSearchState.searchFilter)
         );
-        console.log("[useVectorSearch] Vector-based search = embeddings: ", fetchEmbeddings);
+
         // Store search time in state
-        onSearchStateChange({ searchTime: duration });
+        updateSearchState({ searchTime: duration });
+        
+        // Update results title
+        updateSearchState({ resultsTitle: searchString });
         
         // Process results
         onSearchResults(vsimResults);
@@ -280,12 +290,15 @@ export function useVectorSearch({
         onStatusChange(`Element: "${internalSearchState.searchQuery}"`);
         
         const [vsimResults, duration] = await measureSearchTime(
-            () => redisCommands.vsim(vectorSetName!, internalSearchState.searchQuery, count, fetchEmbeddings, internalSearchState.searchFilter  )
+            () => redisCommands.vget(vectorSetName!, internalSearchState.searchQuery, count, fetchEmbeddings, internalSearchState.searchFilter)
         );
         console.log("[useVectorSearch] Element-based search = embeddings: ", fetchEmbeddings);
 
         // Store search time in state
-        onSearchStateChange({ searchTime: duration });
+        updateSearchState({ searchTime: duration });
+        
+        // Update results title
+        updateSearchState({ resultsTitle: `Results for "${internalSearchState.searchQuery}"` });
         
         // Process results
         onSearchResults(vsimResults);

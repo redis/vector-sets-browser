@@ -1,12 +1,9 @@
 "use client"
 
 import { useState } from "react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import SearchBox from "./SearchBox"
 import VectorResults from "./VectorResults"
 import StatusMessage from "./StatusMessage"
-import SearchTimeIndicator from "./SearchTimeIndicator"
 import { useVectorSearch } from "../hooks/useVectorSearch"
 import { VectorSetMetadata } from "../types/embedding"
 import { VectorTuple } from "../api/types"
@@ -18,7 +15,10 @@ interface VectorSearchTabProps {
     metadata: VectorSetMetadata | null
     onAddVector: () => void
     onShowVector: (element: string) => Promise<number[] | null>
-    onDeleteVector: (element: string) => void
+    onDeleteVector: (element: string) => Promise<void>
+    isLoading: boolean
+    results: VectorTuple[]
+    setResults: (results: VectorTuple[]) => void
 }
 
 export default function VectorSearchTab({
@@ -28,9 +28,19 @@ export default function VectorSearchTab({
     onAddVector,
     onShowVector,
     onDeleteVector,
+    isLoading,
+    results,
+    setResults,
 }: VectorSearchTabProps) {
     const [fileOperationStatus, setFileOperationStatus] = useState("")
-    const [results, setResults] = useState<VectorTuple[]>([])
+    const [searchState, setSearchState] = useState({
+        searchType: "Vector" as const,
+        searchQuery: "",
+        searchCount: "10",
+        searchFilter: "",
+        resultsTitle: "Search Results",
+        searchTime: undefined as string | undefined
+    })
 
     const {
         searchType,
@@ -48,15 +58,10 @@ export default function VectorSearchTab({
         metadata,
         onSearchResults: setResults,
         onStatusChange: setFileOperationStatus,
-        // Initial state - hook will manage this internally
-        searchState: {
-            searchType: "Vector",
-            searchQuery: "",
-            searchCount: "10",
-            searchFilter: "",
-            resultsTitle: "Search Results"
-        },
-        onSearchStateChange: () => {} // Let the hook manage state internally
+        searchState,
+        onSearchStateChange: (newState) => {
+            setSearchState(prev => ({ ...prev, ...newState }))
+        }
     })
 
     const handleSearchQueryChange = (query: string) => {
@@ -108,11 +113,11 @@ export default function VectorSearchTab({
                 metadata={metadata}
             />
             <div className="bg-white p-4 rounded shadow-md">
-                <div className="flex mb-4 items-center space-x-2">
+                {/* <div className="flex mb-4 items-center space-x-2">
                     <div className="flex items-center gap-2 w-full">
                         <StatusMessage message={fileOperationStatus} />
                     </div>
-                </div>
+                </div> */}
                 <VectorResults
                     results={results}
                     onRowClick={handleRowClick}
@@ -125,6 +130,7 @@ export default function VectorSearchTab({
                     onAddVector={onAddVector}
                     isSearching={isSearching}
                     searchTime={searchTime}
+                    isLoading={isLoading}
                 />
             </div>
         </section>

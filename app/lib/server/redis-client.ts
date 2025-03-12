@@ -28,53 +28,152 @@ export interface VectorOperationResult {
 }
 
 export class RedisClient {
-    private static async createConnection(
-        url: string
-    ): Promise<RedisClientType> {
-        const client = createClient({
-            url,
-            socket: {
-                connectTimeout: 5000,
-            },
-        })
+    private static connectionPool: Map<string, {
+        client: RedisClientType;
+        lastUsed: number;
+        isConnecting: boolean;
+    }> = new Map();
+    
+    private static readonly CONNECTION_TIMEOUT = 60000; // 1 minute timeout
+    private static cleanupInterval: NodeJS.Timeout | null = null;
 
-        client.on("error", (err) => console.error("Redis Client Error:", err))
-        await client.connect()
-        return client
+    private static async getConnection(url: string): Promise<RedisClientType> {
+        // Check if we have an existing connection
+        const existingConnection = this.connectionPool.get(url);
+        
+        if (existingConnection) {
+            // If connection exists and is connecting, wait for it
+            if (existingConnection.isConnecting) {
+                let attempts = 0;
+                while (existingConnection.isConnecting && attempts < 10) {
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                    attempts++;
+                }
+            }
+            
+            // Update last used timestamp
+            existingConnection.lastUsed = Date.now();
+            
+            // Check if connection is still valid
+            try {
+                if (existingConnection.client.isOpen) {
+                    return existingConnection.client;
+                }
+                // If connection is closed, we'll create a new one below
+            } catch (error) {
+                console.warn("[RedisClient] Error checking connection status:", error);
+                // We'll create a new connection below
+            }
+        }
+        
+        // Create a new connection
+        const connectionInfo = {
+            client: null as unknown as RedisClientType,
+            lastUsed: Date.now(),
+            isConnecting: true
+        };
+        
+        this.connectionPool.set(url, connectionInfo);
+        
+        try {
+            const client = createClient({
+                url,
+                socket: {
+                    connectTimeout: 5000,
+                },
+            });
+
+            client.on("error", (err) => console.error("Redis Client Error:", err));
+            await client.connect();
+            
+            connectionInfo.client = client;
+            connectionInfo.isConnecting = false;
+            
+            // Start cleanup interval if not already running
+            if (!this.cleanupInterval) {
+                this.cleanupInterval = setInterval(() => this.cleanupConnections(), this.CONNECTION_TIMEOUT);
+            }
+            
+            return client;
+        } catch (error) {
+            connectionInfo.isConnecting = false;
+            this.connectionPool.delete(url);
+            throw error;
+        }
+    }
+    
+    private static async cleanupConnections() {
+        const now = Date.now();
+        const expiredUrls: string[] = [];
+        
+        // Find expired connections
+        for (const [url, connection] of this.connectionPool.entries()) {
+            if (now - connection.lastUsed > this.CONNECTION_TIMEOUT) {
+                expiredUrls.push(url);
+            }
+        }
+        
+        // Close expired connections
+        for (const url of expiredUrls) {
+            const connection = this.connectionPool.get(url);
+            if (connection) {
+                try {
+                    await connection.client.quit();
+                    console.log(`[RedisClient] Closed idle connection for ${url}`);
+                } catch (error) {
+                    console.error(`[RedisClient] Error closing idle connection for ${url}:`, error);
+                }
+                this.connectionPool.delete(url);
+            }
+        }
+        
+        // Clear interval if no more connections
+        if (this.connectionPool.size === 0 && this.cleanupInterval) {
+            clearInterval(this.cleanupInterval);
+            this.cleanupInterval = null;
+        }
     }
 
     public static async withConnection<T>(
         url: string,
         operation: (client: RedisClientType) => Promise<T>
     ): Promise<VectorOperationResult> {
-        let client: RedisClientType | null = null
-
         try {
-            client = await RedisClient.createConnection(url)
-            console.log("[RedisClient] Connected successfully")
-            const result = await operation(client)
-            console.log("[RedisClient] Operation result:", result)
-            return { success: true, result }
+            const client = await RedisClient.getConnection(url);
+            //console.log("[RedisClient] Connected successfully")
+            const result = await operation(client);
+            //console.log("[RedisClient] Operation result:", result)
+            return { success: true, result };
         } catch (error) {
-            console.error("[RedisClient] Operation failed:", error)
+            console.error("[RedisClient] Operation failed:", error);
             console.error("[RedisClient] Error details:", {
                 name: error.name,
                 message: error.message,
                 stack: error.stack
-            })
+            });
             return {
                 success: false,
                 error: error instanceof Error ? error.message : String(error),
+            };
+        }
+    }
+    
+    // Add a method to explicitly close all connections (useful for cleanup)
+    public static async closeAllConnections(): Promise<void> {
+        for (const [url, connection] of this.connectionPool.entries()) {
+            try {
+                await connection.client.quit();
+                console.log(`[RedisClient] Closed connection for ${url}`);
+            } catch (error) {
+                console.error(`[RedisClient] Error closing connection for ${url}:`, error);
             }
-        } finally {
-            if (client) {
-                try {
-                    await client.quit()
-                    console.log("[RedisClient] Connection closed")
-                } catch (error) {
-                    console.error("[RedisClient] Error closing connection:", error)
-                }
-            }
+        }
+        
+        this.connectionPool.clear();
+        
+        if (this.cleanupInterval) {
+            clearInterval(this.cleanupInterval);
+            this.cleanupInterval = null;
         }
     }
 }
@@ -214,10 +313,12 @@ export async function vsim(
                     ...params.searchVector.map(String)
                 )
             } else if (params.searchElement) {
+                console.log("SEARCH ELEMENT", params.searchElement)
                 baseCommand.push("ELE", params.searchElement)
             }
 
             if (params.filter && params.filter !== "") {
+                console.log("FILTER", params.filter)
                 baseCommand.push("FILTER", params.filter)
             }
 

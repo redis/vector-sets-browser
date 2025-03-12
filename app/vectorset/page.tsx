@@ -39,7 +39,8 @@ const DEFAULT_SEARCH_STATE: VectorSetSearchState = {
     searchType: "Vector",
     searchQuery: "",
     searchCount: "10",
-    resultsTitle: "Search Results"
+    resultsTitle: "Search Results",
+    searchFilter: "",
 }
 
 export default function VectorSetPage() {
@@ -73,6 +74,8 @@ export default function VectorSetPage() {
         handleAddVector,
         handleDeleteVector,
         handleShowVector,
+        results,
+        setResults
     } = useVectorSet()
 
     // Update search state for current vector set
@@ -92,6 +95,7 @@ export default function VectorSetPage() {
     const { handleSaveConfig } = useFileOperations({
         vectorSetName,
         onModalClose: () => {}, // No need to reload since we're not managing results here anymore
+        onStatusChange: (status) => console.log(status),
     })
 
     const handleDisconnect = () => {
@@ -290,6 +294,7 @@ export default function VectorSetPage() {
                         </TabsContent>
 
                         <TabsContent value="search">
+                            {!isVectorSetChanging && (
                             <VectorSearchTab
                                 vectorSetName={vectorSetName}
                                 dim={dim}
@@ -297,17 +302,23 @@ export default function VectorSetPage() {
                                 onAddVector={() => setIsAddVectorModalOpen(true)}
                                 onShowVector={handleShowVector}
                                 onDeleteVector={handleDeleteVector}
-                            />
+                                    isLoading={isVectorSetChanging}
+                                    results={results}
+                                    setResults={setResults}
+                                />
+                            )}
                         </TabsContent>
 
                         <TabsContent value="visualize">
-                            <VectorSetVisualization 
-                                vectorSetName={vectorSetName}
-                                dim={dim || 0}
-                                metadata={metadata}
-                                searchState={currentSearchState}
-                                onSearchStateChange={handleSearchStateChange}
-                            />
+                            {!isVectorSetChanging && (
+                                <VectorSetVisualization 
+                                    vectorSetName={vectorSetName}
+                                    dim={dim || 0}
+                                    metadata={metadata}
+                                    searchState={currentSearchState}
+                                    onSearchStateChange={handleSearchStateChange}
+                                />
+                            )}
                         </TabsContent>
                     </Tabs>
                 ) : (
