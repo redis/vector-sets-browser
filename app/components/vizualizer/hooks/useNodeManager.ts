@@ -32,9 +32,8 @@ export function useNodeManager(
                     maxNodes,
                     true
                 )
-
+                
                 if (!Array.isArray(response)) {
-                    console.log("[useNodeManager] Invalid response format from getNeighbors:", response)
                     const error = "Invalid response format from getNeighbors"
                     setErrorMessage(error)
                     return { success: false, result: [], error }

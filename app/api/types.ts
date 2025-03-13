@@ -5,6 +5,7 @@ export interface ApiResponse<T = unknown> {
     success: boolean;
     result?: T;
     error?: string;
+    executionTimeMs?: number;
 }
 
 // Redis command request/response types

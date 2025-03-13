@@ -14,7 +14,6 @@ import {
 } from "./hooks"
 import { ControlPanel, ZoomControls, HoverLabel, LoadingOverlay } from "./components"
 import type { HNSWVizPureProps } from "./types"
-import type { SimilarityItem } from "./types" 
 
 // Comment out the old implementation
 /* Original implementation...
@@ -321,7 +320,7 @@ const HNSWVizPure: React.FC<HNSWVizPureProps> = ({
     }, [edgesRef])
 
     // Handle node click
-    const handleNodeClick = async (mesh: THREE.Mesh) => {
+    const handleNodeClick = async (mesh: THREE.Mesh, maxNeighborCount?: number) => {
         if (!scene || !mesh.userData.element) return
 
         // Update selected node
@@ -354,20 +353,56 @@ const HNSWVizPure: React.FC<HNSWVizPureProps> = ({
 
         // Fetch and add neighbor nodes
         const response = await fetchNeighbors(mesh.userData.element)
+        console.log("[HNSWVizPure] Response from fetchNeighbors:", response)
+        
         if (!response.success || !scene) return
 
-        // Count how many nodes we can still add
+        // If maxNeighborCount is provided, we're in the initial expansion mode
+        // Otherwise, we're in user-click mode and should add all immediate neighbors
         const currentNodeCount = nodesRef.current.length
-        const remainingSlots = Math.max(0, initialNodes - currentNodeCount)
-        if (remainingSlots === 0) {
-            //toast.info(`Maximum number of nodes (${initialNodes}) reached`)
-            return
+        
+        // Determine how many nodes we can add
+        let remainingSlots: number
+        
+        if (maxNeighborCount !== undefined) {
+            // Initial expansion mode - limit by maxNeighborCount
+            remainingSlots = Math.max(0, maxNeighborCount - currentNodeCount)
+            if (remainingSlots === 0) {
+                return
+            }
+        } else {
+            // User click mode - add all immediate neighbors, limited by maxNodes
+            remainingSlots = Math.max(0, maxNodes - currentNodeCount)
+            if (remainingSlots === 0) {
+                //toast.info(`Maximum number of nodes (${maxNodes}) reached`)
+                return
+            }
         }
 
-        // Process each neighbor, up to the remaining slots
+        // Process each neighbor
         let addedNodes = 0
-        for (const item of response.result.slice(0, remainingSlots)) {
-            if (addedNodes >= remainingSlots) break
+        
+        // In user click mode, we want all neighbors
+        // In initial expansion mode, we limit by remainingSlots
+        const neighborsToProcess = maxNeighborCount !== undefined 
+            ? response.result.slice(0, remainingSlots)
+            : response.result;
+        
+        // Keep track of the most similar neighbor for potential recursive expansion
+        let mostSimilarNeighbor: { 
+            mesh: THREE.Mesh, 
+            similarity: number 
+        } | null = null;
+        
+        for (const item of neighborsToProcess) {
+            // In initial expansion mode, check if we've added enough nodes
+            if (maxNeighborCount !== undefined && addedNodes >= remainingSlots) break
+            
+            // In user click mode, check if we've hit the maxNodes limit
+            if (maxNeighborCount === undefined && nodesRef.current.length >= maxNodes) {
+                //toast.info(`Maximum number of nodes (${maxNodes}) reached`)
+                break
+            }
 
             // Check if this element already exists
             const existingNode = nodesRef.current.find(
@@ -377,6 +412,7 @@ const HNSWVizPure: React.FC<HNSWVizPureProps> = ({
             if (!existingNode) {
                 // Create new node
                 const newMesh = createNodeMesh(item.element, item.vector)
+                newMesh.userData.similarity = item.similarity
                 scene.add(newMesh)
                 const newNode = addNode(newMesh)
 
@@ -409,11 +445,34 @@ const HNSWVizPure: React.FC<HNSWVizPureProps> = ({
                 )
 
                 addedNodes++
+                
+                // Track the most similar neighbor for potential recursive expansion
+                if (maxNeighborCount !== undefined && 
+                    (!mostSimilarNeighbor || item.similarity > mostSimilarNeighbor.similarity)) {
+                    mostSimilarNeighbor = { 
+                        mesh: newMesh, 
+                        similarity: item.similarity 
+                    };
+                }
             }
         }
 
         // Apply current layout
         applyLayout(currentLayout)
+        
+        // If we're in initial expansion mode and haven't added enough nodes,
+        // recursively expand the most similar neighbor
+        if (maxNeighborCount !== undefined && 
+            nodesRef.current.length < maxNeighborCount && 
+            mostSimilarNeighbor) {
+            
+            console.log("[HNSWVizPure] Recursively expanding most similar neighbor to reach initialNodes count");
+            
+            // Small delay to allow the current layout to settle
+            setTimeout(() => {
+                handleNodeClick(mostSimilarNeighbor!.mesh, maxNeighborCount);
+            }, 100);
+        }
     }
 
     // Handle node hover
@@ -582,7 +641,7 @@ const HNSWVizPure: React.FC<HNSWVizPureProps> = ({
             // Delay the initial node click to ensure proper initialization
             setTimeout(() => {
                 if (initialMesh && scene.children.includes(initialMesh)) {
-                    handleNodeClick(initialMesh)
+                    handleNodeClick(initialMesh, initialNodes)
                 }
             }, 0)
 

@@ -1,8 +1,7 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import SearchBox from "./SearchBox"
-import { Input } from "@/components/ui/input"
 import {
     Select,
     SelectContent,
@@ -17,27 +16,31 @@ import VectorViz3D from "./VectorViz3D"
 import { useVectorSearch, VectorSetSearchState } from "../hooks/useVectorSearch"
 import { VectorSetMetadata } from "../types/embedding"
 import { VectorTuple } from "../api/types"
-import * as redis from "../services/redis"
+import { redisCommands } from "../api/redis-commands"
 
 interface VectorSetVisualizationProps {
     vectorSetName: string
     dim: number
     metadata: VectorSetMetadata | null
-    searchState: VectorSetSearchState | null
-    onSearchStateChange: (state: VectorSetSearchState) => void
 }
 
 export default function VectorSetVisualization({
     vectorSetName,
     dim,
     metadata,
-    searchState: initialSearchState,
-    onSearchStateChange,
 }: VectorSetVisualizationProps) {
     const [vizType, setVizType] = useState<"2d" | "3d">("2d")
     const [fileOperationStatus, setFileOperationStatus] = useState("")
     const [results, setResults] = useState<VectorTuple[]>([])
     const [isVectorSetChanging, setIsVectorSetChanging] = useState(false)
+    const [searchState, setSearchState] = useState<VectorSetSearchState>({
+        searchType: "Vector" as const,
+        searchQuery: "",
+        searchCount: "10",
+        searchFilter: "",
+        resultsTitle: "Search Results",
+        searchTime: undefined as string | undefined,
+    })
 
     // Track vector set changes
     useEffect(() => {
@@ -50,20 +53,20 @@ export default function VectorSetVisualization({
         if (isVectorSetChanging && results.length > 0) {
             setIsVectorSetChanging(false)
         }
+        
+        // Debug log to see the structure of results
+        console.log("VectorSetVisualization results:", results);
     }, [results, isVectorSetChanging])
 
-    // Wrap onSearchStateChange to handle the type mismatch
-    const handleSearchStateChange = (state: Partial<VectorSetSearchState>) => {
-        // Ensure we have a complete state before calling the parent handler
-        const completeState: VectorSetSearchState = {
-            searchType: state.searchType ?? "Vector",
-            searchQuery: state.searchQuery ?? "",
-            searchCount: state.searchCount ?? "10",
-            searchFilter: state.searchFilter ?? "",
-            resultsTitle: state.resultsTitle ?? "Search Results",
-        }
-        onSearchStateChange(completeState)
-    }
+    const handleSearchStateChange = useCallback(
+        (newState: Partial<VectorSetSearchState>) => {
+            setSearchState((prevState) => ({
+                ...prevState,
+                ...newState,
+            }))
+        },
+        []
+    )
 
     const {
         searchType,
@@ -82,13 +85,7 @@ export default function VectorSetVisualization({
         fetchEmbeddings: true, // Always fetch embeddings for visualization
         onSearchResults: setResults,
         onStatusChange: setFileOperationStatus,
-        searchState: initialSearchState || {
-            searchType: "Vector",
-            searchQuery: "",
-            searchCount: "10",
-            searchFilter: "",
-            resultsTitle: "Search Results",
-        },
+        searchState,
         onSearchStateChange: handleSearchStateChange,
     })
 
@@ -98,17 +95,25 @@ export default function VectorSetVisualization({
         withEmbeddings?: boolean
     ) => {
         try {
-            const data = await redis.vlinks(
+            const data = await redisCommands.vlinks(
                 vectorSetName,
                 element,
                 count,
                 true // Always fetch embeddings
             )
-            return data.map((item) => ({
+
+            // data is an array of arrays
+            // each inner array contains [element, similarity, vector]
+            // we want to return an array of objects with the following structure:
+            // { element: string, similarity: number, vector: number[] }
+            const response = data.flat().map((item) => ({
                 element: item[0],
                 similarity: item[1],
                 vector: item[2],
             }))
+
+            console.log("[getNeighbors] retreived Neighbors: ", response)
+            return response
         } catch (error) {
             console.error("Error fetching neighbors:", error)
             return []
@@ -139,8 +144,6 @@ export default function VectorSetVisualization({
                 <div className="p-4 rounded shadow-md flex-1 flex flex-col">
                     <div className="flex mb-4 items-center">
                         <div className="flex items-center gap-4 w-full">
-                            <StatusMessage message={fileOperationStatus} />
-                            <div className="grow"></div>
                             {(searchTime || isSearching) && (
                                 <div className="text-sm text-gray-500 mb-4">
                                     <div className="flex items-center gap-4">
@@ -155,6 +158,9 @@ export default function VectorSetVisualization({
                                     </div>
                                 </div>
                             )}
+                            <StatusMessage message={fileOperationStatus} />
+                            <div className="grow"></div>
+
                             <Select
                                 value={vizType}
                                 onValueChange={(value: "2d" | "3d") =>
@@ -191,11 +197,9 @@ export default function VectorSetVisualization({
                             ) : (
                                 <VectorViz3D
                                     data={results.map(
-                                        ([label, score, vector]) => ({
-                                            label: `${label} (${score.toFixed(
-                                                3
-                                            )})`,
-                                            vector,
+                                        (result) => ({
+                                            label: `${result[0]} (${result[1].toFixed(3)})`,
+                                            vector: result[2] || [],
                                         })
                                     )}
                                     onVectorSelect={handleRowClick}

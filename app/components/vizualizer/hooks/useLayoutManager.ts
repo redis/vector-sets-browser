@@ -200,7 +200,6 @@ export function useLayoutManager(
                 console.log("[useLayoutManager] Not enough nodes for PCA projection")
                 return
             }
-            console.log("[useLayoutManager] Vector count:", nodes.length)
 
             setIsProjectionRunning(true)
 
@@ -225,7 +224,6 @@ export function useLayoutManager(
                     setIsProjectionRunning(false)
                     return
                 }
-                console.log("[useLayoutManager] Vector count:", vectors.length)
                 // Run PCA
                 const pca = new PCA(vectors)
                 const embedding = pca.predict(vectors, { nComponents: 2 })

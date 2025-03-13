@@ -60,6 +60,14 @@ export const apiClient = {
                 throw new ApiError(errorMessage, undefined, responseData);
             }
 
+            // Return the result and execution time if available
+            if (responseData.executionTimeMs !== undefined) {
+                return {
+                    result: responseData.result as TResponse,
+                    executionTimeMs: responseData.executionTimeMs
+                };
+            }
+            
             return responseData.result as TResponse;
         } catch (error) {
             if (error instanceof ApiError) {

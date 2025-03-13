@@ -87,10 +87,16 @@ export const redisCommands = {
                 : { searchElement: searchVectorOrElement }),
         }
 
-        return apiClient.post<VectorTuple[], VsimRequest>(
-            "/api/redis/command/vsim",
-            request
-        )
+        const response = await apiClient.post<
+            { result: VectorTuple[]; executionTimeMs?: number },
+            VsimRequest
+        >("/api/redis/command/vsim", request);
+        
+        // Return both the result and execution time
+        return {
+            result: response.result,
+            executionTimeMs: response.executionTimeMs
+        };
     },
 
     async vsetattr(keyName: string, element: string, attributes: string) {

@@ -25,6 +25,7 @@ export interface VectorOperationResult {
         | [string, number, number[]][]
         | [string, number, number[]][][]
         | any
+    executionTimeMs?: number
 }
 
 export class RedisClient {
@@ -332,7 +333,11 @@ export async function vsim(
 
             baseCommand.push("WITHSCORES", "COUNT", String(params.count))
 
+            // Start timing the Redis command execution
+            const startTime = performance.now()
             const result = (await client.sendCommand(baseCommand)) as string[]
+            const endTime = performance.now()
+            const executionTimeMs = endTime - startTime
 
             if (!result || !Array.isArray(result)) {
                 throw new Error("Invalid response from Redis VSIM command")
@@ -366,7 +371,7 @@ export async function vsim(
 
             // Fetch vectors in bulk if needed
             if (params.needVectors && elements.length > 0) {
-                const vectorResult = await vembBatch(url, keyName, elements)
+                const vectorResult = await vemb_multi(url, keyName, elements)
                 if (vectorResult.success && Array.isArray(vectorResult.result)) {
                     // Update tuples with vectors
                     for (let i = 0; i < elements.length; i++) {
@@ -380,6 +385,7 @@ export async function vsim(
             return {
                 success: true,
                 result: tuples,
+                executionTimeMs
             }
         } catch (error) {
             console.error("VSIM operation error:", error)
@@ -503,7 +509,7 @@ export async function vemb(
     })
 }
 
-export async function vembBatch(
+export async function vemb_multi(
     url: string,
     keyName: string,
     elements: string[]
@@ -518,13 +524,14 @@ export async function vembBatch(
 
     return RedisClient.withConnection(url, async (client) => {
         try {
+            const multi = client.multi()
             // Map elements to promises of VEMB commands
-            const promises = elements.map(element => 
-                client.sendCommand(["VEMB", String(keyName), String(element)])
+            elements.forEach(element => 
+                multi.addCommand(["VEMB", String(keyName), String(element)])
             );
 
             // Execute all commands in parallel
-            const results = await Promise.all(promises);
+            const results = await multi.exec()
 
             // Process results
             const vectors = results.map((value, index) => {

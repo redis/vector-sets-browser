@@ -69,8 +69,6 @@ export async function POST(
         // Store the value, converting objects/arrays to JSON strings
         const valueToStore = JSON.stringify(value);
         
-        console.log("[UserSettingsRoute] Setting value:", settingsKey, params.keyname, value)
-        
         await client.hSet(settingsKey, `setting:${params.keyname}`, valueToStore);
         
         await client.quit();

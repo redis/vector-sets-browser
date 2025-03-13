@@ -297,15 +297,13 @@ export default function VectorSetPage() {
                         </TabsContent>
 
                         <TabsContent value="visualize">
-                            {/* {!isVectorSetChanging && (
+                            {!isVectorSetChanging && (
                                 <VectorSetVisualization 
                                     vectorSetName={vectorSetName}
                                     dim={dim || 0}
                                     metadata={metadata}
-                                    searchState={currentSearchState}
-                                    onSearchStateChange={handleSearchStateChange}
                                 />
-                            )} */}
+                            )}
                         </TabsContent>
                     </Tabs>
                 ) : (

@@ -79,10 +79,10 @@ export async function POST(request: Request) {
             //console.log("[vsim] validResults (without embeddings): ", validResults)
         }
 
-
         return NextResponse.json({
             success: true,
-            result: validResults
+            result: validResults,
+            executionTimeMs: data.result.executionTimeMs
         })
     } catch (error) {
         console.error("Error in VSIM route:", error)

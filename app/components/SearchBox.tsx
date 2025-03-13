@@ -360,7 +360,12 @@ export default function SearchBox({
                                         handleFilterChange(e.target.value)
                                     }
                                     placeholder="Enter a search filter (e.g. .year < 1982)"
-                                    className={error ? "border-red-500" : ""}
+                                    className={
+                                        error &&
+                                        error.includes("syntax error in FILTER")
+                                            ? "border-red-500"
+                                            : ""
+                                    }
                                 />
                                 <Button
                                     variant="ghost"
@@ -375,7 +380,7 @@ export default function SearchBox({
                     )}
 
                     {/* Display search error */}
-                    {error && (
+                    {error && error.includes("syntax error in FILTER") && (
                         <div className="text-red-500 text-sm mt-2 w-full">
                             {error}
                         </div>

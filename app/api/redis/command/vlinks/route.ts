@@ -49,7 +49,7 @@ export async function POST(request: Request) {
             ));
             
             // Single batch fetch for all embeddings
-            const embResults = await redis.vembBatch(url, keyName, allIds);
+            const embResults = await redis.vemb_multi(url, keyName, allIds);
             
             if (embResults.success) {
                 // Create a map of id -> embedding for quick lookup
@@ -134,7 +134,7 @@ export async function GET(request: Request) {
             ));
             
             // Single batch fetch for all embeddings
-            const embResults = await redis.vembBatch(redisUrl, keyName, allIds);
+            const embResults = await redis.vemb_multi(redisUrl, keyName, allIds);
             
             if (embResults.success) {
                 // Create a map of id -> embedding for quick lookup

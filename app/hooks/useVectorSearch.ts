@@ -100,18 +100,6 @@ export function useVectorSearch({
         if (onError) onError(errorMessage)
     }, [onError])
 
-    // Helper function to measure search time
-    const measureSearchTime = useCallback(
-        async <T>(searchFn: () => Promise<T>): Promise<[T, string]> => {
-            const startTime = performance.now()
-            const result = await searchFn()
-            const endTime = performance.now()
-            const duration = ((endTime - startTime) / 1000).toFixed(4) // Convert to seconds with 4 decimal places
-            return [result, duration]
-        },
-        []
-    )
-
     // Function to perform a zero vector search
     const performZeroVectorSearch = useCallback(
         async (count: number) => {
@@ -126,22 +114,24 @@ export function useVectorSearch({
                 const dim = await redisCommands.vdim(vectorSetName)
                 const zeroVector = Array(dim).fill(0)
 
-                // Perform search and measure time
-                const [vsimResults, duration] = await measureSearchTime(() =>
-                    redisCommands.vsim(
-                        vectorSetName!,
-                        zeroVector,
-                        count,
-                        fetchEmbeddings,
-                        internalSearchState.searchFilter
-                    )
+                // Perform search using the server-side timing
+                const vsimResponse = await redisCommands.vsim(
+                    vectorSetName!,
+                    zeroVector,
+                    count,
+                    fetchEmbeddings,
+                    internalSearchState.searchFilter
                 )
-                // Store search time in state
-                updateSearchState({ searchTime: duration })
+                
+                // Use the execution time from the server response
+                if (vsimResponse.executionTimeMs) {
+                    const durationInSeconds = (vsimResponse.executionTimeMs / 1000).toFixed(4)
+                    updateSearchState({ searchTime: durationInSeconds })
+                }
 
                 onStatusChange("")
                 // Process results
-                onSearchResults(vsimResults)
+                onSearchResults(vsimResponse.result)
             } catch (error) {
                 console.error("Zero vector search error:", error)
                 // Format the error as a string before passing to error handler
@@ -154,7 +144,6 @@ export function useVectorSearch({
         },
         [
             vectorSetName,
-            measureSearchTime,
             onSearchResults,
             onStatusChange,
             fetchEmbeddings,
@@ -224,13 +213,14 @@ export function useVectorSearch({
             performZeroVectorSearch(10)
                 .catch((error) => {
                     console.error("Zero vector search error:", error)
-                    const errorMessage = error instanceof Error ? error.message : String(error)
+                    const errorMessage =
+                        error instanceof Error ? error.message : String(error)
                     handleError(errorMessage)
                 })
                 .finally(() => {
                     setIsSearching(false)
                     // Clear the current search vector set when done
-                    currentSearchVectorSetRef.current = null;
+                    currentSearchVectorSetRef.current = null
                 })
         } else {
             // Clear the current search vector set if no vector set name
@@ -373,24 +363,25 @@ export function useVectorSearch({
             // }
 
             // Perform vector-based search and measure time
-            const [vsimResults, duration] = await measureSearchTime(() =>
-                redisCommands.vsim(
-                    vectorSetName!,
-                    searchVector,
-                    count,
-                    fetchEmbeddings,
-                    internalSearchState.searchFilter
-                )
+            const vsimResponse = await redisCommands.vsim(
+                vectorSetName!,
+                searchVector,
+                count,
+                fetchEmbeddings,
+                internalSearchState.searchFilter
             )
-
-            // Store search time in state
-            updateSearchState({ searchTime: duration })
+            
+            // Use the execution time from the server response
+            if (vsimResponse.executionTimeMs) {
+                const durationInSeconds = (vsimResponse.executionTimeMs / 1000).toFixed(4)
+                updateSearchState({ searchTime: durationInSeconds })
+            }
 
             // Update results title
             updateSearchState({ resultsTitle: searchString })
 
             // Process results
-            onSearchResults(vsimResults)
+            onSearchResults(vsimResponse.result)
 
             onStatusChange(searchString)
         },
@@ -398,7 +389,6 @@ export function useVectorSearch({
             vectorSetName,
             internalSearchState.searchQuery,
             getVectorFromText,
-            measureSearchTime,
             onSearchStateChange,
             onSearchResults,
             onStatusChange,
@@ -418,19 +408,19 @@ export function useVectorSearch({
             
             onStatusChange(`Element: "${internalSearchState.searchQuery}"`)
 
-            const [vsimResults, duration] = await measureSearchTime(() =>
-                // @ts-expect-error - vget exists at runtime but TypeScript doesn't know about it
-                redisCommands.vget(
-                    vectorSetName!,
-                    internalSearchState.searchQuery,
-                    count,
-                    fetchEmbeddings,
-                    internalSearchState.searchFilter
-                )
+            const vsimResponse = await redisCommands.vsim(
+                vectorSetName!,
+                internalSearchState.searchQuery,
+                count,
+                fetchEmbeddings,
+                internalSearchState.searchFilter
             )
-
-            // Store search time in state
-            updateSearchState({ searchTime: duration })
+            
+            // Use the execution time from the server response
+            if (vsimResponse.executionTimeMs) {
+                const durationInSeconds = (vsimResponse.executionTimeMs / 1000).toFixed(4)
+                updateSearchState({ searchTime: durationInSeconds })
+            }
 
             // Update results title
             updateSearchState({
@@ -438,13 +428,11 @@ export function useVectorSearch({
             })
 
             // Process results
-            // Cast the results to VectorTuple[] as we know the structure matches
-            onSearchResults(vsimResults as VectorTuple[])
+            onSearchResults(vsimResponse.result)
         },
         [
             vectorSetName,
             internalSearchState.searchQuery,
-            measureSearchTime,
             onSearchStateChange,
             onSearchResults,
             onStatusChange,
