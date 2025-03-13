@@ -125,11 +125,19 @@ export default function VectorResults({
         setSortColumn("none")
         setSortDirection("asc")
         setFilterText("")
+
+        setIsLoadingAttributes(false)
     }, [keyName]) // Dependency on keyName (vectorSetName)
 
     // Fetch attributes when showAttributes is enabled
     useEffect(() => {
-        if (!showAttributes) {
+        // skip if showAttributes is off or there are no results
+        if (!showAttributes || results.length === 0) {
+            return
+        }
+
+        // skip if attributes are already loaded
+        if (isLoadingAttributes) {
             return
         }
 
@@ -138,27 +146,55 @@ export default function VectorResults({
             const newCache: AttributeCache = { ...attributeCache }
             let hasChanges = false
 
-            for (const row of results) {
-                const element = row[0]
-                if (attributeCache[element] === undefined) {
-                    try {
-                        const attributes = await redisCommands.vgetattr(
-                            keyName,
-                            element
-                        )
-                        newCache[element] = attributes
-                        hasChanges = true
-                    } catch (error) {
-                        console.error(
-                            `Error fetching attributes for ${element}:`,
-                            error
-                        )
-                        newCache[element] = null
-                        hasChanges = true
+            const supportMultiCommand = true 
+
+            if (supportMultiCommand) {
+                const elements = results.map((row) => row[0])
+                let attributes: string[] | null = []
+                try {
+                    attributes = await redisCommands.vgetattr_multi(
+                        keyName,
+                        elements
+                    ) 
+                } catch (error) {
+                    console.error(
+                        `Error fetching attributes`,
+                        error
+                    )
+                }
+
+                if (attributes) {
+                    for (let i = 0; i < elements.length; i++) {
+                        const element = elements[i];
+                        const attribute = attributes[i];
+                        newCache[element] = attribute;
+                        hasChanges = true;
+                    }
+                } 
+
+            }
+            else {
+                for (const row of results) {
+                    const element = row[0]
+                    if (attributeCache[element] === undefined) {
+                        try {
+                            const attributes = await redisCommands.vgetattr(
+                                keyName,
+                                element
+                            )
+                            newCache[element] = attributes
+                            hasChanges = true
+                        } catch (error) {
+                            console.error(
+                                `Error fetching attributes for ${element}:`,
+                                error
+                            )
+                            newCache[element] = null
+                            hasChanges = true
+                        }
                     }
                 }
             }
-
             if (hasChanges) {
                 setAttributeCache(newCache)
             }
@@ -639,7 +675,7 @@ export default function VectorResults({
                                     setShowAttributes(checked);
                                 }}
                             >
-                                Show Attributes (Persisted)
+                                Show Attributes
                             </DropdownMenuCheckboxItem>
                             {showAttributes && (
                                 <DropdownMenuCheckboxItem

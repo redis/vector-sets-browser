@@ -54,7 +54,10 @@ export const apiClient = {
 
             if (!responseData.success) {
                 console.error("Operation failed:", responseData);
-                throw new ApiError(responseData.error || 'Operation failed');
+                const errorMessage = responseData.error || 
+                                     (responseData.result && responseData.result.error) || 
+                                     'Operation failed';
+                throw new ApiError(errorMessage, undefined, responseData);
             }
 
             return responseData.result as TResponse;

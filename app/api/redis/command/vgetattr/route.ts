@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from "next/server"
-import { RedisClient } from "@/app/lib/server/redis-client"
+import {
+    RedisClient,
+    VectorOperationResult,
+} from "@/app/lib/server/redis-client"
 import { VgetAttrRequest } from "@/app/api/types"
-import { getRedisUrl } from "@/app/lib/server/redis-client" 
+import { getRedisUrl } from "@/app/lib/server/redis-client"
 
 export async function POST(request: NextRequest) {
     try {
-        const { keyName, element } = (await request.json()) as VgetAttrRequest
+        const { keyName, element, elements } =
+            (await request.json()) as VgetAttrRequest
 
         const url = getRedisUrl()
         if (!url) {
@@ -14,40 +18,93 @@ export async function POST(request: NextRequest) {
                 { status: 401 }
             )
         }
+        let redisResult: VectorOperationResult
+        
+        if (elements) {
+            // Multiple elements
+            redisResult = await RedisClient.withConnection(
+                url,
+                async (client) => {
+                    const pipeline = client.multi()
+                    for (const element of elements) {
+                        const command = ["VGETATTR", keyName, element]
+                        pipeline.addCommand(command)
+                    }
+                    return await pipeline.exec()
+                }
+            )
 
-        const redisResult = await RedisClient.withConnection(url, async (client) => {
-            const command = ["VGETATTR", keyName, element]
-            return await client.sendCommand(command)
-        })
+            if (!redisResult.success) {
+                return NextResponse.json(
+                    {
+                        success: false,
+                        error:
+                            redisResult.error ||
+                            "Failed to get vector attributes",
+                    },
+                    { status: 500 }
+                )
+            }
+            const result = redisResult.result.map((el: VectorOperationResult) => el)
 
-        if (!redisResult.success) {
-            return NextResponse.json({
-                success: false,
-                error: redisResult.error || "Failed to get vector attributes"
-            }, { status: 500 })
-        }
+            // Handle null/empty response from Redis
+            if (!result) {
+                return NextResponse.json({
+                    success: true,
+                    result: null,
+                })
+            }
 
-        const result = redisResult.result
-
-        // Handle null/empty response from Redis
-        if (!result) {
             return NextResponse.json({
                 success: true,
-                result: null
+                result: result,
             })
-        }
+        } else if (element) {
+            // Single element
+            redisResult = await RedisClient.withConnection(
+                url,
+                async (client) => {
+                    const command = ["VGETATTR", keyName, element]
+                    return await client.sendCommand(command)
+                }
+            )
+            if (!redisResult.success) {
+                return NextResponse.json(
+                    {
+                        success: false,
+                        error:
+                            redisResult.error ||
+                            "Failed to get vector attributes",
+                    },
+                    { status: 500 }
+                )
+            }
 
-        return NextResponse.json({
-            success: true,
-            result: result
-        })
+            const result = redisResult.result
+
+            // Handle null/empty response from Redis
+            if (!result) {
+                return NextResponse.json({
+                    success: true,
+                    result: null,
+                })
+            }
+
+            return NextResponse.json({
+                success: true,
+                result: result,
+            })
+        } else {
+            return NextResponse.json(
+                {
+                    success: false,
+                    error: "No element or elements provided",
+                },
+                { status: 400 }
+            )
+        }
     } catch (error) {
         console.error("Error in VGETATTR:", error)
-        console.error("Error details:", {
-            name: error.name,
-            message: error.message,
-            stack: error.stack
-        })
         return NextResponse.json(
             { success: false, error: (error as Error).message },
             { status: 500 }

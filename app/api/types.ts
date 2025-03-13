@@ -108,5 +108,6 @@ export interface VsetAttrRequest {
 
 export interface VgetAttrRequest {
     keyName: string;
-    element: string;
+    element?: string;
+    elements?: string[];
 }

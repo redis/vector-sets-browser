@@ -1,21 +1,46 @@
-import { useState, useCallback, useEffect } from "react"
+import { useState, useCallback, useEffect, useRef } from "react"
 import { userSettings } from "@/app/api/userSettings"
+
+// Create a simple cache to prevent duplicate API calls
+const settingsCache: Record<string, any> = {}
 
 export function useVectorResultsSettings() {
     // Start with default values, will be overridden by stored settings if available
     const [showAttributes, setShowAttributes] = useState<boolean>(false)
     const [showOnlyFilteredAttributes, setShowOnlyFilteredAttributes] = useState<boolean>(true)
     const [isLoaded, setIsLoaded] = useState<boolean>(false)
+    
+    // Use a ref to track if settings are being loaded
+    const isLoadingRef = useRef(false)
 
     const loadSettings = useCallback(async () => {
+        // Skip if already loading
+        if (isLoadingRef.current) return
+        
+        isLoadingRef.current = true
+        
         try {
-            const storedShowAttributes = await userSettings.get("vectorResults.showAttributes")
+            // Use Promise.all to fetch both settings in parallel
+            const [storedShowAttributes, storedShowOnlyFiltered] = await Promise.all([
+                // Check cache first, then fetch if not in cache
+                settingsCache["vectorResults.showAttributes"] !== undefined
+                    ? Promise.resolve(settingsCache["vectorResults.showAttributes"])
+                    : userSettings.get("vectorResults.showAttributes").then(value => {
+                        settingsCache["vectorResults.showAttributes"] = value;
+                        return value;
+                    }),
+                
+                settingsCache["vectorResults.showOnlyFilteredAttributes"] !== undefined
+                    ? Promise.resolve(settingsCache["vectorResults.showOnlyFilteredAttributes"])
+                    : userSettings.get("vectorResults.showOnlyFilteredAttributes").then(value => {
+                        settingsCache["vectorResults.showOnlyFilteredAttributes"] = value;
+                        return value;
+                    })
+            ]);
             
             if (typeof storedShowAttributes === "boolean") {
                 setShowAttributes(storedShowAttributes)
             }
-
-            const storedShowOnlyFiltered = await userSettings.get("vectorResults.showOnlyFilteredAttributes")
             
             if (typeof storedShowOnlyFiltered === "boolean") {
                 setShowOnlyFilteredAttributes(storedShowOnlyFiltered)
@@ -25,6 +50,8 @@ export function useVectorResultsSettings() {
         } catch (error) {
             console.error("Error loading vector results settings:", error)
             setIsLoaded(true)
+        } finally {
+            isLoadingRef.current = false
         }
     }, [])
 
@@ -33,6 +60,9 @@ export function useVectorResultsSettings() {
         setShowAttributes(prevValue => {
             // Handle both direct values and updater functions
             const newValue = typeof value === 'function' ? value(prevValue) : value
+            
+            // Update cache immediately
+            settingsCache["vectorResults.showAttributes"] = newValue
             
             // Persist the new value
             userSettings.set("vectorResults.showAttributes", newValue)
@@ -47,6 +77,9 @@ export function useVectorResultsSettings() {
         setShowOnlyFilteredAttributes(prevValue => {
             // Handle both direct values and updater functions
             const newValue = typeof value === 'function' ? value(prevValue) : value
+            
+            // Update cache immediately
+            settingsCache["vectorResults.showOnlyFilteredAttributes"] = newValue
             
             // Persist the new value
             userSettings.set("vectorResults.showOnlyFilteredAttributes", newValue)

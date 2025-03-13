@@ -1,4 +1,4 @@
-import { apiClient } from './client';
+import { apiClient } from "./client"
 import {
     VinfoRequest,
     VinfoResponse,
@@ -12,57 +12,62 @@ import {
     VsetAttrRequest,
     VgetAttrRequest,
     VectorTuple,
-    VectorTupleLevels
-} from './types';
+    VectorTupleLevels,
+} from "./types"
 
 export const redisCommands = {
     async vinfo(keyName: string) {
         return apiClient.post<VinfoResponse, VinfoRequest>(
-            '/api/redis/command/vinfo',
+            "/api/redis/command/vinfo",
             { keyName }
-        );
+        )
     },
 
     async vdim(keyName: string) {
-        return apiClient.post<number, VdimRequest>(
-            '/api/redis/command/vdim',
-            { keyName }
-        );
+        return apiClient.post<number, VdimRequest>("/api/redis/command/vdim", {
+            keyName,
+        })
     },
 
     async vcard(keyName: string) {
         return apiClient.post<number, VcardRequest>(
-            '/api/redis/command/vcard',
+            "/api/redis/command/vcard",
             { keyName }
-        );
+        )
     },
 
     async vrem(keyName: string, element: string) {
-        return apiClient.post<boolean, VremRequest>(
-            '/api/redis/command/vrem',
-            { keyName, element }
-        );
+        return apiClient.post<boolean, VremRequest>("/api/redis/command/vrem", {
+            keyName,
+            element,
+        })
     },
 
     async vemb(keyName: string, element: string) {
         return apiClient.post<number[], VembRequest>(
-            '/api/redis/command/vemb',
+            "/api/redis/command/vemb",
             { keyName, element }
-        );
+        )
     },
 
     async vadd(keyName: string, element: string, vector: number[]) {
-        return apiClient.post<boolean, VaddRequest>(
-            '/api/redis/command/vadd',
-            { keyName, element, vector }
-        );
+        return apiClient.post<boolean, VaddRequest>("/api/redis/command/vadd", {
+            keyName,
+            element,
+            vector,
+        })
     },
 
-    async vlinks(keyName: string, element: string, count?: number, withEmbeddings?: boolean) {
+    async vlinks(
+        keyName: string,
+        element: string,
+        count?: number,
+        withEmbeddings?: boolean
+    ) {
         return apiClient.post<VectorTupleLevels, VlinkRequest>(
-            '/api/redis/command/vlinks',
+            "/api/redis/command/vlinks",
             { keyName, element, count, withEmbeddings }
-        );
+        )
     },
 
     async vsim(
@@ -80,30 +85,45 @@ export const redisCommands = {
             ...(Array.isArray(searchVectorOrElement)
                 ? { searchVector: searchVectorOrElement }
                 : { searchElement: searchVectorOrElement }),
-        };
+        }
 
         return apiClient.post<VectorTuple[], VsimRequest>(
-            '/api/redis/command/vsim',
+            "/api/redis/command/vsim",
             request
-        );
+        )
     },
 
     async vsetattr(keyName: string, element: string, attributes: string) {
-        return apiClient.post<{ success: boolean; error?: string }, VsetAttrRequest>(
-            '/api/redis/command/vsetattr',
-            { keyName, element, attributes }
-        );
+        return apiClient.post<
+            { success: boolean; error?: string },
+            VsetAttrRequest
+        >("/api/redis/command/vsetattr", { keyName, element, attributes })
     },
 
     async vgetattr(keyName: string, element: string): Promise<string | null> {
         try {
             return await apiClient.post<string, VgetAttrRequest>(
-                '/api/redis/command/vgetattr',
+                "/api/redis/command/vgetattr",
                 { keyName, element }
-            );
+            )
         } catch (error) {
             console.error("[vgetattr] error: ", error)
-            return null;
+            return null
         }
-    }
-}; 
+    },
+
+    async vgetattr_multi(
+        keyName: string,
+        elements: string[]
+    ): Promise<string[] | null> {
+        try {
+            return await apiClient.post<string[], VgetAttrRequest>(
+                "/api/redis/command/vgetattr",
+                { keyName, elements }
+            )
+        } catch (error) {
+            console.error("[vgetattr] error: ", error)
+            return null
+        }
+    },
+}

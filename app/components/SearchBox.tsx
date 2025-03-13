@@ -1,9 +1,8 @@
-import { useMemo, useEffect, useState } from "react"
+import { useMemo, useEffect, useState, useRef } from "react"
 import { getEmbeddingDataFormat, VectorSetMetadata } from "../types/embedding"
 import * as React from "react"
 import { Input } from "@/components/ui/input"
 import {
-    ChevronDown,
     Shuffle,
     HelpCircle,
     Settings,
@@ -11,6 +10,7 @@ import {
     Check,
     Copy,
     Filter,
+    AlertCircle,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
@@ -32,6 +32,7 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 
 const searchTypes = [
     {
@@ -60,6 +61,8 @@ interface SearchBoxProps {
     metadata: VectorSetMetadata | null
     searchCount?: string
     setSearchCount?: (value: string) => void
+    error?: string | null
+    clearError?: () => void
 }
 
 export default function SearchBox({
@@ -74,6 +77,8 @@ export default function SearchBox({
     metadata,
     searchCount,
     setSearchCount,
+    clearError,
+    error,
 }: SearchBoxProps) {
     const [showFilters, setShowFilters] = useState(() => {
         // Initialize from localStorage, default to true if not set
@@ -81,6 +86,39 @@ export default function SearchBox({
         return stored ? JSON.parse(stored) : true
     })
     const [showFilterHelp, setShowFilterHelp] = useState(false)
+    // Add local filter state to debounce filter changes
+    const [localFilter, setLocalFilter] = useState(searchFilter)
+    const filterTimeoutRef = useRef<NodeJS.Timeout>()
+
+    // Update local filter when searchFilter prop changes, but only on initial mount
+    // or when the vector set changes, not on every searchFilter change
+    useEffect(() => {
+        // Update localFilter from prop when vector set changes
+        setLocalFilter(searchFilter)
+    }, [vectorSetName, searchFilter]) // Depend on both vectorSetName and searchFilter
+
+    // Handle filter changes with debounce
+    const handleFilterChange = (value: string) => {
+        setLocalFilter(value)
+
+        if (filterTimeoutRef.current) {
+            clearTimeout(filterTimeoutRef.current)
+        }
+
+        filterTimeoutRef.current = setTimeout(() => {
+            setSearchFilter(value)
+        }, 500)
+    }
+
+    // Clean up timeout on unmount
+    useEffect(() => {
+        return () => {
+            if (filterTimeoutRef.current) {
+                clearTimeout(filterTimeoutRef.current)
+            }
+        }
+    }, [])
+
     const isImageEmbedding =
         metadata && getEmbeddingDataFormat(metadata?.embedding) === "image"
     const isTextEmbedding =
@@ -146,12 +184,12 @@ export default function SearchBox({
 
     // Add this new function to generate the Redis command
     const getRedisCommand = () => {
-        if (!searchQuery && !searchFilter)
+        if (!searchQuery && !localFilter)
             return `VSIM ${vectorSetName} VALUES [0.0000, 0.0000, ...] WITHSCORES COUNT 10`
 
         const type = searchType === "Element" ? "ELE" : "VALUES"
         const count = "10" // Using default count of 10
-        const filterExpr = searchFilter ? `"${searchFilter}"` : ""
+        const filterExpr = localFilter ? `"${localFilter}"` : ""
 
         let command = `VSIM ${vectorSetName} ${type} `
 
@@ -223,7 +261,9 @@ export default function SearchBox({
                                 <Input
                                     type="number"
                                     value={searchCount}
-                                    onChange={(e) => setSearchCount(e.target.value)}
+                                    onChange={(e) =>
+                                        setSearchCount(e.target.value)
+                                    }
                                     className="w-16 h-8 text-center"
                                     min="1"
                                 />
@@ -299,7 +339,11 @@ export default function SearchBox({
                         <Button
                             variant="outline"
                             size="icon"
-                            className={`h-9 ${showFilters ? 'bg-gray-500 hover:bg-gray-600 text-white' : 'bg-white hover:bg-gray-100'}`}
+                            className={`h-9 ${
+                                showFilters
+                                    ? "bg-gray-500 hover:bg-gray-600 text-white"
+                                    : "bg-white hover:bg-gray-100"
+                            }`}
                             onClick={() => setShowFilters(!showFilters)}
                         >
                             <Filter className="h-4 w-4" />
@@ -311,12 +355,12 @@ export default function SearchBox({
                             <div className="grow relative">
                                 <Input
                                     type="text"
-                                    value={searchFilter}
+                                    value={localFilter}
                                     onChange={(e) =>
-                                        setSearchFilter(e.target.value)
+                                        handleFilterChange(e.target.value)
                                     }
                                     placeholder="Enter a search filter (e.g. .year < 1982)"
-                                    className=""
+                                    className={error ? "border-red-500" : ""}
                                 />
                                 <Button
                                     variant="ghost"
@@ -327,6 +371,13 @@ export default function SearchBox({
                                     <HelpCircle className="h-8 w-8" />
                                 </Button>
                             </div>
+                        </div>
+                    )}
+
+                    {/* Display search error */}
+                    {error && (
+                        <div className="text-red-500 text-sm mt-2 w-full">
+                            {error}
                         </div>
                     )}
                 </div>
@@ -342,8 +393,8 @@ export default function SearchBox({
                             size="icon"
                             className="h-6 w-6 text-gray-500"
                             onClick={() => {
-                                const command = getRedisCommand();
-                                navigator.clipboard.writeText(command);
+                                const command = getRedisCommand()
+                                navigator.clipboard.writeText(command)
                             }}
                         >
                             <Copy className="h-4 w-4" />

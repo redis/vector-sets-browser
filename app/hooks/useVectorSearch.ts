@@ -19,6 +19,7 @@ interface UseVectorSearchProps {
     metadata: VectorSetMetadata | null
     onSearchResults: (results: VectorTuple[]) => void
     onStatusChange: (status: string) => void
+    onError?: (error: string | null) => void // Add dedicated error handler
     searchState: VectorSetSearchState
     onSearchStateChange: (state: Partial<VectorSetSearchState>) => void
     fetchEmbeddings?: boolean // Renamed from embeddings
@@ -37,6 +38,8 @@ interface UseVectorSearchReturn {
     resultsTitle: string
     setResultsTitle: (title: string) => void
     searchTime?: string
+    error: string | null // Add error to the return type
+    clearError: () => void // Add function to clear errors
 }
 
 export function useVectorSearch({
@@ -44,10 +47,12 @@ export function useVectorSearch({
     metadata,
     onSearchResults,
     onStatusChange,
+    onError,
     onSearchStateChange,
     fetchEmbeddings = false
 }: UseVectorSearchProps): UseVectorSearchReturn {
     const [isSearching, setIsSearching] = useState(false)
+    const [error, setError] = useState<string | null>(null) // Add error state
     const searchTimeoutRef = useRef<NodeJS.Timeout>()
     const initialSearchDone = useRef(false)
     const lastSearchRef = useRef<{
@@ -83,6 +88,18 @@ export function useVectorSearch({
         [onSearchStateChange]
     )
 
+    // Function to clear error
+    const clearError = useCallback(() => {
+        setError(null)
+        if (onError) onError(null)
+    }, [onError])
+
+    // Helper function to set error
+    const handleError = useCallback((errorMessage: string) => {
+        setError(errorMessage)
+        if (onError) onError(errorMessage)
+    }, [onError])
+
     // Helper function to measure search time
     const measureSearchTime = useCallback(
         async <T>(searchFn: () => Promise<T>): Promise<[T, string]> => {
@@ -102,6 +119,8 @@ export function useVectorSearch({
 
             try {
                 setIsSearching(true)
+                // Clear any previous errors when starting a new search
+                clearError()
 
                 // Get dimension from Redis
                 const dim = await redisCommands.vdim(vectorSetName)
@@ -125,7 +144,9 @@ export function useVectorSearch({
                 onSearchResults(vsimResults)
             } catch (error) {
                 console.error("Zero vector search error:", error)
-                onStatusChange("Error performing zero vector search")
+                // Format the error as a string before passing to error handler
+                const errorMessage = error instanceof Error ? error.message : String(error)
+                handleError(errorMessage)
                 onSearchResults([])
             } finally {
                 setIsSearching(false)
@@ -139,6 +160,8 @@ export function useVectorSearch({
             fetchEmbeddings,
             internalSearchState.searchFilter,
             updateSearchState,
+            clearError,
+            handleError,
         ]
     )
 
@@ -157,19 +180,26 @@ export function useVectorSearch({
             clearTimeout(searchTimeoutRef.current)
         }
 
-        // Reset internal state
+        // Clear any previous errors
+        clearError()
+
+        // Save the current filter before resetting
+        const currentFilter = internalSearchState.searchFilter;
+
+        // Reset internal state but preserve the filter
         initialSearchDone.current = false
         lastSearchRef.current = {
             query: "",
             type: "Vector",
             count: "10",
-            filter: "",
+            filter: currentFilter, // Preserve the filter
         }
+        
         setInternalSearchState({
             searchType: "Vector",
             searchQuery: "",
             searchCount: "10",
-            searchFilter: "",
+            searchFilter: currentFilter, // Preserve the filter
             resultsTitle: "Search Results",
             searchTime: undefined,
         })
@@ -178,7 +208,7 @@ export function useVectorSearch({
             searchType: "Vector",
             searchQuery: "",
             searchCount: "10",
-            searchFilter: "",
+            searchFilter: currentFilter, // Preserve the filter
             resultsTitle: "Search Results",
             searchTime: undefined,
         })
@@ -194,7 +224,8 @@ export function useVectorSearch({
             performZeroVectorSearch(10)
                 .catch((error) => {
                     console.error("Zero vector search error:", error)
-                    onStatusChange("Error performing initial search")
+                    const errorMessage = error instanceof Error ? error.message : String(error)
+                    handleError(errorMessage)
                 })
                 .finally(() => {
                     setIsSearching(false)
@@ -211,6 +242,8 @@ export function useVectorSearch({
         onStatusChange,
         onSearchStateChange,
         performZeroVectorSearch,
+        clearError,
+        handleError,
     ])
 
     // Debounced search effect
@@ -221,9 +254,13 @@ export function useVectorSearch({
             clearTimeout(searchTimeoutRef.current)
         }
 
+        // Use a longer timeout for filter changes to give users time to type
+        const timeoutDuration = 
+            lastSearchRef.current.filter !== internalSearchState.searchFilter ? 800 : 300;
+
         searchTimeoutRef.current = setTimeout(() => {
             performSearch()
-        }, 300)
+        }, timeoutDuration)
 
         return () => {
             if (searchTimeoutRef.current) {
@@ -249,21 +286,25 @@ export function useVectorSearch({
         (error: unknown) => {
             console.error("Search error:", error)
 
+            // Extract the error message, ensuring we get the actual Redis error
+            let errorMessage = "Search failed";
             if (error instanceof ApiError) {
-                if (error.message.includes("element not found in set")) {
-                    onStatusChange("Element not found")
-                } else {
-                    onStatusChange(error.message)
-                }
+                // Try to get the detailed error message
+                errorMessage = error.message;
+                
+                // Log the full error data to help debug
+                console.log("Full API error data:", error.data);
+            } else if (error instanceof Error) {
+                errorMessage = error.message;
             } else {
-                onStatusChange(
-                    error instanceof Error ? error.message : String(error)
-                )
+                errorMessage = String(error);
             }
-
-            onSearchResults([])
+            
+            // Set the error state instead of using onStatusChange
+            handleError(errorMessage);
+            onSearchResults([]);
         },
-        [onStatusChange, onSearchResults]
+        [handleError, onSearchResults]
     )
 
     // Function to get vector from text using embedding API
@@ -296,6 +337,9 @@ export function useVectorSearch({
     const handleVectorSearch = useCallback(
         async (count: number) => {
             if (!vectorSetName) return
+
+            // Clear any previous errors when starting a new search
+            clearError()
 
             let searchVector: number[]
 
@@ -360,6 +404,7 @@ export function useVectorSearch({
             onStatusChange,
             fetchEmbeddings,
             internalSearchState.searchFilter,
+            clearError,
         ]
     )
 
@@ -368,10 +413,13 @@ export function useVectorSearch({
         async (count: number) => {
             if (!vectorSetName) return
 
+            // Clear any previous errors when starting a new search
+            clearError()
+            
             onStatusChange(`Element: "${internalSearchState.searchQuery}"`)
 
             const [vsimResults, duration] = await measureSearchTime(() =>
-                // @ts-ignore - vget exists at runtime but TypeScript doesn't know about it
+                // @ts-expect-error - vget exists at runtime but TypeScript doesn't know about it
                 redisCommands.vget(
                     vectorSetName!,
                     internalSearchState.searchQuery,
@@ -402,6 +450,7 @@ export function useVectorSearch({
             onStatusChange,
             fetchEmbeddings,
             internalSearchState.searchFilter,
+            clearError,
         ]
     )
 
@@ -412,15 +461,13 @@ export function useVectorSearch({
             !vectorSetName ||
             (lastSearchRef.current.query === internalSearchState.searchQuery &&
                 lastSearchRef.current.type === internalSearchState.searchType &&
-                lastSearchRef.current.count ===
-                    internalSearchState.searchCount &&
-                lastSearchRef.current.filter ===
-                    internalSearchState.searchFilter)
+                lastSearchRef.current.count === internalSearchState.searchCount &&
+                lastSearchRef.current.filter === internalSearchState.searchFilter)
         ) {
             return
         }
 
-        // Update last search state
+        // Update last search state without modifying the filter
         lastSearchRef.current = {
             query: internalSearchState.searchQuery,
             type: internalSearchState.searchType,
@@ -429,6 +476,9 @@ export function useVectorSearch({
         }
 
         setIsSearching(true)
+        // Clear any previous errors when starting a new search
+        clearError()
+        
         const count = parseCount(internalSearchState.searchCount)
 
         try {
@@ -456,6 +506,7 @@ export function useVectorSearch({
         handleVectorSearch,
         handleElementSearch,
         performZeroVectorSearch,
+        clearError,
     ])
 
     return {
@@ -464,13 +515,23 @@ export function useVectorSearch({
         searchQuery: internalSearchState.searchQuery,
         setSearchQuery: (query) => updateSearchState({ searchQuery: query }),
         searchFilter: internalSearchState.searchFilter,
-        setSearchFilter: (filter) =>
-            updateSearchState({ searchFilter: filter }),
+        setSearchFilter: (filter) => {
+            // Update the internal state with the new filter
+            updateSearchState({ searchFilter: filter });
+            
+            // Also update the lastSearchRef to prevent immediate re-search
+            lastSearchRef.current = {
+                ...lastSearchRef.current,
+                filter: filter
+            };
+        },
         searchCount: internalSearchState.searchCount,
         setSearchCount: (count) => updateSearchState({ searchCount: count }),
         isSearching,
         resultsTitle: internalSearchState.resultsTitle,
         setResultsTitle: (title) => updateSearchState({ resultsTitle: title }),
         searchTime: internalSearchState.searchTime,
+        error, // Expose error state
+        clearError, // Expose function to clear errors
     }
 } 

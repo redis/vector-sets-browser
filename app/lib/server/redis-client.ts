@@ -143,6 +143,13 @@ export class RedisClient {
             //console.log("[RedisClient] Connected successfully")
             const result = await operation(client);
             //console.log("[RedisClient] Operation result:", result)
+            
+            // Check if the result is already a VectorOperationResult with success: false
+            if (result && typeof result === 'object' && 'success' in result && result.success === false) {
+                // Pass through the error result without wrapping it
+                return result as VectorOperationResult;
+            }
+            
             return { success: true, result };
         } catch (error) {
             console.error("[RedisClient] Operation failed:", error);
@@ -266,6 +273,7 @@ export async function vgetattr(
         }
     })
 }
+
 export async function vsetattr(
     url: string,
     keyName: string,
@@ -377,7 +385,7 @@ export async function vsim(
             console.error("VSIM operation error:", error)
             return {
                 success: false,
-                error: error instanceof Error ? error.message : String(error),
+                error: error instanceof Error ? error.message : String(error)
             }
         }
     })

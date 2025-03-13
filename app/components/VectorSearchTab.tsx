@@ -31,7 +31,6 @@ export default function VectorSearchTab({
     results,
     setResults
 }: VectorSearchTabProps) {
-    const [fileOperationStatus, setFileOperationStatus] = useState("")
     const [searchState, setSearchState] = useState<VectorSetSearchState>({
         searchType: "Vector" as const,
         searchQuery: "",
@@ -46,8 +45,8 @@ export default function VectorSearchTab({
     }, [setResults])
 
     const handleStatusChange = useCallback((status: string) => {
-        setFileOperationStatus(status)
-    }, [])
+        console.log("Status change:", status);
+    }, []);
 
     const handleSearchStateChange = useCallback((newState: Partial<VectorSetSearchState>) => {
         setSearchState(prevState => ({
@@ -55,6 +54,10 @@ export default function VectorSearchTab({
             ...newState
         }))
     }, [])
+
+    const handleError = useCallback((error: string | null) => {
+        console.log("Search error:", error);
+    }, []);
 
     const {
         searchType,
@@ -67,11 +70,14 @@ export default function VectorSearchTab({
         searchTime,
         searchFilter,
         setSearchFilter,
+        error,
+        clearError
     } = useVectorSearch({
         vectorSetName,
         metadata,
         onSearchResults: handleSearchResults,
         onStatusChange: handleStatusChange,
+        onError: handleError,
         searchState,
         onSearchStateChange: handleSearchStateChange,
         fetchEmbeddings: false
@@ -124,6 +130,8 @@ export default function VectorSearchTab({
                 setSearchCount={setSearchCount}
                 dim={dim}
                 metadata={metadata}
+                error={error}
+                clearError={clearError}
             />
             <div className="bg-white p-4 rounded shadow-md">
                 <VectorResults
