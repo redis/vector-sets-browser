@@ -6,11 +6,6 @@ import {
     EmbeddingTemplateRequestBody,
 } from "../../openai"
 
-// Initialize the OpenAI client
-const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
-})
-
 export async function POST(request: NextRequest) {
     try {
         const { columns, sampleRows } =
@@ -22,6 +17,14 @@ export async function POST(request: NextRequest) {
                 { status: 400 }
             )
         }
+
+        // Get user-provided API key from headers if available
+        const userApiKey = request.headers.get("X-OpenAI-Key");
+        
+        // Initialize the OpenAI client with user key or fallback to env
+        const openai = new OpenAI({
+            apiKey: userApiKey || process.env.OPENAI_API_KEY,
+        })
 
         let userPrompt = `This CSV file contains the following columns:`
         for (const column of columns) {
