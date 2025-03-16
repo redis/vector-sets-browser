@@ -215,36 +215,63 @@ export async function vadd(
     url: string,
     keyName: string,
     element: string,
-    vector: number[]
+    vector: number[],
+    attributes?: string,
+    useCAS?: boolean,
+    reduceDimensions?: number
 ): Promise<VectorOperationResult> {
     return RedisClient.withConnection(url, async (client) => {
         // Ensure vector is an array of numbers
         if (!Array.isArray(vector)) {
-            throw new Error(`Invalid vector data: not an array`)
+            return {
+                success: false,
+                error: `Invalid vector data: not an array`
+            }
         }
 
         if (vector.some((v) => typeof v !== "number" || isNaN(v))) {
-            throw new Error(`Invalid vector data: contains non-numeric values`)
+            return {
+                success: false,
+                error: `Invalid vector data: contains non-numeric values`
+            }
         }
 
         const command = [
             "VADD",
-            keyName,
+            keyName
+        ]
+
+        if (reduceDimensions) {
+            command.push("REDUCE", reduceDimensions.toString())
+        }
+
+        command.push(
             "VALUES",
             vector.length.toString(),
             ...vector.map((v) => v.toString()),
             element,
-        ]
+        )
 
+        if (attributes) {
+            command.push("SETATTR", attributes)
+        }
+
+        // Add CAS flag if enabled
+        if (useCAS) {
+            command.push("CAS")
+        }
+        
         try {
-            return await client.sendCommand(command)
+            const result = await client.sendCommand(command)
+            return result
         } catch (error) {
             console.error("Error executing VADD command:", error)
-            throw new Error(
-                `Failed to add vector: ${
+            return {
+                success: false,
+                error: `${
                     error instanceof Error ? error.message : String(error)
                 }`
-            )
+            }
         }
     })
 }
@@ -263,14 +290,16 @@ export async function vgetattr(
         ]
 
         try {
-            return await client.sendCommand(command)
+            const result = await client.sendCommand(command)
+            return result
         } catch (error) {
             console.error("Error executing VGETATTR command:", error)
-            throw new Error(
-                `Failed to get vector: ${
+            return {
+                success: false,
+                error: `Failed to get vector attributes: ${
                     error instanceof Error ? error.message : String(error)
                 }`
-            )
+            }
         }
     })
 }
@@ -290,18 +319,26 @@ export async function vsetattr(
             return result
         } catch (error) {
             console.error("Error executing VSETATTR command:", error)
-            throw new Error(
-                `Failed to set vector attributes: ${
+            return {
+                success: false,
+                error: `Failed to set vector attributes: ${
                     error instanceof Error ? error.message : String(error)
                 }`
-            )
+            }
         }
     })
 }
 export async function vsim(
     url: string,
     keyName: string,
-    params: { searchVector?: number[]; searchElement?: string; count: number; needVectors?: boolean; filter?: string }
+    params: { 
+        searchVector?: number[]; 
+        searchElement?: string; 
+        count: number; 
+        needVectors?: boolean; 
+        filter?: string;
+        expansionFactor?: number;
+    }
 ): Promise<VectorOperationResult> {
     console.log("VSIM", url, keyName)
     if (!params.searchVector && !params.searchElement) {
@@ -332,6 +369,12 @@ export async function vsim(
             }
 
             baseCommand.push("WITHSCORES", "COUNT", String(params.count))
+            
+            // Add EF parameter if provided
+            if (params.expansionFactor && params.expansionFactor > 0) {
+                console.log("Using custom EF:", params.expansionFactor)
+                baseCommand.push("EF", String(params.expansionFactor))
+            }
 
             // Start timing the Redis command execution
             const startTime = performance.now()

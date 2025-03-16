@@ -14,12 +14,15 @@ interface VaddRequestBody {
     keyName: string
     element: string
     vector: number[]
+    attributes?: string
+    reduceDimensions?: number
+    useCAS?: boolean
 }
 
 export async function POST(request: Request) {
     try {
         const body = await request.json() as VaddRequestBody
-        const { keyName, element, vector } = body
+        const { keyName, element, vector, attributes, useCAS, reduceDimensions } = body
 
         if (!keyName) {
             return NextResponse.json(
@@ -59,12 +62,19 @@ export async function POST(request: Request) {
             )
         }
 
-        const result = await redis.vadd(url, keyName, element, validationResult.vector)
+        const result = await redis.vadd(url, keyName, element, validationResult.vector, attributes, useCAS, reduceDimensions)
+
+        // If the operation failed, return the error with an appropriate status code
+        if (!result.success) {
+            return NextResponse.json({
+                success: false,
+                error: result.error || "Failed to add vector"
+            }, { status: 400 })
+        }
 
         return NextResponse.json({
-            success: result.success,
-            result: result.result,
-            error: result.error
+            success: true,
+            result: result.result
         })
     } catch (error) {
         console.error("Error in VADD API:", error)

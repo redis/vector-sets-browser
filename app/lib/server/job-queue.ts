@@ -22,25 +22,76 @@ export class JobQueueService {
         console.log(`[JobQueue] Progress updated successfully for job ${jobId}`);
     }
 
-    public static async createJob(url: string, file: File, vectorSetName: string, embeddingConfig: EmbeddingConfig): Promise<string> {
+    public static async createJob(
+        url: string, 
+        file: File, 
+        vectorSetName: string, 
+        embeddingConfig: EmbeddingConfig,
+        options?: {
+            elementColumn?: string;
+            textColumn?: string;
+            elementTemplate?: string;
+            textTemplate?: string;
+            attributeColumns?: string[];
+            delimiter?: string;
+            hasHeader?: boolean;
+            skipRows?: number;
+        }
+    ): Promise<string> {
         const jobId = uuidv4();
         console.log(`[JobQueue] Creating new job ${jobId} for vector set ${vectorSetName}`);
+        console.log(`[JobQueue] Options:`, options);
+        
+        // Set default options
+        const delimiter = options?.delimiter || ',';
+        const hasHeader = options?.hasHeader !== undefined ? options.hasHeader : true;
+        const skipRows = options?.skipRows || 0;
         
         console.log(`[JobQueue] Reading CSV file ${file.name}`);
         const text = await file.text();
         const records = parse(text, {
-            columns: true,
+            columns: hasHeader,
             skip_empty_lines: true,
+            delimiter,
+            from_line: Math.max(1, skipRows + (hasHeader ? 1 : 0))
         }) as CSVRow[];
         console.log(`[JobQueue] Parsed ${records.length} records from CSV`);
+
+        // Determine column names from the first record
+        const availableColumns = records.length > 0 ? Object.keys(records[0]) : [];
+        console.log(`[JobQueue] Available columns:`, availableColumns);
+        
+        // Select appropriate columns based on options or defaults
+        const elementColumn = options?.elementColumn || 
+            (availableColumns.includes('title') ? 'title' : availableColumns[0] || 'title');
+        
+        const textColumn = options?.textColumn || 
+            (availableColumns.includes('plot_synopsis') ? 'plot_synopsis' : 
+             availableColumns.length > 1 ? availableColumns[1] : 'plot_synopsis');
+        
+        console.log(`[JobQueue] Selected element column: ${elementColumn}`);
+        console.log(`[JobQueue] Selected text column: ${textColumn}`);
+        
+        if (options?.attributeColumns) {
+            console.log(`[JobQueue] Selected attribute columns:`, options.attributeColumns);
+        }
 
         const result = await RedisClient.withConnection(url, async (client) => {
             // Create job metadata
             const metadata: CSVJobMetadata = {
-                vectorSetName,
+                jobId,
                 filename: file.name,
-                created: new Date().toISOString(),
-                embedding: embeddingConfig
+                vectorSetName,
+                embedding: embeddingConfig,
+                elementColumn,
+                textColumn,
+                elementTemplate: options?.elementTemplate,
+                textTemplate: options?.textTemplate,
+                attributeColumns: options?.attributeColumns || [],
+                total: records.length,
+                delimiter,
+                hasHeader,
+                skipRows
             };
             console.log(`[JobQueue] Setting metadata for job ${jobId}:`, metadata);
             await client.hSet(getJobMetadataKey(jobId), { data: JSON.stringify(metadata) });

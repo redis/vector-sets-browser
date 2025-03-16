@@ -4,14 +4,25 @@ import { useState, useEffect, useMemo } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import { VectorSetMetadata, isImageEmbedding, isTextEmbedding } from "../types/embedding"
+import {
+    VectorSetMetadata,
+    isImageEmbedding,
+    isTextEmbedding,
+} from "../types/embedding"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import ImageUploader from "./ImageUploader"
+import { Switch } from "@/components/ui/switch"
+import { Label } from "@/components/ui/label"
+import { Copy } from "lucide-react"
 
 interface AddVectorModalProps {
     isOpen: boolean
     onClose: () => void
-    onAdd: (element: string, elementData: string | number[]) => Promise<void>
+    onAdd: (
+        element: string,
+        elementData: string | number[],
+        useCAS?: boolean
+    ) => Promise<void>
     metadata: VectorSetMetadata | null
     dim: number | null
     vectorSetName?: string | null
@@ -32,6 +43,7 @@ export default function AddVectorModal({
     const [error, setError] = useState<string | null>(null)
     const [isAdding, setIsAdding] = useState(false)
     const [status, setStatus] = useState("")
+    const [useCAS, setUseCAS] = useState(false)
 
     // Determine if we're using an image embedding model using the helper function
     const useImageEmbedding = metadata?.embedding
@@ -42,7 +54,11 @@ export default function AddVectorModal({
         : true
     const supportsEmbeddings =
         metadata?.embedding.provider && metadata?.embedding.provider !== "none"
-
+    
+    const reduceDimensions = metadata?.redisConfig?.reduceDimensions 
+        ? metadata?.redisConfig?.reduceDimensions
+        : undefined
+    
     // Set the default active tab based on the embedding data format
     useEffect(() => {
         if (useImageEmbedding) {
@@ -56,7 +72,7 @@ export default function AddVectorModal({
     const embeddingPlaceholder = useMemo(() => {
         if (!supportsEmbeddings) {
             return "Enter vector data (0.1, 0.2, ...)"
-        } else { 
+        } else {
             return "Enter Text to embed or Enter vector data (0.1, 0.2, ...)"
         }
     }, [supportsEmbeddings])
@@ -83,16 +99,17 @@ export default function AddVectorModal({
         try {
             setIsAdding(true)
             setStatus("Adding vector...")
+            setError(null)
 
             // Use the pre-generated embedding if available for images
             if (activeTab === "image" && imageEmbedding) {
-                await onAdd(element, imageEmbedding)
+                await onAdd(element, imageEmbedding, useCAS)
                 setStatus("Vector added successfully!")
             } else if (activeTab === "image") {
-                await onAdd(element, imageData)
+                await onAdd(element, imageData, useCAS)
                 setStatus("Vector added successfully!")
             } else {
-                await onAdd(element, elementData)
+                await onAdd(element, elementData, useCAS)
                 setStatus("Vector added successfully!")
             }
 
@@ -106,10 +123,25 @@ export default function AddVectorModal({
             onClose()
         } catch (err) {
             console.error("Error adding vector:", err)
-            setError(
-                err instanceof Error ? err.message : "Failed to add vector"
-            )
+            
+            // Extract the most informative error message
+            let errorMessage = "Failed to add vector"
+            if (err instanceof Error) {
+                errorMessage = err.message
+            } else if (typeof err === 'object' && err !== null) {
+                // Try to extract error message from various possible formats
+                if ('message' in err && typeof err.message === 'string') {
+                    errorMessage = err.message
+                } else if ('error' in err && typeof err.error === 'string') {
+                    errorMessage = err.error
+                } else if ('data' in err && typeof err.data === 'object' && err.data && 'error' in err.data && typeof err.data.error === 'string') {
+                    errorMessage = err.data.error
+                }
+            }
+            
+            setError(errorMessage)
             setStatus("Error adding vector")
+            // Keep the modal open so the user can see the error
         } finally {
             setIsAdding(false)
         }
@@ -124,6 +156,58 @@ export default function AddVectorModal({
     const handleEmbeddingGenerated = (embedding: number[]) => {
         setImageEmbedding(embedding)
         setStatus(`Embedding generated: ${embedding.length} dimensions`)
+    }
+
+    // Function to generate the VADD command preview
+    const getVaddCommand = () => {
+        if (!element || (!elementData && activeTab === "text") || (!imageData && activeTab === "image")) {
+            return `VADD ${vectorSetName || "vector-set"} ${reduceDimensions ? `REDUCE ${reduceDimensions}` : ""} VALUES [vector values...] ${element || "element_id"} ${useCAS ? "CAS" : ""}`
+        }
+
+        let command = `VADD ${vectorSetName || "vector-set"} ${reduceDimensions ? `REDUCE ${reduceDimensions}` : ""}`
+        
+        // Add VALUES part
+        if (activeTab === "text") { 
+            // For text, try to determine if it's raw vector data or text to embed
+            const isRawVector = elementData.includes(",") && 
+                elementData.split(",").every(v => !isNaN(parseFloat(v.trim())));
+                
+            if (isRawVector) {
+                // Format as vector values
+                const vectorValues = elementData
+                    .split(",")
+                    .map(v => parseFloat(v.trim()))
+                    .filter(v => !isNaN(v));
+                    
+                // Only include dimensions if we have them
+                if (vectorValues.length > 0) {
+                    command += ` VALUES ${vectorValues.length} ${vectorValues.join(" ")}`
+                } else {
+                    command += ` VALUES [vector values...]`
+                }
+            } else {
+                // It's text to be embedded
+                command += ` VALUES [text to be embedded: "${elementData.substring(0, 30)}${elementData.length > 30 ? '...' : ''}"]`
+            }
+        } else if (activeTab === "image") {
+            if (imageEmbedding) {
+                // Show with actual embedding dimensions
+                command += ` VALUES ${imageEmbedding.length} [image embedding values...]`
+            } else {
+                // Show placeholder for image data without dimensions
+                command += ` VALUES [image data will be embedded]`
+            }
+        }
+        
+        // Add element ID
+        command += ` "${element}"`
+        
+        // Add CAS flag if enabled
+        if (useCAS) {
+            command += " CAS"
+        }
+        
+        return command
     }
 
     if (!isOpen) return null
@@ -230,6 +314,24 @@ export default function AddVectorModal({
                                 </div>
                             </TabsContent>
                         </Tabs>
+                        <div className="mb-4 flex items-center space-x-2">
+                            <Label
+                                htmlFor="cas-toggle"
+                                className="cursor-pointer flex flex-col gap-1"
+                            >
+                                <div>Use Multi-threaded insert</div>
+                                <div className="text-xs text-gray-500">
+                                    Sets the CAS flag (Check and Set) which uses
+                                    multi-threading when adding to the
+                                    vectorset, improving performance.
+                                </div>
+                            </Label>
+                            <Switch
+                                id="cas-toggle"
+                                checked={useCAS}
+                                onCheckedChange={setUseCAS}
+                            />
+                        </div>
 
                         {error && (
                             <div className="mb-4 p-2 bg-red-100 border border-red-400 text-red-700 rounded">
@@ -242,6 +344,25 @@ export default function AddVectorModal({
                                 {status}
                             </div>
                         )}
+
+                        {/* Command Preview Box */}
+                        <div className="flex gap-2 items-center w-full bg-gray-100 rounded-md mb-4">
+                            <div className="text-grey-400 p-2 font-mono overflow-x-scroll text-sm grow">
+                                {getVaddCommand()}
+                            </div>
+                            <div className="grow"></div>
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 text-gray-500"
+                                onClick={() => {
+                                    const command = getVaddCommand();
+                                    navigator.clipboard.writeText(command);
+                                }}
+                            >
+                                <Copy className="h-4 w-4" />
+                            </Button>
+                        </div>
 
                         <div className="flex justify-end space-x-2">
                             <Button

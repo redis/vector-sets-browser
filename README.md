@@ -15,6 +15,7 @@ Vector Sets Browser is a Next.js application that provides real-time visualizati
 
 - Node.js (Latest LTS version recommended)
 - Redis server with vector-sets module installed ([Installation instructions](https://github.com/antirez/vector-sets))
+- OpenAI API key (for AI-assisted template generation)
 
 ## Installation
 
@@ -29,7 +30,11 @@ cd vector-sets-browser
 npm install
 ```
 
-3. Build the application:
+3. Configure environment variables:
+   - Create a `.env.local` file in the root directory
+   - Add your OpenAI API key: `OPENAI_API_KEY=your_api_key_here`
+
+4. Build the application:
 ```bash
 npm run build
 ```
@@ -38,7 +43,7 @@ npm run build
 
 1. Start the development server:
 ```bash
-npm run
+npm run dev
 ```
 
 2. Open your browser and navigate to `http://localhost:3000`
@@ -51,6 +56,7 @@ npm run
   - UMAP for preserving both local and global structure
   - PCA for linear dimensionality reduction
   - Force-directed layout for graph visualization
+- **AI-Assisted CSV Import**: Automatically generate optimal templates for CSV imports using OpenAI
 - **Modern UI**: Built with modern React components and Tailwind CSS
 - **Real-time Updates**: Live visualization updates as vector sets change
 - **Flexible Integration**: Works with any vector embeddings stored in Redis vector-sets

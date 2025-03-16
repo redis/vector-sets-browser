@@ -44,6 +44,8 @@ export interface VaddRequest {
     element: string;
     vector: number[];
     attributes?: string;
+    useCAS?: boolean;
+    reduceDimensions?: number;
 }
 
 export interface VlinkRequest {
@@ -60,6 +62,7 @@ export interface VsimRequest {
     count: number;
     withEmbeddings?: boolean;
     filter?: string;
+    expansionFactor?: number;
 }
 
 // Common response types

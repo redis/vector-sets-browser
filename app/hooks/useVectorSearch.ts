@@ -12,6 +12,7 @@ export interface VectorSetSearchState {
     resultsTitle: string
     searchTime?: string // Add searchTime to store the search duration
     searchFilter: string
+    expansionFactor?: number // Add expansionFactor
 }
 
 interface UseVectorSearchProps {
@@ -40,6 +41,8 @@ interface UseVectorSearchReturn {
     searchTime?: string
     error: string | null // Add error to the return type
     clearError: () => void // Add function to clear errors
+    expansionFactor?: number // Add expansionFactor
+    setExpansionFactor: (value: number | undefined) => void // Add setExpansionFactor
 }
 
 export function useVectorSearch({
@@ -120,7 +123,8 @@ export function useVectorSearch({
                     zeroVector,
                     count,
                     fetchEmbeddings,
-                    internalSearchState.searchFilter
+                    internalSearchState.searchFilter,
+                    internalSearchState.expansionFactor
                 )
                 
                 // Use the execution time from the server response
@@ -148,9 +152,10 @@ export function useVectorSearch({
             onStatusChange,
             fetchEmbeddings,
             internalSearchState.searchFilter,
-            updateSearchState,
+            internalSearchState.expansionFactor,
             clearError,
             handleError,
+            updateSearchState
         ]
     )
 
@@ -368,7 +373,8 @@ export function useVectorSearch({
                 searchVector,
                 count,
                 fetchEmbeddings,
-                internalSearchState.searchFilter
+                internalSearchState.searchFilter,
+                internalSearchState.expansionFactor
             )
             
             // Use the execution time from the server response
@@ -389,11 +395,12 @@ export function useVectorSearch({
             vectorSetName,
             internalSearchState.searchQuery,
             getVectorFromText,
-            onSearchStateChange,
             onSearchResults,
             onStatusChange,
             fetchEmbeddings,
+            updateSearchState,
             internalSearchState.searchFilter,
+            internalSearchState.expansionFactor,
             clearError,
         ]
     )
@@ -413,7 +420,8 @@ export function useVectorSearch({
                 internalSearchState.searchQuery,
                 count,
                 fetchEmbeddings,
-                internalSearchState.searchFilter
+                internalSearchState.searchFilter,
+                internalSearchState.expansionFactor
             )
             
             // Use the execution time from the server response
@@ -438,6 +446,7 @@ export function useVectorSearch({
             onStatusChange,
             fetchEmbeddings,
             internalSearchState.searchFilter,
+            internalSearchState.expansionFactor,
             clearError,
         ]
     )
@@ -521,5 +530,7 @@ export function useVectorSearch({
         searchTime: internalSearchState.searchTime,
         error, // Expose error state
         clearError, // Expose function to clear errors
+        expansionFactor: internalSearchState.expansionFactor,
+        setExpansionFactor: (value) => updateSearchState({ expansionFactor: value }),
     }
 } 

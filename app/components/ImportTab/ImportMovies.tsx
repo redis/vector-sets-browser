@@ -2,7 +2,7 @@
 
 import { useState, useRef } from "react"
 import { Button } from "@/components/ui/button"
-import { VectorSetMetadata } from "../types/embedding"
+import { VectorSetMetadata } from "../../types/embedding"
 import { AlertCircle, CheckCircle2 } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react"
 import { VectorSetMetadata } from "@/app/types/embedding"
 import EditEmbeddingConfigModal from "./EditEmbeddingConfigModal"
 import CreateVectorSetModal from "./CreateVectorSetModal"
+import DeleteVectorSetDialog from "./DeleteVectorSetDialog"
 import { vectorSets } from "@/app/api/vector-sets"
 import { redisCommands } from "@/app/api/redis-commands"
 import { jobs, type Job } from "@/app/api/jobs"
@@ -49,6 +50,8 @@ export default function VectorSetNav({
     const [statusMessage, setStatusMessage] = useState<string | null>(null)
     const [isEditConfigModalOpen, setIsEditConfigModalOpen] = useState(false)
     const [editingVectorSet, setEditingVectorSet] = useState<string | null>(null)
+    const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+    const [vectorSetToDelete, setVectorSetToDelete] = useState<string | null>(null)
     const [isInitialLoad, setIsInitialLoad] = useState(true)
 
     const loadVectorSets = useCallback(async () => {
@@ -218,6 +221,22 @@ export default function VectorSetNav({
         }
     }
 
+    const openDeleteDialog = (name: string) => {
+        setVectorSetToDelete(name)
+        setIsDeleteDialogOpen(true)
+    }
+
+    const openEditConfigDialog = (name: string) => {
+        setEditingVectorSet(name)
+        setIsEditConfigModalOpen(true)
+    }
+
+    const handleConfirmDelete = () => {
+        if (vectorSetToDelete) {
+            handleDeleteVectorSet(vectorSetToDelete)
+        }
+    }
+
     return (
         <Sidebar>
             <SidebarHeader>
@@ -250,12 +269,32 @@ export default function VectorSetNav({
                         <div className="flex gap-1">
                             <Button
                                 variant="ghost"
+                                onClick={() => loadVectorSets()}
+                                title="Refresh Vector Sets"
+                                className="p-1"
+                            >
+                                <svg
+                                    className="w-5 h-5 text-gray-500"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                >
+                                    <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={2}
+                                        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                                    />
+                                </svg>
+                            </Button>
+                            <Button
+                                variant="ghost"
                                 onClick={() => setIsCreateModalOpen(true)}
                                 title="Quick Create Vector Set"
                                 className="p-1"
                             >
                                 <svg
-                                    className="w-5 h-5"
+                                    className="w-5 h-5 text-gray-500"
                                     fill="none"
                                     stroke="currentColor"
                                     viewBox="0 0 24 24"
@@ -331,7 +370,7 @@ export default function VectorSetNav({
                                         size="icon"
                                         onClick={(e) => {
                                             e.stopPropagation()
-                                            handleDeleteVectorSet(setName)
+                                            openDeleteDialog(setName)
                                         }}
                                         className=""
                                         title="Delete Vector Set"
@@ -366,21 +405,39 @@ export default function VectorSetNav({
                 </div>
             </SidebarContent>
 
-            <CreateVectorSetModal
-                isOpen={isCreateModalOpen}
-                onClose={() => setIsCreateModalOpen(false)}
-                onCreate={handleBasicCreateVectorSet}
-            />
+            {isCreateModalOpen && (
+                <CreateVectorSetModal
+                    isOpen={isCreateModalOpen}
+                    onClose={() => setIsCreateModalOpen(false)}
+                    onCreate={handleBasicCreateVectorSet}
+                />
+            )}
 
-            <EditEmbeddingConfigModal
-                isOpen={isEditConfigModalOpen}
-                onClose={() => {
-                    setIsEditConfigModalOpen(false)
-                    setEditingVectorSet(null)
-                }}
-                vectorSetName={editingVectorSet || ""}
-                onSave={(config) => handleSaveMetadata(editingVectorSet || "", config)}
-            />
+            {isEditConfigModalOpen && editingVectorSet && (
+                <EditEmbeddingConfigModal
+                    isOpen={isEditConfigModalOpen}
+                    onClose={() => {
+                        setIsEditConfigModalOpen(false)
+                        setEditingVectorSet(null)
+                    }}
+                    config={vectorSetInfo[editingVectorSet]?.metadata?.embedding}
+                    onSave={(config) => 
+                        handleSaveMetadata(editingVectorSet, {
+                            ...vectorSetInfo[editingVectorSet]?.metadata,
+                            embedding: config,
+                        })
+                    }
+                />
+            )}
+
+            {isDeleteDialogOpen && vectorSetToDelete && (
+                <DeleteVectorSetDialog
+                    isOpen={isDeleteDialogOpen}
+                    onClose={() => setIsDeleteDialogOpen(false)}
+                    onConfirm={handleConfirmDelete}
+                    vectorSetName={vectorSetToDelete}
+                />
+            )}
         </Sidebar>
     )
 }

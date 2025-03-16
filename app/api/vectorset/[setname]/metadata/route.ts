@@ -20,6 +20,7 @@ export async function GET(
     { params }: { params: { setname: string } }
 ) {
     try {
+        console.log("GET /api/vectorset/[setname]/metadata")
         const keyName = params.setname
         
         if (!keyName) {

@@ -12,18 +12,22 @@ export const vectorSets = {
     },
 
     async create(setName: string, request: VectorSetCreateRequest): Promise<void> {
-        return apiClient.post(`/api/vectorset/${setName}`, request);
+        const encodedName = encodeURIComponent(setName);
+        return apiClient.post(`/api/vectorset/${encodedName}`, request);
     },
 
     async delete(setName: string): Promise<void> {
-        return apiClient.delete(`/api/vectorset/${setName}`);
+        const encodedName = encodeURIComponent(setName);
+        return apiClient.delete(`/api/vectorset/${encodedName}`);
     },
 
     async getMetadata(vectorSetName: string): Promise<VectorSetMetadataResponse> {
-        return apiClient.get(`/api/vectorset/${vectorSetName}/metadata`);
+        const encodedName = encodeURIComponent(vectorSetName);
+        return apiClient.get(`/api/vectorset/${encodedName}/metadata`);
     },
 
     async getMemoryUsage(vectorSetName: string): Promise<MemoryUsageResponse> {
-        return apiClient.get(`/api/vectorset/${vectorSetName}/memory`);
+        const encodedName = encodeURIComponent(vectorSetName);
+        return apiClient.get(`/api/vectorset/${encodedName}/memory`);
     }
 }; 

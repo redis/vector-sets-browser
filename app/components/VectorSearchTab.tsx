@@ -37,7 +37,8 @@ export default function VectorSearchTab({
         searchCount: "10",
         searchFilter: "",
         resultsTitle: "Search Results",
-        searchTime: undefined as string | undefined
+        searchTime: undefined as string | undefined,
+        expansionFactor: undefined
     })
 
     const handleSearchResults = useCallback((newResults: VectorTuple[]) => {
@@ -45,7 +46,7 @@ export default function VectorSearchTab({
     }, [setResults])
 
     const handleStatusChange = useCallback((status: string) => {
-        console.log("Status change:", status);
+        //console.log("Status change:", status);
     }, []);
 
     const handleSearchStateChange = useCallback((newState: Partial<VectorSetSearchState>) => {
@@ -71,7 +72,9 @@ export default function VectorSearchTab({
         searchFilter,
         setSearchFilter,
         error,
-        clearError
+        clearError,
+        expansionFactor,
+        setExpansionFactor
     } = useVectorSearch({
         vectorSetName,
         metadata,
@@ -132,6 +135,8 @@ export default function VectorSearchTab({
                 metadata={metadata}
                 error={error}
                 clearError={clearError}
+                expansionFactor={expansionFactor}
+                setExpansionFactor={setExpansionFactor}
             />
             <div className="bg-white p-4 rounded shadow-md">
                 <VectorResults

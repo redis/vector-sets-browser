@@ -50,12 +50,21 @@ export const redisCommands = {
         )
     },
 
-    async vadd(keyName: string, element: string, vector: number[]) {
-        return apiClient.post<boolean, VaddRequest>("/api/redis/command/vadd", {
-            keyName,
-            element,
-            vector,
-        })
+    async vadd(keyName: string, element: string, vector: number[], attributes?: string, useCAS?: boolean, reduceDimensions?: number) {
+        try {
+            return await apiClient.post<boolean, VaddRequest>("/api/redis/command/vadd", {
+                keyName,
+                element,
+                vector,
+                attributes,
+                useCAS,
+                reduceDimensions,
+            });
+        } catch (error) {
+            console.error("[vadd] API error:", error);
+            // Re-throw the error to be caught by the caller
+            throw error;
+        }
     },
 
     async vlinks(
@@ -75,13 +84,15 @@ export const redisCommands = {
         searchVectorOrElement: number[] | string,
         count: number,
         withEmbeddings?: boolean,
-        filter?: string
+        filter?: string,
+        expansionFactor?: number
     ) {
         const request: VsimRequest = {
             keyName,
             count,
             withEmbeddings,
             filter,
+            expansionFactor,
             ...(Array.isArray(searchVectorOrElement)
                 ? { searchVector: searchVectorOrElement }
                 : { searchElement: searchVectorOrElement }),

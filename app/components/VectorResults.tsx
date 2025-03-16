@@ -15,8 +15,19 @@ import {
     DropdownMenuTrigger,
     DropdownMenuSeparator,
     DropdownMenuLabel,
+    DropdownMenuItem,
 } from "@/components/ui/dropdown-menu"
-import { useState, useMemo, useEffect } from "react"
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogDescription,
+} from "@/components/ui/dialog"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import { Switch } from "@/components/ui/switch"
+import { Label } from "@/components/ui/label"
+import { useState, useMemo, useEffect, useRef } from "react"
 import {
     ArrowDownUp,
     ArrowDownWideNarrow,
@@ -27,7 +38,7 @@ import {
 import EditAttributesDialog from "./EditAttributesDialog"
 import { redisCommands } from "@/app/api/redis-commands"
 import SearchTimeIndicator from "./SearchTimeIndicator"
-import { useVectorResultsSettings } from "@/app/hooks/useVectorResultsSettings"
+import { useVectorResultsSettings, ColumnConfig } from "@/app/hooks/useVectorResultsSettings"
 import { parseFieldFilters } from "@/app/utils/filterParser"
 import { VectorTuple } from "../api/types"
 
@@ -56,16 +67,104 @@ type AttributeCache = {
 type AttributeValue = string | number | boolean | any[]
 type ParsedAttributes = Record<string, AttributeValue>
 
-interface ColumnConfig {
-    name: string
-    visible: boolean
-    type: "system" | "attribute" // system columns are Element and Score
-}
-
 // Add this new type and function after the existing type definitions
 type FieldFilter = {
     field: string
     expression: string
+}
+
+// Add this new component for the attribute columns dialog
+interface AttributeColumnsDialogProps {
+    isOpen: boolean
+    onClose: () => void
+    columns: ColumnConfig[]
+    onToggleColumn: (columnName: string, visible: boolean) => void
+}
+
+function AttributeColumnsDialog({
+    isOpen,
+    onClose,
+    columns,
+    onToggleColumn,
+}: AttributeColumnsDialogProps) {
+    const attributeColumns = columns.filter(col => col.type === "attribute")
+    
+    // Add handlers for select all and deselect all
+    const handleSelectAll = () => {
+        attributeColumns.forEach(col => {
+            if (!col.visible) {
+                onToggleColumn(col.name, true)
+            }
+        })
+    }
+    
+    const handleDeselectAll = () => {
+        attributeColumns.forEach(col => {
+            if (col.visible) {
+                onToggleColumn(col.name, false)
+            }
+        })
+    }
+    
+    return (
+        <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+            <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                    <DialogTitle>Attribute Columns</DialogTitle>
+                    <DialogDescription>
+                        Select which attribute columns to display in the results table.
+                        Your selections will be saved for future sessions.
+                    </DialogDescription>
+                </DialogHeader>
+                
+                {attributeColumns.length > 0 && (
+                    <div className="flex justify-between items-center mb-4">
+                        <Button 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={handleSelectAll}
+                            className="text-xs"
+                        >
+                            Select All
+                        </Button>
+                        <Button 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={handleDeselectAll}
+                            className="text-xs"
+                        >
+                            Deselect All
+                        </Button>
+                    </div>
+                )}
+                
+                <ScrollArea className="h-[50vh] mt-4 pr-4">
+                    <div className="space-y-0">
+                        {attributeColumns.length === 0 ? (
+                            <p className="text-sm text-gray-500">No attribute columns available.</p>
+                        ) : (
+                            attributeColumns.map((col) => (
+                                <div key={col.name} className="flex items-center justify-between py-2">
+                                    <Label htmlFor={`column-${col.name}`} className="flex-grow">
+                                        {col.name.charAt(0).toUpperCase() + col.name.slice(1)}
+                                    </Label>
+                                    <Switch
+                                        id={`column-${col.name}`}
+                                        checked={col.visible}
+                                        onCheckedChange={(checked) => onToggleColumn(col.name, checked)}
+                                    />
+                                </div>
+                            ))
+                        )}
+                    </div>
+                </ScrollArea>
+                
+                <div className="mt-6 flex justify-end">
+                    <Button onClick={onClose}>Close</Button>
+                </div>
+            </DialogContent>
+        </Dialog>
+    )
 }
 
 export default function VectorResults({
@@ -88,8 +187,20 @@ export default function VectorResults({
         setShowAttributes,
         showOnlyFilteredAttributes,
         setShowOnlyFilteredAttributes,
+        attributeColumns: savedAttributeColumns,
+        updateAttributeColumnVisibility,
+        getColumnVisibility,
         isLoaded
     } = useVectorResultsSettings()
+    
+    // Store the getColumnVisibility function in a ref to avoid dependency issues
+    const getColumnVisibilityRef = useRef(getColumnVisibility);
+    
+    // Update the ref when getColumnVisibility changes
+    useEffect(() => {
+        getColumnVisibilityRef.current = getColumnVisibility;
+    }, [getColumnVisibility]);
+    
     const [filterText, setFilterText] = useState("")
     const [sortColumn, setSortColumn] = useState<SortColumn>("none")
     const [sortDirection, setSortDirection] = useState<SortDirection>("asc")
@@ -108,13 +219,14 @@ export default function VectorResults({
         { name: "element", visible: true, type: "system" },
         { name: "score", visible: true, type: "system" },
     ])
+    const [isAttributeColumnsDialogOpen, setIsAttributeColumnsDialogOpen] = useState(false)
 
     // Add this effect to reset states when vectorSet changes
     useEffect(() => {
         // Reset to default columns
         setAvailableColumns([
-            { name: "element", visible: true, type: "system" },
-            { name: "score", visible: true, type: "system" },
+            { name: "element", visible: getColumnVisibilityRef.current("element", true), type: "system" },
+            { name: "score", visible: getColumnVisibilityRef.current("score", true), type: "system" },
         ])
         
         // Reset other related states
@@ -127,7 +239,7 @@ export default function VectorResults({
         setFilterText("")
 
         setIsLoadingAttributes(false)
-    }, [keyName]) // Dependency on keyName (vectorSetName)
+    }, [keyName])
 
     // Fetch attributes when showAttributes is enabled
     useEffect(() => {
@@ -253,8 +365,8 @@ export default function VectorResults({
 
         // Then determine which columns should be visible
         const systemColumns = [
-            { name: "element", visible: true, type: "system" as const },
-            { name: "score", visible: true, type: "system" as const },
+            { name: "element", visible: getColumnVisibilityRef.current("element", true), type: "system" as const },
+            { name: "score", visible: getColumnVisibilityRef.current("score", true), type: "system" as const },
         ]
 
         let attributeColumns: ColumnConfig[] = []
@@ -265,14 +377,14 @@ export default function VectorResults({
                 .filter((name) => filteredFields.includes(name))
                 .map((name) => ({
                     name,
-                    visible: true,
+                    visible: getColumnVisibilityRef.current(name, true),
                     type: "attribute" as const,
                 }))
         } else {
             // Include all attribute columns
             attributeColumns = Array.from(allAttributeColumns).map((name) => ({
                 name,
-                visible: true,
+                visible: getColumnVisibilityRef.current(name, true),
                 type: "attribute" as const,
             }))
         }
@@ -283,7 +395,7 @@ export default function VectorResults({
         attributeCache,
         showOnlyFilteredAttributes,
         searchFilter,
-        filteredFields,
+        filteredFields
     ])
 
     // Fetch field values when filtered fields change
@@ -482,6 +594,21 @@ export default function VectorResults({
         }
     }
 
+    // Update the handler for toggling column visibility
+    const handleToggleColumn = (columnName: string, visible: boolean) => {
+        // Update the local state
+        setAvailableColumns((prev) =>
+            prev.map((c) =>
+                c.name === columnName
+                    ? { ...c, visible }
+                    : c
+            )
+        )
+        
+        // Persist the change to user settings
+        updateAttributeColumnVisibility(columnName, visible)
+    }
+
     // Update the early return to handle both empty results and loading state
     if (!isLoaded || isLoading || isSearching) {
         return (
@@ -558,6 +685,13 @@ export default function VectorResults({
                 onClose={() => setEditingAttributes(null)}
                 keyName={keyName}
                 element={editingAttributes || ""}
+            />
+            
+            <AttributeColumnsDialog
+                isOpen={isAttributeColumnsDialogOpen}
+                onClose={() => setIsAttributeColumnsDialogOpen(false)}
+                columns={availableColumns}
+                onToggleColumn={handleToggleColumn}
             />
 
             <div className="flex flex-col sm:flex-row gap-4 items-center justify-between mb-4">
@@ -686,7 +820,7 @@ export default function VectorResults({
                                     }}
                                     disabled={!showAttributes}
                                 >
-                                    Show Only Filtered Attributes (Persisted)
+                                    Show Only Filtered Attributes
                                 </DropdownMenuCheckboxItem>
                             )}
                             <DropdownMenuSeparator />
@@ -702,6 +836,7 @@ export default function VectorResults({
                                         key={col.name}
                                         checked={col.visible}
                                         onCheckedChange={(checked) => {
+                                            // Update local state
                                             setAvailableColumns((prev) =>
                                                 prev.map((c) =>
                                                     c.name === col.name
@@ -712,6 +847,9 @@ export default function VectorResults({
                                                         : c
                                                 )
                                             )
+                                            
+                                            // Persist the change
+                                            updateAttributeColumnVisibility(col.name, checked)
                                         }}
                                     >
                                         {col.name.charAt(0).toUpperCase() +
@@ -719,45 +857,23 @@ export default function VectorResults({
                                     </DropdownMenuCheckboxItem>
                                 ))}
 
-                            {/* Attribute Columns */}
+                            {/* Attribute Columns Menu Item */}
                             {availableColumns.some(
                                 (col) => col.type === "attribute"
                             ) && (
                                 <>
                                     <DropdownMenuSeparator />
-                                    <DropdownMenuLabel className="text-xs text-gray-500 pl-2">
-                                        Attributes
-                                    </DropdownMenuLabel>
-                                    {availableColumns
-                                        .filter(
-                                            (col) => col.type === "attribute"
-                                        )
-                                        .map((col) => (
-                                            <DropdownMenuCheckboxItem
-                                                key={col.name}
-                                                checked={col.visible}
-                                                onCheckedChange={(checked) => {
-                                                    setAvailableColumns(
-                                                        (prev) =>
-                                                            prev.map((c) =>
-                                                                c.name ===
-                                                                col.name
-                                                                    ? {
-                                                                          ...c,
-                                                                          visible:
-                                                                              checked,
-                                                                      }
-                                                                    : c
-                                                            )
-                                                    )
-                                                }}
-                                            >
-                                                {col.name
-                                                    .charAt(0)
-                                                    .toUpperCase() +
-                                                    col.name.slice(1)}
-                                            </DropdownMenuCheckboxItem>
-                                        ))}
+                                    <DropdownMenuItem 
+                                        onClick={() => setIsAttributeColumnsDialogOpen(true)}
+                                        className="cursor-pointer"
+                                    >
+                                        <div className="flex items-center justify-between w-full">
+                                            <span>Attribute Columns</span>
+                                            <span className="text-xs text-gray-500">
+                                                {availableColumns.filter(col => col.type === "attribute" && col.visible).length} / {availableColumns.filter(col => col.type === "attribute").length}
+                                            </span>
+                                        </div>
+                                    </DropdownMenuItem>
                                 </>
                             )}
                         </DropdownMenuContent>

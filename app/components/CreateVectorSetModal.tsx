@@ -77,7 +77,7 @@ export default function CreateVectorSetModal({
         resolver: zodResolver(vectorSetSchema),
         defaultValues: {
             name: "",
-            dimensions: 0,
+            dimensions: 256,
             customElement: "",
             customVector: "",
             quantization: undefined,
@@ -166,7 +166,7 @@ export default function CreateVectorSetModal({
             }
 
             // Build redisConfig object only with defined values
-            const redisConfig: Record<string, any> = {};
+            const redisConfig: Record<string, string | number | boolean> = {};
             
             // Only add properties that are explicitly set
             if (values.quantization) {
@@ -261,7 +261,7 @@ export default function CreateVectorSetModal({
 
                         <Form {...form}>
                             <p className="text-gray-600 mb-4 text-lg">
-                                We've chosen the defaults for you, all you have
+                                We&apos;ve chosen the defaults for you, all you have
                                 to do is provide the name of your vector set,
                                 but you can customize the settings below.
                             </p>
@@ -686,38 +686,6 @@ export default function CreateVectorSetModal({
                                                 onCheckedChange={field.onChange}
                                             />
                                         </FormControl>
-                                    </FormItem>
-                                )}
-                            />
-
-                            <FormField
-                                control={form.control}
-                                name="buildExplorationFactor"
-                                render={({ field }) => (
-                                    <FormItem className="form-item">
-                                        <div className="form-label">
-                                            <FormLabel>
-                                                Build Exploration Factor
-                                            </FormLabel>
-                                            <FormDescription>
-                                                Controls how detailed the
-                                                neighbor search is during index
-                                                building. Higher values may
-                                                improve accuracy but increase
-                                                build time.
-                                            </FormDescription>
-                                        </div>
-                                        <FormControl>
-                                            <Input
-                                                type="number"
-                                                className="text-right border-none"
-                                                placeholder="200 (default)"
-                                                min="1"
-                                                {...field}
-                                            />
-                                        </FormControl>
-
-                                        <FormMessage />
                                     </FormItem>
                                 )}
                             />

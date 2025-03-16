@@ -10,7 +10,6 @@ import {
     Check,
     Copy,
     Filter,
-    AlertCircle,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
@@ -32,7 +31,8 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Switch } from "@/components/ui/switch"
+import { Label } from "@/components/ui/label"
 
 const searchTypes = [
     {
@@ -63,6 +63,8 @@ interface SearchBoxProps {
     setSearchCount?: (value: string) => void
     error?: string | null
     clearError?: () => void
+    expansionFactor?: number
+    setExpansionFactor?: (value: number | undefined) => void
 }
 
 export default function SearchBox({
@@ -77,8 +79,9 @@ export default function SearchBox({
     metadata,
     searchCount,
     setSearchCount,
-    clearError,
     error,
+    expansionFactor,
+    setExpansionFactor,
 }: SearchBoxProps) {
     const [showFilters, setShowFilters] = useState(() => {
         // Initialize from localStorage, default to true if not set
@@ -86,9 +89,18 @@ export default function SearchBox({
         return stored ? JSON.parse(stored) : true
     })
     const [showFilterHelp, setShowFilterHelp] = useState(false)
+    const [showSearchOptions, setShowSearchOptions] = useState(false)
     // Add local filter state to debounce filter changes
     const [localFilter, setLocalFilter] = useState(searchFilter)
     const filterTimeoutRef = useRef<NodeJS.Timeout>()
+
+    // State for custom expansion factor
+    const [useCustomEF, setUseCustomEF] = useState(() => {
+        return !!expansionFactor
+    })
+    const [efValue, setEFValue] = useState(() => {
+        return expansionFactor?.toString() || "200"
+    })
 
     // Update local filter when searchFilter prop changes, but only on initial mount
     // or when the vector set changes, not on every searchFilter change
@@ -108,6 +120,27 @@ export default function SearchBox({
         filterTimeoutRef.current = setTimeout(() => {
             setSearchFilter(value)
         }, 500)
+    }
+
+    // Handle expansion factor changes
+    const handleEFToggle = (checked: boolean) => {
+        setUseCustomEF(checked)
+        if (setExpansionFactor) {
+            if (checked) {
+                const value = parseInt(efValue)
+                setExpansionFactor(isNaN(value) ? 200 : value)
+            } else {
+                setExpansionFactor(undefined)
+            }
+        }
+    }
+
+    const handleEFValueChange = (value: string) => {
+        setEFValue(value)
+        if (setExpansionFactor && useCustomEF) {
+            const numValue = parseInt(value)
+            setExpansionFactor(isNaN(numValue) ? 200 : numValue)
+        }
     }
 
     // Clean up timeout on unmount
@@ -188,7 +221,7 @@ export default function SearchBox({
             return `VSIM ${vectorSetName} VALUES [0.0000, 0.0000, ...] WITHSCORES COUNT 10`
 
         const type = searchType === "Element" ? "ELE" : "VALUES"
-        const count = "10" // Using default count of 10
+        const count = searchCount || "10"
         const filterExpr = localFilter ? `"${localFilter}"` : ""
 
         let command = `VSIM ${vectorSetName} ${type} `
@@ -217,6 +250,11 @@ export default function SearchBox({
 
         if (filterExpr) {
             command += ` FILTER ${filterExpr}`
+        }
+
+        // Add EF parameter if custom expansion factor is enabled
+        if (useCustomEF && efValue) {
+            command += ` EF ${efValue}`
         }
 
         return command
@@ -300,6 +338,13 @@ export default function SearchBox({
                                     {showRedisCommand && (
                                         <Check className="h-4 w-4 ml-2" />
                                     )}
+                                </div>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                                onClick={() => setShowSearchOptions(true)}
+                            >
+                                <div className="flex items-center justify-between w-full">
+                                    Search Options
                                 </div>
                             </DropdownMenuItem>
                         </DropdownMenuContent>
@@ -417,6 +462,7 @@ export default function SearchBox({
                 )}
             </div>
 
+            {/* Filter Help Dialog */}
             <Dialog open={showFilterHelp} onOpenChange={setShowFilterHelp}>
                 <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
                     <DialogHeader>
@@ -469,6 +515,56 @@ export default function SearchBox({
 .director in ["Spielberg", "Nolan"]
 (.year - 2000) ** 2 < 100 and .rating / 2 > 4`}</code>
                         </pre>
+                    </div>
+                </DialogContent>
+            </Dialog>
+
+            {/* Search Options Dialog */}
+            <Dialog open={showSearchOptions} onOpenChange={setShowSearchOptions}>
+                <DialogContent className="max-w-md">
+                    <DialogHeader>
+                        <DialogTitle className="text-lg font-bold">
+                            Search Options
+                        </DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-6">
+                        <div className="space-y-4">
+                            <div className="flex items-center justify-between">
+                                <div className="space-y-0.5">
+                                    <Label htmlFor="custom-ef">
+                                        Custom Build Exploration Factor (EF)
+                                    </Label>
+                                    <p className="text-sm text-gray-500">
+                                        Enable to set a custom HNSW expansion factor
+                                    </p>
+                                </div>
+                                <Switch
+                                    id="custom-ef"
+                                    checked={useCustomEF}
+                                    onCheckedChange={handleEFToggle}
+                                />
+                            </div>
+                            
+                            {useCustomEF && (
+                                <div className="space-y-2">
+                                    <Label htmlFor="ef-value">EF Value</Label>
+                                    <Input
+                                        id="ef-value"
+                                        type="number"
+                                        value={efValue}
+                                        onChange={(e) => handleEFValueChange(e.target.value)}
+                                        min="1"
+                                        className="w-full"
+                                    />
+                                    <p className="text-sm text-gray-500">
+                                        The Expansion Factor (EF) controls the search quality in HNSW graphs. 
+                                        Higher values (100-500) improve search quality at the cost of performance. 
+                                        Lower values (10-50) prioritize speed over accuracy. 
+                                        The default value of 200 provides a good balance.
+                                    </p>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </DialogContent>
             </Dialog>

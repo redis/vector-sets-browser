@@ -40,6 +40,7 @@ export default function VectorSetVisualization({
         searchFilter: "",
         resultsTitle: "Search Results",
         searchTime: undefined as string | undefined,
+        expansionFactor: undefined
     })
 
     // Track vector set changes
@@ -126,19 +127,41 @@ export default function VectorSetVisualization({
     }
 
     return (
-        <div>
+        <div className="flex flex-col h-full">
+            <div className="mb-4 flex items-center gap-2">
+                <label className="text-sm font-medium text-gray-700">
+                    Visualization Type
+                </label>
+                <Select
+                    value={vizType}
+                    onValueChange={(value) => setVizType(value as "2d" | "3d")}
+                >
+                    <SelectTrigger className="w-[120px]">
+                        <SelectValue placeholder="Select type..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="2d">2D Graph</SelectItem>
+                        <SelectItem value="3d">3D Vectors</SelectItem>
+                    </SelectContent>
+                </Select>
+            </div>
+
             <SearchBox
                 vectorSetName={vectorSetName}
                 searchType={searchType}
                 setSearchType={setSearchType}
                 searchQuery={searchQuery}
                 setSearchQuery={setSearchQuery}
-                searchCount={searchCount}
-                setSearchCount={setSearchCount}
                 searchFilter={searchFilter}
                 setSearchFilter={setSearchFilter}
                 dim={dim}
                 metadata={metadata}
+                searchCount={searchCount}
+                setSearchCount={setSearchCount}
+                error={fileOperationStatus}
+                clearError={() => setFileOperationStatus("")}
+                expansionFactor={searchState.expansionFactor}
+                setExpansionFactor={(factor) => setSearchState({ ...searchState, expansionFactor: factor })}
             />
             <div className="bg-white rounded shadow-md h-[calc(100vh-300px)]">
                 <div className="p-4 rounded shadow-md flex-1 flex flex-col">
@@ -160,21 +183,6 @@ export default function VectorSetVisualization({
                             )}
                             <StatusMessage message={fileOperationStatus} />
                             <div className="grow"></div>
-
-                            <Select
-                                value={vizType}
-                                onValueChange={(value: "2d" | "3d") =>
-                                    setVizType(value)
-                                }
-                            >
-                                <SelectTrigger className="w-[100px]">
-                                    <SelectValue placeholder="Visualization" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="2d">2D View</SelectItem>
-                                    <SelectItem value="3d">3D View</SelectItem>
-                                </SelectContent>
-                            </Select>
                         </div>
                     </div>
                     <div

@@ -10,8 +10,7 @@ import InfoPanel from "../components/InfoPanel"
 import VectorSetHeader from "../components/VectorSetHeader"
 import { useRedisConnection } from "../hooks/useRedisConnection"
 import { useVectorSet } from "../hooks/useVectorSet"
-import { useFileOperations } from "../hooks/useFileOperations"
-import ImportTab from "../components/ImportTab"
+import ImportTab from "../components/ImportTab/ImportTab"
 import { getConnection, removeConnection } from "../lib/connectionManager"
 import { EmbeddingConfig, VectorSetMetadata } from "../types/embedding"
 import VectorSetVisualization from "../components/VectorSetVisualization"
@@ -77,12 +76,6 @@ export default function VectorSetPage() {
         setResults,
     } = useVectorSet()
 
-    const { handleSaveConfig } = useFileOperations({
-        vectorSetName,
-        onModalClose: () => {}, // No need to reload since we're not managing results here anymore
-        onStatusChange: (status) => console.log(status),
-    })
-
     const handleDisconnect = () => {
         if (connectionId) {
             removeConnection(connectionId)
@@ -119,7 +112,12 @@ export default function VectorSetPage() {
                     if (savedConnections) {
                         const connections = JSON.parse(savedConnections)
                         const matchingConnection = connections.find(
-                            (conn: { id: string; host: string; port: string; name: string }) =>
+                            (conn: {
+                                id: string
+                                host: string
+                                port: string
+                                name: string
+                            }) =>
                                 conn.id === connection.url ||
                                 `redis://${conn.host}:${conn.port}` ===
                                     connection.url
@@ -179,7 +177,36 @@ export default function VectorSetPage() {
                 lastUpdated: new Date().toISOString(),
             }
 
-            await handleSaveConfig(vectorSetName, updatedMetadata)
+            const response = await fetch(
+                `/api/vectorset/${vectorSetName}/metadata`,
+                {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        metadata: updatedMetadata,
+                    }),
+                }
+            )
+            if (!response.ok) {
+                const errorData = await response.json()
+                console.error(
+                    "Failed to save metadata:",
+                    errorData
+                )
+                throw new Error(errorData.error || "Failed to save metadata")
+            }
+            const data = await response.json()
+            if (!data.success) {
+                console.error(
+                    "Save metadata failed:",
+                    data.error
+                )
+                throw new Error(data.error || "Failed to save metadata")
+            }
+            console.log(
+                "Metadata saved successfully:",
+                data
+            )
             setIsEditConfigModalOpen(false)
         } catch (error) {
             console.error("[VectorSetPage] Error saving config:", error)
@@ -298,7 +325,7 @@ export default function VectorSetPage() {
 
                         <TabsContent value="visualize">
                             {!isVectorSetChanging && (
-                                <VectorSetVisualization 
+                                <VectorSetVisualization
                                     vectorSetName={vectorSetName}
                                     dim={dim || 0}
                                     metadata={metadata}

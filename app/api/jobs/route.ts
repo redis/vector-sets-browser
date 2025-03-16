@@ -3,8 +3,8 @@ import { cookies } from "next/headers"
 import { JobQueueService } from "@/app/lib/server/job-queue"
 import { JobProcessor } from "@/app/lib/server/job-processor"
 import RedisClient from "@/app/lib/server/redis-client"
+import * as redis from "@/app/lib/server/redis-client"
 import { VectorSetMetadata } from "@/app/types/embedding"
-
 const REDIS_URL_COOKIE = "redis_url"
 
 // Map to store active job processors
@@ -75,13 +75,6 @@ export async function GET(req: NextRequest) {
                         jobs.push({ jobId, status, metadata })
                     }
                 }
-                if (vectorSetName) {
-                    console.log(
-                        "LIST JOBS for vector set",
-                        vectorSetName,
-                        jobs
-                    )
-                }
 
                 return jobs
             }
@@ -143,32 +136,37 @@ export async function POST(req: NextRequest) {
             )
         }
 
+        // Log form data for debugging
+        console.log(`[Jobs API] Creating job for vector set ${vectorSetName}`);
+        console.log(`[Jobs API] Form data keys:`, Array.from(formData.keys()));
+        
+        // Get element column and text column from form data
+        const elementColumn = formData.get("elementColumn") as string;
+        const textColumn = formData.get("textColumn") as string;
+        
+        // Get template fields if they exist
+        const elementTemplate = formData.get("elementTemplate") as string;
+        const textTemplate = formData.get("textTemplate") as string;
+        
+        // Get attribute columns from form data
+        const attributeColumns = formData.getAll("attributeColumns") as string[];
+        
+        // Get other configuration options
+        const delimiter = formData.get("delimiter") as string || ",";
+        const hasHeader = formData.get("hasHeader") === "true";
+        const skipRows = parseInt(formData.get("skipRows") as string || "0", 10);
+        
+        console.log(`[Jobs API] Element column: ${elementColumn || 'not specified'}`);
+        console.log(`[Jobs API] Text column: ${textColumn || 'not specified'}`);
+        console.log(`[Jobs API] Element template: ${elementTemplate || 'not specified'}`);
+        console.log(`[Jobs API] Text template: ${textTemplate || 'not specified'}`);
+        console.log(`[Jobs API] Attribute columns: ${attributeColumns.length ? attributeColumns.join(', ') : 'none'}`);
+        console.log(`[Jobs API] Delimiter: ${delimiter}, Has header: ${hasHeader}, Skip rows: ${skipRows}`);
+
         // Get vector set metadata
-        const metadataResult = await RedisClient.withConnection(
-            redisResult.url,
-            async (client) => {
-                const metadataKey = `${vectorSetName}_metadata`
-                const storedData = await client.hGetAll(metadataKey)
-                return storedData
-            }
-        )
-
-        if (!metadataResult.success) {
-            return NextResponse.json(
-                {
-                    error: "Failed to get vector set metadata",
-                    details: metadataResult.error,
-                },
-                { status: 400 }
-            )
-        }
-
-        const metadata = metadataResult.result.data
-            ? ((typeof metadataResult.result.data === "string"
-                  ? JSON.parse(metadataResult.result.data)
-                  : metadataResult.result.data) as VectorSetMetadata)
-            : null
-
+        const result = await redis.getMetadata(redisResult.url, vectorSetName)
+        const metadata = result.result as VectorSetMetadata | null
+        
         if (!metadata?.embedding) {
             return NextResponse.json(
                 {
@@ -185,7 +183,17 @@ export async function POST(req: NextRequest) {
             redisResult.url,
             file,
             vectorSetName,
-            metadata.embedding
+            metadata.embedding,
+            {
+                elementColumn: elementColumn || undefined,
+                textColumn: textColumn || undefined,
+                elementTemplate: elementTemplate || undefined,
+                textTemplate: textTemplate || undefined,
+                attributeColumns: attributeColumns.length > 0 ? attributeColumns : undefined,
+                delimiter,
+                hasHeader,
+                skipRows
+            }
         )
 
         // Start processing the job

@@ -16,12 +16,21 @@ interface VsimRequestBody {
     count: number
     withEmbeddings?: boolean
     filter?: string
+    expansionFactor?: number
 }
 
 export async function POST(request: Request) {
     try {
         const body = (await request.json()) as VsimRequestBody
-        const { keyName, searchVector, searchElement, count, withEmbeddings = false, filter = "" } = body
+        const { 
+            keyName, 
+            searchVector, 
+            searchElement, 
+            count, 
+            withEmbeddings = false, 
+            filter = "",
+            expansionFactor 
+        } = body
 
         if (!keyName || (!searchVector && !searchElement)) {
             return NextResponse.json(
@@ -42,7 +51,8 @@ export async function POST(request: Request) {
             searchVector,
             searchElement,
             count: count || 10,
-            filter
+            filter,
+            expansionFactor
         }
 
         const data = await redis.vsim(url, keyName, params)

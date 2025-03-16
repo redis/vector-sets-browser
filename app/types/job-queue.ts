@@ -11,10 +11,19 @@ export interface JobProgress {
 }
 
 export interface CSVJobMetadata {
-    vectorSetName: string;
+    jobId: string;
     filename: string;
-    created: string;
+    vectorSetName: string;
     embedding: EmbeddingConfig;
+    elementColumn?: string;
+    textColumn?: string;
+    elementTemplate?: string;
+    textTemplate?: string;
+    attributeColumns?: string[];
+    total: number;
+    delimiter?: string;
+    hasHeader?: boolean;
+    skipRows?: number;
 }
 
 export interface CSVRow {
@@ -22,8 +31,9 @@ export interface CSVRow {
 }
 
 export interface JobQueueItem {
-    element: string;
-    data: string;
+    jobId: string;
+    rowData: CSVRow;
+    index: number;
 }
 
 // Redis key helpers

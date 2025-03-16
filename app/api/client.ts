@@ -55,8 +55,10 @@ export const apiClient = {
             if (!responseData.success) {
                 console.error("Operation failed:", responseData);
                 const errorMessage = responseData.error || 
-                                     (responseData.result && responseData.result.error) || 
-                                     'Operation failed';
+                                    (responseData.result && typeof responseData.result === 'object' && 'error' in responseData.result 
+                                        ? responseData.result.error 
+                                        : null) || 
+                                    'Operation failed';
                 throw new ApiError(errorMessage, undefined, responseData);
             }
 
@@ -86,8 +88,11 @@ export const apiClient = {
     async post<TResponse, TRequest>(
         url: string,
         data: TRequest,
-        headers?: Record<string, string>
+        headersOrOptions?: Record<string, string> | boolean
     ) {
+        // For backward compatibility, if the third parameter is a boolean, ignore it
+        const headers = typeof headersOrOptions === 'object' ? headersOrOptions : undefined;
+        
         return this.request<TResponse, TRequest>(url, {
             method: 'POST',
             data,

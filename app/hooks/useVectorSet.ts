@@ -17,7 +17,7 @@ interface UseVectorSetReturn {
     results: VectorTuple[]
     setResults: (results: VectorTuple[]) => void
     loadVectorSet: () => Promise<void>
-    handleAddVector: (element: string, elementData: string | number[]) => Promise<void>
+    handleAddVector: (element: string, elementData: string | number[], useCAS?: boolean) => Promise<void>
     handleDeleteVector: (element: string) => Promise<void>
     handleShowVector: (element: string) => Promise<number[] | null>
 }
@@ -115,10 +115,9 @@ export function useVectorSet(): UseVectorSetReturn {
     };
 
     // Handle adding a new vector
-    const handleAddVector = async (element: string, elementData: string | number[]) => {
+    const handleAddVector = async (element: string, elementData: string | number[], useCAS?: boolean) => {
         if (!vectorSetName) {
-            setStatusMessage("Please select a vector set first")
-            return
+            throw new Error("Please select a vector set first");
         }
 
         try {
@@ -148,9 +147,12 @@ export function useVectorSet(): UseVectorSetReturn {
             } else {  
                 throw new Error("Error with Vector Set configuration.");
             }
-
+            const reduceDimensions = metadata?.redisConfig?.reduceDimensions 
+                ? metadata?.redisConfig?.reduceDimensions
+                : undefined
             // Add the vector using Redis commands
-            await redisCommands.vadd(vectorSetName, element, vector);
+            await redisCommands.vadd(vectorSetName, element, vector, undefined, useCAS, reduceDimensions);
+            
             setStatusMessage("Vector created successfully");
 
             // Add the new vector to the results list
@@ -169,6 +171,8 @@ export function useVectorSet(): UseVectorSetReturn {
         } catch (error) {
             console.error("Error creating vector:", error);
             setStatusMessage(error instanceof ApiError ? error.message : "Error creating vector");
+            // Re-throw the error so it can be caught by the caller
+            throw error;
         }
     };
 
