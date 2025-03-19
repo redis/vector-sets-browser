@@ -43,6 +43,11 @@ export default function RootLayout({
 
     return (
         <html lang="en">
+            <head>
+                <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+                <title>Vector Sets Browser</title>
+                <meta name="description" content="Vector Sets Browser Application" />
+            </head>
             <body>
                 <div className="min-h-screen bg-gray-100 flex flex-col">
                     <TopNav 

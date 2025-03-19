@@ -16,6 +16,10 @@ const config: Config = {
             },
         },
         extend: {
+            fontFamily: {
+                sans: ["Geist", "Space Grotesk", "sans-serif"],
+                mono: ["Geist Mono", "Space Mono", "monospace"],
+            },
             colors: {
                 background: "hsl(var(--background))",
                 foreground: "hsl(var(--foreground))",

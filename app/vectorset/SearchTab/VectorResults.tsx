@@ -909,7 +909,7 @@ export default function VectorResults({
                             </Button>
                             
                             {onAddVector && (
-                                <Button variant="default" onClick={handleAddVector}>
+                                <Button variant="outline" onClick={handleAddVector}>
                                     <svg
                                         className="w-5 h-5"
                                         fill="none"
@@ -928,8 +928,9 @@ export default function VectorResults({
                             )}
                             <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
-                                    <Button variant="outline" size="icon">
+                                    <Button variant="outline">
                                         <Settings className="h-4 w-4" />
+                                        Options
                                     </Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end" className="w-56">

@@ -283,11 +283,12 @@ export default function ImportTab({ vectorSetName, metadata }: ImportTabProps) {
                                     </div>
                                 ) : (
                                     <div>
-                                        <p className="p-4">
+                                        <p className="py-4">
+                             
                                             Import your data into this Vector
                                             Set to get started.
                                         </p>
-                                        <p className="p-4">
+                                        <p className="py-4">
                                             This vector set is configured to use{" "}
                                             <strong>
                                                 {" "}

@@ -1,3 +1,19 @@
+@font-face {
+  font-family: 'Geist';
+  src: url('/app/fonts/GeistVF.woff') format('woff');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Geist Mono';
+  src: url('/app/fonts/GeistMonoVF.woff') format('woff');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
 @import url('https://fonts.googleapis.com/css2?family=Space+Mono&display=swap');
 @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;700&display=swap');
 
@@ -11,11 +27,11 @@
   }
 
   .redis-mono {
-    font-family: "Space Mono", monospace;
+    font-family: "Geist Mono", "Space Mono", monospace;
   }
     
   .redis-grotesk {
-    font-family: "Space Grotesk", sans-serif;
+    font-family: "Geist", "Space Grotesk", sans-serif;
   }
 
   .text-column {
@@ -30,8 +46,8 @@
 
 @layer base {
   :root {
-    /* --font-body: 'Space Grotesk', sans-serif; */
-    --font-mono: 'Space Mono', monospace;
+    --font-body: 'Geist', 'Space Grotesk', sans-serif;
+    --font-mono: 'Geist Mono', 'Space Mono', monospace;
     --background: 0 0% 100%;
     --foreground: 0 0% 3.9%;
     --card: 0 0% 100%;

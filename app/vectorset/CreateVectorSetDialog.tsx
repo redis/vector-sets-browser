@@ -19,11 +19,12 @@ import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { ArrowLeft, ChevronRight } from "lucide-react"
+import { ArrowLeft, ChevronRight, Database } from "lucide-react"
 import { useState } from "react"
 import { FormProvider, useForm } from "react-hook-form"
 import { z } from "zod"
 import EditEmbeddingConfigModal from "../components/EmbeddingConfig/EditEmbeddingConfigDialog"
+import ImportSampleData from "./ImportTab/ImportSampleData"
 
 interface CreateVectorSetModalProps {
     isOpen: boolean
@@ -51,6 +52,8 @@ const vectorSetSchema = z.object({
     reduceDimensions: z.string().optional(),
     defaultCAS: z.boolean().optional(),
     buildExplorationFactor: z.string().optional(),
+    loadSampleData: z.boolean().optional(),
+    selectedDataset: z.string().optional(),
 })
 
 type FormValues = z.infer<typeof vectorSetSchema>
@@ -77,6 +80,9 @@ export default function CreateVectorSetModal({
     // Add state for sliding panels
     const [activePanel, setActivePanel] = useState<string | null>(null)
 
+    const [isSampleDataImportStarted, setIsSampleDataImportStarted] = useState(false)
+    const [selectedSampleDataset, setSelectedSampleDataset] = useState<string | null>(null)
+
     const form = useForm<FormValues>({
         resolver: zodResolver(vectorSetSchema),
         defaultValues: {
@@ -88,6 +94,8 @@ export default function CreateVectorSetModal({
             reduceDimensions: undefined,
             defaultCAS: undefined,
             buildExplorationFactor: undefined,
+            loadSampleData: false,
+            selectedDataset: undefined,
         },
     })
 
@@ -234,13 +242,19 @@ export default function CreateVectorSetModal({
                       }
                     : undefined
 
-            await onCreate(
+            const result = await onCreate(
                 values.name.trim(),
                 effectiveDimensions,
                 metadata,
                 customData
             )
-            onClose()
+            
+            // Don't close dialog if sample data import is selected
+            if (!values.loadSampleData) {
+                onClose()
+            } else {
+                setIsSampleDataImportStarted(true)
+            }
         } catch (err) {
             console.error("Error in CreateVectorSetModal handleSubmit:", err)
             setError(
@@ -262,7 +276,7 @@ export default function CreateVectorSetModal({
                     {/* Main Form Content */}
                     <div
                         className={`transition-transform duration-300 ${
-                            activePanel ? "transform -translate-x-full" : ""
+                            activePanel || isSampleDataImportStarted ? "transform -translate-x-full" : ""
                         } w-full`}
                     >
                         <div className="mb-4">
@@ -345,6 +359,36 @@ export default function CreateVectorSetModal({
                                             </div>
                                         </div>
                                     </div>
+                                    
+                                    <div className="form-section">
+                                        {/* Sample Data Button */}
+                                        <div
+                                            className="w-full cursor-pointer"
+                                            onClick={() =>
+                                                setActivePanel(
+                                                    "sampleData"
+                                                )
+                                            }
+                                        >
+                                            <div className="flex w-full space-x-2 items-center">
+                                                <div className="text-lg font-medium">
+                                                    Load Sample Data
+                                                </div>
+                                                <div className="grow"></div>
+                                                <div className="text-right text-gray-500 flex flex-col">
+                                                    <div>
+                                                        {form.watch("loadSampleData") 
+                                                            ? "Yes" 
+                                                            : "No"}
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <ChevronRight className="h-5 w-5" />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
                                     <div className="form-section">
                                         {/* Advanced Configuration Button */}
                                         <div
@@ -506,12 +550,12 @@ export default function CreateVectorSetModal({
                                                 name="dimensions"
                                                 render={({ field }) => (
                                                     <FormItem className="form-item border-none">
-                                                        <div className="form-label">
+                                                        <FormLabel className="form-label">
                                                             <FormLabel className="form-label">
                                                                 Dimensions
                                                             </FormLabel>
                                                             <FormMessage />
-                                                        </div>
+                                                        </FormLabel>
                                                         <FormControl className="form-control">
                                                             <Input
                                                                 type="number"
@@ -585,6 +629,67 @@ export default function CreateVectorSetModal({
                                     </div>
                                 </TabsContent>
                             </Tabs>
+                        </div>
+                    </div>
+
+                    {/* Sample Data Panel */}
+                    <div
+                        className={`absolute top-0 left-0 w-full h-full bg-white p-6 transition-transform duration-300 transform ${
+                            activePanel === "sampleData"
+                                ? "translate-x-0"
+                                : "translate-x-full"
+                        } overflow-y-auto`}
+                    >
+                        <div className="flex items-center mb-4 border-b pb-4">
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="mr-2"
+                                onClick={() => setActivePanel(null)}
+                            >
+                                <ArrowLeft className="h-5 w-5" />
+                            </Button>
+                            <h2 className="text-xl font-semibold">
+                                Load Sample Data
+                            </h2>
+                        </div>
+
+                        <div className="space-y-4">
+                            <p className="text-gray-600">
+                                Would you like to load sample data into your vector set?
+                                This will help you get started quickly with pre-populated data.
+                            </p>
+                        
+                            <FormField
+                                control={form.control}
+                                name="loadSampleData"
+                                render={({ field }) => (
+                                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                                        <div className="space-y-0.5">
+                                            <FormLabel className="text-base">
+                                                Import sample data after creation
+                                            </FormLabel>
+                                            <FormDescription>
+                                                Start with curated sample datasets
+                                            </FormDescription>
+                                        </div>
+                                        <FormControl>
+                                            <Switch
+                                                checked={field.value}
+                                                onCheckedChange={field.onChange}
+                                            />
+                                        </FormControl>
+                                    </FormItem>
+                                )}
+                            />
+                            
+                            {form.watch("loadSampleData") && (
+                                <div className="mt-4">
+                                    <p className="text-sm text-gray-600 mb-2">
+                                        You'll be able to choose your dataset after creating the vector set.
+                                    </p>
+                                </div>
+                            )}
                         </div>
                     </div>
 
@@ -706,6 +811,46 @@ export default function CreateVectorSetModal({
                                 )}
                             />
                         </div>
+                    </div>
+                    
+                    {/* Sample Data Import Panel - This is shown after vector set is created */}
+                    <div
+                        className={`absolute top-0 left-0 w-full h-full bg-white p-6 transition-transform duration-300 transform ${
+                            isSampleDataImportStarted
+                                ? "translate-x-0"
+                                : "translate-x-full"
+                        } overflow-y-auto`}
+                    >
+                        <div className="flex items-center mb-4 border-b pb-4">
+                            <h2 className="text-xl font-semibold">
+                                Import Sample Data
+                            </h2>
+                        </div>
+                        
+                        {isSampleDataImportStarted && (
+                            <ImportSampleData 
+                                onClose={onClose}
+                                metadata={
+                                    activeTab === "automatic"
+                                        ? {
+                                            ...createVectorSetMetadata(embeddingConfig),
+                                            redisConfig: form.getValues("quantization") 
+                                                ? { quantization: form.getValues("quantization") } 
+                                                : undefined,
+                                          }
+                                        : {
+                                            embedding: {
+                                                provider: "none" as EmbeddingProvider,
+                                            },
+                                            created: new Date().toISOString(),
+                                            redisConfig: form.getValues("quantization")
+                                                ? { quantization: form.getValues("quantization") }
+                                                : undefined,
+                                        }
+                                }
+                                vectorSetName={form.getValues("name").trim()}
+                            />
+                        )}
                     </div>
                 </FormProvider>
 

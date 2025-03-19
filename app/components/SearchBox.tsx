@@ -88,10 +88,14 @@ export default function SearchBox({
     executedCommand,
     results = [],
 }: SearchBoxProps) {
-    const [showFilters, setShowFilters] = useState(true)
+    const [showFilters, setShowFilters] = useState(() => {
+        return userSettings.get("showFilters") ?? true
+    })
     const [showFilterHelp, setShowFilterHelp] = useState(false)
     const [showSearchOptions, setShowSearchOptions] = useState(false)
-    const [showRedisCommand, setShowRedisCommand] = useState(true)
+    const [showRedisCommand, setShowRedisCommand] = useState(() => {
+        return userSettings.get("showRedisCommand") ?? true
+    })
     // Add local filter state to debounce filter changes
     const [localFilter, setLocalFilter] = useState(searchFilter)
     const filterTimeoutRef = useRef<NodeJS.Timeout>()
@@ -212,17 +216,6 @@ export default function SearchBox({
             }
         }
     }, [metadata]) // Only run when metadata changes
-
-    // Load user settings
-    useEffect(() => {
-        const loadSettings = () => {
-            const storedFilters = userSettings.get("showFilters")
-            const storedCommand = userSettings.get("showRedisCommand")
-            setShowFilters(storedFilters ?? true)
-            setShowRedisCommand(storedCommand ?? true)
-        }
-        loadSettings()
-    }, [])
 
     // Debug logging for results
     useEffect(() => {
