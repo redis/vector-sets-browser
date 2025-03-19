@@ -1,15 +1,15 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
-import RedisConnectionList from "../components/RedisConnectionList"
+import { Card } from "@/components/ui/card"
+import { useRouter } from "next/navigation"
+import { useEffect, useRef, useState } from "react"
+import { toast } from "sonner"
 import { useRedisConnection } from "../hooks/useRedisConnection"
 import {
-    storeConnection,
     cleanupOldConnections,
-} from "../lib/connectionManager"
-import { toast } from "sonner"
-import { useRouter } from "next/navigation"
-import { Card } from "@/components/ui/card"
+    storeConnection,
+} from "../redis-server/connectionManager"
+import RedisConnectionList from "./RedisConnectionList"
 
 export default function ConsolePage() {
     const router = useRouter()
@@ -17,28 +17,24 @@ export default function ConsolePage() {
         useRedisConnection()
     const [isConnecting, setIsConnecting] = useState(false)
     const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
-    const connectionListRef = useRef<{ setIsAddDialogOpen: (open: boolean) => void } | null>(null)
+    const connectionListRef = useRef<{
+        setIsAddDialogOpen: (open: boolean) => void
+    } | null>(null)
 
     const handleConnectionSuccess = async (url: string) => {
         setIsConnecting(true)
         try {
-            console.log("Starting connection process for:", url)
             // Clean up old connections first
             cleanupOldConnections()
 
             // Try to connect to Redis
-            console.log("Attempting to connect to Redis...")
             const success = await handleConnect(url)
-            console.log("Connection result:", success, "Status:", statusMessage)
 
             if (success) {
                 // Store connection details and get connection ID
                 const connectionId = storeConnection(url)
-                console.log("Connection stored with ID:", connectionId)
 
                 // Redirect to vectorset page with the connection ID
-                console.log("Redirecting to:", `/vectorset?cid=${connectionId}`)
-                // Use window.location for a more forceful redirect
                 window.location.href = `/vectorset?cid=${connectionId}`
             } else {
                 toast.error(statusMessage || "Failed to connect to Redis")

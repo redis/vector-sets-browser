@@ -1,21 +1,11 @@
+import { VinfoRequestBody } from "@/app/redis-server/api"
+import * as redis from "@/app/redis-server/server/commands"
+import { getRedisUrl } from "@/app/redis-server/server/commands"
 import { NextResponse } from "next/server"
-import { cookies } from "next/headers"
-import * as redis from "@/app/lib/server/redis-client"
-
-// Helper to get Redis URL from cookies
-function getRedisUrl(): string | null {
-    const url = cookies().get("redis_url")?.value
-    return url || null
-}
-
-// Type definitions for the request body
-interface VinfoRequestBody {
-    keyName: string
-}
 
 export async function POST(request: Request) {
     try {
-        const body = await request.json() as VinfoRequestBody
+        const body = (await request.json()) as VinfoRequestBody
         const { keyName } = body
 
         if (!keyName) {
@@ -25,15 +15,15 @@ export async function POST(request: Request) {
             )
         }
 
-        const url = getRedisUrl()
-        if (!url) {
+        const redisUrl = redis.getRedisUrl()
+        if (!redisUrl) {
             return NextResponse.json(
                 { success: false, error: "No Redis connection available" },
                 { status: 401 }
             )
         }
 
-        const result = await redis.vinfo(url, keyName)
+        const result = await redis.vinfo(redisUrl, keyName)
 
         if (!result.success) {
             return NextResponse.json(
@@ -44,14 +34,14 @@ export async function POST(request: Request) {
 
         return NextResponse.json({
             success: true,
-            result: result.result
+            result: result.result,
         })
     } catch (error) {
         console.error("Error in VINFO API:", error)
         return NextResponse.json(
-            { 
+            {
                 success: false,
-                error: error instanceof Error ? error.message : String(error) 
+                error: error instanceof Error ? error.message : String(error),
             },
             { status: 500 }
         )
@@ -61,15 +51,15 @@ export async function POST(request: Request) {
 // Also support GET requests for compatibility
 export async function GET(request: Request) {
     const url = new URL(request.url)
-    const keyName = url.searchParams.get('key')
-    
+    const keyName = url.searchParams.get("key")
+
     if (!keyName) {
         return NextResponse.json(
             { success: false, error: "Key parameter is required" },
             { status: 400 }
         )
     }
-    
+
     const redisUrl = getRedisUrl()
     if (!redisUrl) {
         return NextResponse.json(
@@ -77,29 +67,29 @@ export async function GET(request: Request) {
             { status: 401 }
         )
     }
-    
+
     try {
         const result = await redis.vinfo(redisUrl, keyName)
-        
+
         if (!result.success) {
             return NextResponse.json(
                 { success: false, error: result.error },
                 { status: 500 }
             )
         }
-        
+
         return NextResponse.json({
             success: true,
-            result: result.result
+            result: result.result,
         })
     } catch (error) {
         console.error("Error in VINFO API (GET):", error)
         return NextResponse.json(
-            { 
+            {
                 success: false,
-                error: error instanceof Error ? error.message : String(error) 
+                error: error instanceof Error ? error.message : String(error),
             },
             { status: 500 }
         )
     }
-} 
+}

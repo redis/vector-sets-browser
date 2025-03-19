@@ -1,7 +1,6 @@
 "use client"
 
-import { useState } from "react"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Button } from "@/components/ui/button"
 import {
     Card,
     CardContent,
@@ -9,10 +8,11 @@ import {
     CardHeader,
     CardTitle,
 } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Image, Mic, Code, ChevronRight, Github } from "lucide-react"
-import Link from "next/link"
 import { CodeBlock } from "@/components/ui/code-block"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { ChevronRight, Code, Github, Image, Mic } from "lucide-react"
+import Link from "next/link"
+import { useState } from "react"
 
 export default function Home() {
     const [activeTab, setActiveTab] = useState("javascript")

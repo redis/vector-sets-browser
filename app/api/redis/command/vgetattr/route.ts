@@ -1,18 +1,18 @@
-import { NextRequest, NextResponse } from "next/server"
+import { VgetAttrRequestBody } from "@/app/redis-server/api"
 import {
+    getRedisUrl,
     RedisClient,
     VectorOperationResult,
-} from "@/app/lib/server/redis-client"
-import { VgetAttrRequest } from "@/app/api/types"
-import { getRedisUrl } from "@/app/lib/server/redis-client"
+} from "@/app/redis-server/server/commands"
+import { NextRequest, NextResponse } from "next/server"
 
 export async function POST(request: NextRequest) {
     try {
         const { keyName, element, elements } =
-            (await request.json()) as VgetAttrRequest
+            (await request.json()) as VgetAttrRequestBody
 
-        const url = getRedisUrl()
-        if (!url) {
+        const redisUrl = getRedisUrl()
+        if (!redisUrl) {
             return NextResponse.json(
                 { success: false, error: "No Redis connection available" },
                 { status: 401 }
@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
         if (elements) {
             // Multiple elements
             redisResult = await RedisClient.withConnection(
-                url,
+                redisUrl,
                 async (client) => {
                     const pipeline = client.multi()
                     for (const element of elements) {
@@ -62,7 +62,7 @@ export async function POST(request: NextRequest) {
         } else if (element) {
             // Single element
             redisResult = await RedisClient.withConnection(
-                url,
+                redisUrl,
                 async (client) => {
                     const command = ["VGETATTR", keyName, element]
                     return await client.sendCommand(command)

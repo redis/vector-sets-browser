@@ -1,9 +1,8 @@
-import { useState, useRef, useCallback, useEffect } from "react"
-import { VectorSetMetadata } from "../types/embedding"
-import { redisCommands } from "@/app/api/redis-commands"
-import { embeddings } from "@/app/api/embeddings"
 import { ApiError } from "@/app/api/client"
-import { VectorTuple } from "@/app/api/types"
+import { embeddings } from "@/app/embeddings/client"
+import { VectorTuple, vdim, vsim } from "@/app/redis-server/api"
+import { useCallback, useEffect, useRef, useState } from "react"
+import { VectorSetMetadata } from "@/app/embeddings/types/config"
 
 export interface VectorSetSearchState {
     searchType: "Vector" | "Element" | "Image"
@@ -13,6 +12,8 @@ export interface VectorSetSearchState {
     searchTime?: string // Add searchTime to store the search duration
     searchFilter: string
     expansionFactor?: number // Add expansionFactor
+    lastTextEmbedding?: number[] // Add lastTextEmbedding to store the last embedding vector for text
+    executedCommand?: string
 }
 
 interface UseVectorSearchProps {
@@ -43,6 +44,8 @@ interface UseVectorSearchReturn {
     clearError: () => void // Add function to clear errors
     expansionFactor?: number // Add expansionFactor
     setExpansionFactor: (value: number | undefined) => void // Add setExpansionFactor
+    lastTextEmbedding?: number[] // Add lastTextEmbedding to the return type
+    executedCommand?: string
 }
 
 export function useVectorSearch({
@@ -52,7 +55,7 @@ export function useVectorSearch({
     onStatusChange,
     onError,
     onSearchStateChange,
-    fetchEmbeddings = false
+    fetchEmbeddings = false,
 }: UseVectorSearchProps): UseVectorSearchReturn {
     const [isSearching, setIsSearching] = useState(false)
     const [error, setError] = useState<string | null>(null) // Add error state
@@ -76,11 +79,11 @@ export function useVectorSearch({
             searchFilter: "",
             resultsTitle: "Search Results",
             searchTime: undefined,
+            lastTextEmbedding: undefined,
         })
     // Handle search state updates
     const updateSearchState = useCallback(
         (update: Partial<VectorSetSearchState>) => {
-
             setInternalSearchState((prev) => {
                 const next = { ...prev, ...update }
                 onSearchStateChange(next)
@@ -98,10 +101,13 @@ export function useVectorSearch({
     }, [onError])
 
     // Helper function to set error
-    const handleError = useCallback((errorMessage: string) => {
-        setError(errorMessage)
-        if (onError) onError(errorMessage)
-    }, [onError])
+    const handleError = useCallback(
+        (errorMessage: string) => {
+            setError(errorMessage)
+            if (onError) onError(errorMessage)
+        },
+        [onError]
+    )
 
     // Function to perform a zero vector search
     const performZeroVectorSearch = useCallback(
@@ -114,32 +120,39 @@ export function useVectorSearch({
                 clearError()
 
                 // Get dimension from Redis
-                const dim = await redisCommands.vdim(vectorSetName)
+                const dim = await vdim({ keyName: vectorSetName! })
                 const zeroVector = Array(dim).fill(0)
 
                 // Perform search using the server-side timing
-                const vsimResponse = await redisCommands.vsim(
-                    vectorSetName!,
-                    zeroVector,
+                const vsimResponse = await vsim({
+                    keyName: vectorSetName!,
+                    searchVector: zeroVector,
                     count,
-                    fetchEmbeddings,
-                    internalSearchState.searchFilter,
-                    internalSearchState.expansionFactor
-                )
-                
+                    withEmbeddings: fetchEmbeddings,
+                    filter: internalSearchState.searchFilter,
+                    expansionFactor: internalSearchState.expansionFactor
+                })
+
                 // Use the execution time from the server response
                 if (vsimResponse.executionTimeMs) {
-                    const durationInSeconds = (vsimResponse.executionTimeMs / 1000).toFixed(4)
+                    const durationInSeconds = (
+                        vsimResponse.executionTimeMs / 1000
+                    ).toFixed(4)
                     updateSearchState({ searchTime: durationInSeconds })
                 }
 
                 onStatusChange("")
                 // Process results
                 onSearchResults(vsimResponse.result)
+
+                if (vsimResponse.executedCommand) {
+                    updateSearchState({ executedCommand: vsimResponse.executedCommand })
+                }
             } catch (error) {
                 console.error("Zero vector search error:", error)
                 // Format the error as a string before passing to error handler
-                const errorMessage = error instanceof Error ? error.message : String(error)
+                const errorMessage =
+                    error instanceof Error ? error.message : String(error)
                 handleError(errorMessage)
                 onSearchResults([])
             } finally {
@@ -155,19 +168,22 @@ export function useVectorSearch({
             internalSearchState.expansionFactor,
             clearError,
             handleError,
-            updateSearchState
+            updateSearchState,
         ]
     )
 
     // Reset when vectorSetName changes
     useEffect(() => {
         // Skip if this vectorSetName is already being processed
-        if (vectorSetName && currentSearchVectorSetRef.current === vectorSetName) {
-            return;
+        if (
+            vectorSetName &&
+            currentSearchVectorSetRef.current === vectorSetName
+        ) {
+            return
         }
 
         // Set current vector set being processed
-        currentSearchVectorSetRef.current = vectorSetName;
+        currentSearchVectorSetRef.current = vectorSetName
 
         // Clear any pending searches
         if (searchTimeoutRef.current) {
@@ -178,7 +194,7 @@ export function useVectorSearch({
         clearError()
 
         // Save the current filter before resetting
-        const currentFilter = internalSearchState.searchFilter;
+        const currentFilter = internalSearchState.searchFilter
 
         // Reset internal state but preserve the filter
         initialSearchDone.current = false
@@ -188,7 +204,7 @@ export function useVectorSearch({
             count: "10",
             filter: currentFilter, // Preserve the filter
         }
-        
+
         setInternalSearchState({
             searchType: "Vector",
             searchQuery: "",
@@ -196,6 +212,7 @@ export function useVectorSearch({
             searchFilter: currentFilter, // Preserve the filter
             resultsTitle: "Search Results",
             searchTime: undefined,
+            lastTextEmbedding: undefined,
         })
 
         onSearchStateChange({
@@ -205,6 +222,7 @@ export function useVectorSearch({
             searchFilter: currentFilter, // Preserve the filter
             resultsTitle: "Search Results",
             searchTime: undefined,
+            lastTextEmbedding: undefined,
         })
 
         // Clear results and status
@@ -229,7 +247,7 @@ export function useVectorSearch({
                 })
         } else {
             // Clear the current search vector set if no vector set name
-            currentSearchVectorSetRef.current = null;
+            currentSearchVectorSetRef.current = null
         }
     }, [
         vectorSetName,
@@ -250,8 +268,10 @@ export function useVectorSearch({
         }
 
         // Use a longer timeout for filter changes to give users time to type
-        const timeoutDuration = 
-            lastSearchRef.current.filter !== internalSearchState.searchFilter ? 800 : 300;
+        const timeoutDuration =
+            lastSearchRef.current.filter !== internalSearchState.searchFilter
+                ? 800
+                : 300
 
         searchTimeoutRef.current = setTimeout(() => {
             performSearch()
@@ -282,22 +302,22 @@ export function useVectorSearch({
             console.error("Search error:", error)
 
             // Extract the error message, ensuring we get the actual Redis error
-            let errorMessage = "Search failed";
+            let errorMessage = "Search failed"
             if (error instanceof ApiError) {
                 // Try to get the detailed error message
-                errorMessage = error.message;
-                
+                errorMessage = error.message
+
                 // Log the full error data to help debug
-                console.log("Full API error data:", error.data);
+                console.error("Full API error data:", error.data)
             } else if (error instanceof Error) {
-                errorMessage = error.message;
+                errorMessage = error.message
             } else {
-                errorMessage = String(error);
+                errorMessage = String(error)
             }
-            
+
             // Set the error state instead of using onStatusChange
-            handleError(errorMessage);
-            onSearchResults([]);
+            handleError(errorMessage)
+            onSearchResults([])
         },
         [handleError, onSearchResults]
     )
@@ -318,11 +338,12 @@ export function useVectorSearch({
                 metadata.embedding,
                 text
             )
-            if (!embedding) {
-                console.error("Error getting embedding")
+
+            if (!embedding.success || !embedding.result) {
+                console.error("Error getting embedding", embedding)
                 return []
             } else {
-                return embedding
+                return embedding.result
             }
         },
         [metadata]
@@ -352,6 +373,9 @@ export function useVectorSearch({
                 searchString = `Results for Vector [${firstThreeNumbers}${
                     searchVector.length > 3 ? "..." : ""
                 }]`
+                
+                // Clear any previous text embedding since this is a raw vector search
+                updateSearchState({ lastTextEmbedding: undefined })
             } else {
                 // Not a valid vector, try to convert text to vector
                 updateSearchState({ resultsTitle: "Getting embedding..." })
@@ -359,27 +383,26 @@ export function useVectorSearch({
                     internalSearchState.searchQuery
                 )
                 searchString = `Results for "${internalSearchState.searchQuery}"`
+                
+                // Store the text embedding
+                updateSearchState({ lastTextEmbedding: searchVector })
             }
 
-            // Get and validate vector dimension
-            // const expectedDim = await redisCommands.vdim(vectorSetName);
-            // if (searchVector.length !== expectedDim) {
-            //     throw new Error(`Vector dimension mismatch - expected ${expectedDim} but got ${searchVector.length}`);
-            // }
-
             // Perform vector-based search and measure time
-            const vsimResponse = await redisCommands.vsim(
-                vectorSetName!,
+            const vsimResponse = await vsim({
+                keyName: vectorSetName!,
                 searchVector,
                 count,
-                fetchEmbeddings,
-                internalSearchState.searchFilter,
-                internalSearchState.expansionFactor
-            )
-            
+                withEmbeddings: fetchEmbeddings,
+                filter: internalSearchState.searchFilter,
+                expansionFactor: internalSearchState.expansionFactor
+            })
+
             // Use the execution time from the server response
             if (vsimResponse.executionTimeMs) {
-                const durationInSeconds = (vsimResponse.executionTimeMs / 1000).toFixed(4)
+                const durationInSeconds = (
+                    vsimResponse.executionTimeMs / 1000
+                ).toFixed(4)
                 updateSearchState({ searchTime: durationInSeconds })
             }
 
@@ -390,6 +413,10 @@ export function useVectorSearch({
             onSearchResults(vsimResponse.result)
 
             onStatusChange(searchString)
+
+            if (vsimResponse.executedCommand) {
+                updateSearchState({ executedCommand: vsimResponse.executedCommand })
+            }
         },
         [
             vectorSetName,
@@ -412,21 +439,23 @@ export function useVectorSearch({
 
             // Clear any previous errors when starting a new search
             clearError()
-            
+
             onStatusChange(`Element: "${internalSearchState.searchQuery}"`)
 
-            const vsimResponse = await redisCommands.vsim(
-                vectorSetName!,
-                internalSearchState.searchQuery,
+            const vsimResponse = await vsim({
+                keyName: vectorSetName!,
+                searchElement: internalSearchState.searchQuery,
                 count,
-                fetchEmbeddings,
-                internalSearchState.searchFilter,
-                internalSearchState.expansionFactor
-            )
-            
+                withEmbeddings: fetchEmbeddings,
+                filter: internalSearchState.searchFilter,
+                expansionFactor: internalSearchState.expansionFactor
+            })
+
             // Use the execution time from the server response
             if (vsimResponse.executionTimeMs) {
-                const durationInSeconds = (vsimResponse.executionTimeMs / 1000).toFixed(4)
+                const durationInSeconds = (
+                    vsimResponse.executionTimeMs / 1000
+                ).toFixed(4)
                 updateSearchState({ searchTime: durationInSeconds })
             }
 
@@ -437,6 +466,10 @@ export function useVectorSearch({
 
             // Process results
             onSearchResults(vsimResponse.result)
+
+            if (vsimResponse.executedCommand) {
+                updateSearchState({ executedCommand: vsimResponse.executedCommand })
+            }
         },
         [
             vectorSetName,
@@ -458,8 +491,10 @@ export function useVectorSearch({
             !vectorSetName ||
             (lastSearchRef.current.query === internalSearchState.searchQuery &&
                 lastSearchRef.current.type === internalSearchState.searchType &&
-                lastSearchRef.current.count === internalSearchState.searchCount &&
-                lastSearchRef.current.filter === internalSearchState.searchFilter)
+                lastSearchRef.current.count ===
+                    internalSearchState.searchCount &&
+                lastSearchRef.current.filter ===
+                    internalSearchState.searchFilter)
         ) {
             return
         }
@@ -475,7 +510,7 @@ export function useVectorSearch({
         setIsSearching(true)
         // Clear any previous errors when starting a new search
         clearError()
-        
+
         const count = parseCount(internalSearchState.searchCount)
 
         try {
@@ -514,13 +549,13 @@ export function useVectorSearch({
         searchFilter: internalSearchState.searchFilter,
         setSearchFilter: (filter) => {
             // Update the internal state with the new filter
-            updateSearchState({ searchFilter: filter });
-            
+            updateSearchState({ searchFilter: filter })
+
             // Also update the lastSearchRef to prevent immediate re-search
             lastSearchRef.current = {
                 ...lastSearchRef.current,
-                filter: filter
-            };
+                filter: filter,
+            }
         },
         searchCount: internalSearchState.searchCount,
         setSearchCount: (count) => updateSearchState({ searchCount: count }),
@@ -531,6 +566,9 @@ export function useVectorSearch({
         error, // Expose error state
         clearError, // Expose function to clear errors
         expansionFactor: internalSearchState.expansionFactor,
-        setExpansionFactor: (value) => updateSearchState({ expansionFactor: value }),
+        setExpansionFactor: (value) =>
+            updateSearchState({ expansionFactor: value }),
+        lastTextEmbedding: internalSearchState.lastTextEmbedding, // Expose the last text embedding
+        executedCommand: internalSearchState.executedCommand,
     }
-} 
+}

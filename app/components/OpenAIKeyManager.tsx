@@ -1,38 +1,39 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { userSettings } from "@/app/utils/userSettings";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 export default function OpenAIKeyManager() {
   const [apiKey, setApiKey] = useState<string>("");
+  const [, setIsLoading] = useState(true);
   const [isSaved, setIsSaved] = useState<boolean>(false);
   
   useEffect(() => {
-    // Load saved API key from localStorage on component mount
-    const savedKey = localStorage.getItem("openai_api_key");
-    if (savedKey) {
-      setApiKey(savedKey);
-      setIsSaved(true);
+    async function loadApiKey() {
+      const savedKey = userSettings.get<string>("openai_api_key");
+      if (savedKey) {
+        setApiKey(savedKey);
+        setIsSaved(true);
+      }
+      setIsLoading(false);
     }
+    loadApiKey();
   }, []);
 
-  const handleSave = () => {
-    if (!apiKey.trim()) {
-      toast.error("Please enter a valid API key");
-      return;
+  const handleSave = async () => {
+    if (apiKey) {
+      userSettings.set("openai_api_key", apiKey);
+      setIsSaved(true);
+      toast.success("API key saved successfully");
     }
-    
-    // Save API key to localStorage
-    localStorage.setItem("openai_api_key", apiKey);
-    setIsSaved(true);
-    toast.success("OpenAI API key saved successfully");
   };
 
-  const handleClear = () => {
-    localStorage.removeItem("openai_api_key");
+  const handleClear = async () => {
+    userSettings.delete("openai_api_key");
     setApiKey("");
     setIsSaved(false);
-    toast.success("OpenAI API key removed");
+    toast.success("API key cleared");
   };
 
   return (
@@ -77,7 +78,7 @@ export default function OpenAIKeyManager() {
       
       <div className="mt-4 text-sm text-gray-500">
         <p>
-          Don't have an API key?{" "}
+          Don{"'t"} have an API key?{" "}
           <a 
             href="https://platform.openai.com/api-keys" 
             target="_blank" 

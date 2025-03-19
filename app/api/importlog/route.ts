@@ -1,17 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import RedisClient from "@/app/lib/server/redis-client";
-
-const REDIS_URL_COOKIE = "redis_url";
-
-// Helper to get Redis URL with error handling
-function getRedisUrlOrError(): { url: string } | { error: string } {
-    const url = cookies().get(REDIS_URL_COOKIE)?.value;
-    if (!url) {
-        return { error: "Redis URL not configured" };
-    }
-    return { url };
-}
+import { RedisClient, getRedisUrl } from "@/app/redis-server/server/commands";
 
 // GET /api/importlog - Get import logs
 export async function GET(req: NextRequest) {
@@ -19,13 +7,14 @@ export async function GET(req: NextRequest) {
     const vectorSetName = url.searchParams.get("vectorSetName");
     const limit = parseInt(url.searchParams.get("limit") || "10", 10);
     
-    const redisResult = getRedisUrlOrError();
-    if ("error" in redisResult) {
-        return NextResponse.json({ success: false, error: redisResult.error }, { status: 400 });
+    const redisUrl = getRedisUrl();
+
+    if (!redisUrl) {
+        return NextResponse.json({ success: false, error: "No Redis URL configured" }, { status: 400 });
     }
-    
+
     try {
-        const result = await RedisClient.withConnection(redisResult.url, async (client) => {
+        const result = await RedisClient.withConnection(redisUrl, async (client) => {
             // If vectorSetName is provided, get logs for that specific vector set
             // Otherwise, get global logs
             const logKey = vectorSetName 

@@ -1,24 +1,25 @@
+import { VsetAttrRequestBody } from "@/app/redis-server/api"
+import { getRedisUrl, RedisClient } from "@/app/redis-server/server/commands"
 import { NextRequest, NextResponse } from "next/server"
-import { RedisClient } from "@/app/lib/server/redis-client"
-import { VsetAttrRequest } from "@/app/api/types"
-import { getRedisUrl } from "@/app/lib/server/redis-client"
 
 export async function POST(request: NextRequest) {
     try {
-        const { keyName, element, attributes } = (await request.json()) as VsetAttrRequest
-        const url = getRedisUrl()
-        if (!url) {
+        const { keyName, element, attributes } = (await request.json()) as VsetAttrRequestBody
+        const redisUrl = getRedisUrl()
+        if (!redisUrl) {
             return NextResponse.json(
                 { success: false, error: "No Redis connection available" },
                 { status: 401 }
             )
         }
 
-        const redisResult = await RedisClient.withConnection(url, async (client) => {
-            const command = ["VSETATTR", keyName, element, attributes]
-            console.log(`[vsetattr]`, command)
-            return await client.sendCommand(command)
-        })
+        const redisResult = await RedisClient.withConnection(
+            redisUrl,
+            async (client) => {
+                const command = ["VSETATTR", keyName, element, attributes]
+                return await client.sendCommand(command)
+            }
+        )
 
         if (!redisResult.success) {
             return NextResponse.json({
@@ -28,7 +29,6 @@ export async function POST(request: NextRequest) {
         }
 
         const result = redisResult.result
-        console.log("[vsetattr] result: ", result)
 
         return NextResponse.json({
             success: true,

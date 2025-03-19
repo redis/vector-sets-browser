@@ -1,0 +1,162 @@
+import { EmbeddingConfig } from "./types/config"
+import { OpenAIProvider } from "./providers/openai"
+import { OllamaProvider } from "./providers/ollama"
+import { TensorFlowProvider } from "./providers/tensorflow"
+import { ImageProvider } from "./providers/image"
+import { EmbeddingProvider } from "./providers/base"
+import { validateAndNormalizeVector } from "./utils/validation"
+import { EmbeddingCache } from "./cache/redis-cache"
+import { PROVIDERS } from "./constants"
+
+export class EmbeddingService {
+    private providers: Map<string, EmbeddingProvider>
+    private cache: EmbeddingCache
+
+    constructor() {
+        this.providers = new Map()
+        this.providers.set(PROVIDERS.OPENAI, new OpenAIProvider())
+        this.providers.set(PROVIDERS.OLLAMA, new OllamaProvider())
+        this.providers.set(PROVIDERS.TENSORFLOW, new TensorFlowProvider())
+        this.providers.set(PROVIDERS.IMAGE, new ImageProvider())
+        // Add other providers as they're implemented
+
+        this.cache = new EmbeddingCache()
+    }
+
+    async getEmbedding(
+        input: string,
+        config: EmbeddingConfig,
+        isImage: boolean = false
+    ): Promise<number[]> {
+        // For image data, ensure we're using the image provider
+        if (isImage && config.provider !== PROVIDERS.IMAGE) {
+            throw new Error(`Provider ${config.provider} does not support image data`)
+        }
+        
+        if (config.provider === PROVIDERS.IMAGE && !isImage) {
+            throw new Error("Image provider requires image data")
+        }
+
+        // Check cache first if caching is enabled
+        const cachedEmbedding = await this.cache.get(input, config)
+        if (cachedEmbedding) {
+            return cachedEmbedding
+        }
+
+        const provider = this.providers.get(config.provider)
+        if (!provider) {
+            throw new Error(`Unsupported provider: ${config.provider}`)
+        }
+
+        const embedding = await provider.getEmbedding(input, config)
+
+        // Validate and normalize the embedding
+        const validationResult = validateAndNormalizeVector(
+            embedding,
+            config.provider
+        )
+        if (!validationResult.isValid) {
+            throw new Error(
+                `Invalid embedding from ${config.provider}: ${validationResult.error}`
+            )
+        }
+
+        // Cache the result if caching is enabled
+        await this.cache.set(input, validationResult.vector, config)
+
+        return validationResult.vector
+    }
+
+    async getBatchEmbeddings(
+        inputs: string[],
+        config: EmbeddingConfig,
+        areImages: boolean = false
+    ): Promise<number[][]> {
+        // For image data, ensure we're using the image provider
+        if (areImages && config.provider !== PROVIDERS.IMAGE) {
+            throw new Error(`Provider ${config.provider} does not support image data`)
+        }
+        
+        if (config.provider === PROVIDERS.IMAGE && !areImages) {
+            throw new Error("Image provider requires image data")
+        }
+
+        const provider = this.providers.get(config.provider)
+        if (!provider) {
+            throw new Error(`Unsupported provider: ${config.provider}`)
+        }
+
+        // Check cache first if caching is enabled
+        const embeddings: number[][] = []
+        const uncachedInputs: string[] = []
+        const uncachedIndices: number[] = []
+
+        // Try to get embeddings from cache
+        for (let i = 0; i < inputs.length; i++) {
+            const input = inputs[i]
+            const cachedEmbedding = await this.cache.get(input, config)
+
+            if (cachedEmbedding) {
+                embeddings[i] = cachedEmbedding
+            } else {
+                uncachedInputs.push(input)
+                uncachedIndices.push(i)
+            }
+        }
+
+        // If all embeddings were cached, return them
+        if (uncachedInputs.length === 0) {
+            return embeddings
+        }
+
+        // Get embeddings for uncached inputs
+        let uncachedEmbeddings: number[][]
+
+        if (provider.getBatchEmbeddings && uncachedInputs.length > 1) {
+            // Use batch processing if available
+            uncachedEmbeddings = await provider.getBatchEmbeddings(
+                uncachedInputs,
+                config
+            )
+        } else {
+            // Fall back to sequential processing
+            uncachedEmbeddings = []
+            for (const input of uncachedInputs) {
+                const embedding = await this.getEmbedding(input, config, areImages)
+                uncachedEmbeddings.push(embedding)
+            }
+        }
+
+        // Validate and normalize each embedding
+        const validatedEmbeddings = uncachedEmbeddings.map(
+            (embedding, index) => {
+                const validationResult = validateAndNormalizeVector(
+                    embedding,
+                    config.provider
+                )
+                if (!validationResult.isValid) {
+                    throw new Error(
+                        `Invalid embedding from ${config.provider} for input ${index}: ${validationResult.error}`
+                    )
+                }
+                return validationResult.vector
+            }
+        )
+
+        // Cache the results if caching is enabled
+        for (let i = 0; i < uncachedInputs.length; i++) {
+            await this.cache.set(
+                uncachedInputs[i],
+                validatedEmbeddings[i],
+                config
+            )
+        }
+
+        // Merge cached and newly computed embeddings
+        for (let i = 0; i < uncachedIndices.length; i++) {
+            embeddings[uncachedIndices[i]] = validatedEmbeddings[i]
+        }
+
+        return embeddings
+    }
+}

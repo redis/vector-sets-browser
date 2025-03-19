@@ -1,17 +1,11 @@
+import * as redis from "@/app/redis-server/server/commands"
+import { getRedisUrl } from "@/app/redis-server/server/commands"
 import { NextResponse } from "next/server"
-import { cookies } from "next/headers"
-import * as redis from "@/app/lib/server/redis-client"
-
-// Helper to get Redis URL from cookies
-function getRedisUrl(): string | null {
-    const url = cookies().get("redis_url")?.value
-    return url || null
-}
 
 // GET /api/vectorset - List all vector sets (scanVectorSets)
 export async function GET() {
-    const url = getRedisUrl()
-    if (!url) {
+    const redisUrl = getRedisUrl()
+    if (!redisUrl) {
         return NextResponse.json(
             { success: false, error: "No Redis connection available" },
             { status: 401 }
@@ -19,7 +13,7 @@ export async function GET() {
     }
     
     try {
-        const result = await redis.scanVectorSets(url)
+        const result = await redis.scanVectorSets(redisUrl)
         
         if (!result.success) {
             return NextResponse.json(

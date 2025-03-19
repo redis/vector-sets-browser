@@ -1,21 +1,10 @@
+import { VcardRequestBody } from "@/app/redis-server/api"
+import * as redis from "@/app/redis-server/server/commands"
 import { NextResponse } from "next/server"
-import { cookies } from "next/headers"
-import * as redis from "@/app/lib/server/redis-client"
-
-// Helper to get Redis URL from cookies
-function getRedisUrl(): string | null {
-    const cookieStore = cookies()
-    return cookieStore.get("redis_url")?.value || null
-}
-
-// Type definitions for the request body
-interface VcardRequestBody {
-    keyName: string
-}
 
 export async function POST(request: Request) {
     try {
-        const { keyName } = await request.json()
+        const { keyName } = await request.json() as VcardRequestBody
 
         if (!keyName) {
             return NextResponse.json(
@@ -24,7 +13,7 @@ export async function POST(request: Request) {
             )
         }
 
-        const redisUrl = getRedisUrl()
+        const redisUrl = redis.getRedisUrl()
         if (!redisUrl) {
             return NextResponse.json(
                 { success: false, error: "No Redis connection available" },
@@ -69,7 +58,7 @@ export async function GET(request: Request) {
         )
     }
 
-    const redisUrl = getRedisUrl()
+    const redisUrl = redis.getRedisUrl()
     if (!redisUrl) {
         return NextResponse.json(
             { success: false, error: "No Redis connection available" },

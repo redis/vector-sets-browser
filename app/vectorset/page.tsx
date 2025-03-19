@@ -1,21 +1,22 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { useRouter, useSearchParams } from "next/navigation"
-import VectorSetNav from "../components/VectorSetNav"
-import AddVectorModal from "../components/AddVectorModal"
-import EditEmbeddingConfigModal from "../components/EditEmbeddingConfigModal"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import InfoPanel from "../components/InfoPanel"
-import VectorSetHeader from "../components/VectorSetHeader"
+import { useRouter, useSearchParams } from "next/navigation"
+import { useEffect, useState } from "react"
+import EditEmbeddingConfigModal from "../components/EmbeddingConfig/EditEmbeddingConfigDialog"
 import { useRedisConnection } from "../hooks/useRedisConnection"
-import { useVectorSet } from "../hooks/useVectorSet"
-import ImportTab from "../components/ImportTab/ImportTab"
-import { getConnection, removeConnection } from "../lib/connectionManager"
-import { EmbeddingConfig, VectorSetMetadata } from "../types/embedding"
-import VectorSetVisualization from "../components/VectorSetVisualization"
-import VectorSearchTab from "../components/VectorSearchTab"
 import { VectorSetSearchState } from "../hooks/useVectorSearch"
+import { useVectorSet } from "../hooks/useVectorSet"
+import { getConnection, removeConnection } from "../redis-server/connectionManager"
+import { EmbeddingConfig, VectorSetMetadata } from "@/app/embeddings/types/config"
+import { userSettings } from "../utils/userSettings"
+import AddVectorModal from "./AddVectorDialog"
+import ImportTab from "./ImportTab/ImportTab"
+import InfoPanel from "./InfoTab/InfoPanel"
+import VectorSearchTab from "./SearchTab/VectorSearchTab"
+import VectorSetHeader from "./VectorSetHeader"
+import VectorSetNav from "./VectorSetNav"
+import VectorSetVisualization from "./VisualizationTab/VectorSetVisualization"
 
 /**
  * VectorSetPage handles the display and management of vector sets.
@@ -104,9 +105,9 @@ export default function VectorSetPage() {
                     return
                 }
 
-                // Try to get the friendly name from localStorage
+                // Try to get the friendly name from settings
                 try {
-                    const savedConnections = localStorage.getItem(
+                    const savedConnections = userSettings.get(
                         "recentRedisConnections"
                     )
                     if (savedConnections) {
@@ -189,24 +190,15 @@ export default function VectorSetPage() {
             )
             if (!response.ok) {
                 const errorData = await response.json()
-                console.error(
-                    "Failed to save metadata:",
-                    errorData
-                )
+                console.error("Failed to save metadata:", errorData)
                 throw new Error(errorData.error || "Failed to save metadata")
             }
             const data = await response.json()
             if (!data.success) {
-                console.error(
-                    "Save metadata failed:",
-                    data.error
-                )
+                console.error("Save metadata failed:", data.error)
                 throw new Error(data.error || "Failed to save metadata")
             }
-            console.log(
-                "Metadata saved successfully:",
-                data
-            )
+            console.log("Metadata saved successfully:", data)
             setIsEditConfigModalOpen(false)
         } catch (error) {
             console.error("[VectorSetPage] Error saving config:", error)

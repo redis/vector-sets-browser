@@ -1,22 +1,11 @@
+import { VremRequestBody } from "@/app/redis-server/api"
+import * as redis from "@/app/redis-server/server/commands"
+import { getRedisUrl } from "@/app/redis-server/server/commands"
 import { NextResponse } from "next/server"
-import { cookies } from "next/headers"
-import * as redis from "@/app/lib/server/redis-client"
-
-// Helper to get Redis URL from cookies
-function getRedisUrl(): string | null {
-    const url = cookies().get("redis_url")?.value
-    return url || null
-}
-
-// Type definitions for the request body
-interface vremRequestBody {
-    keyName: string
-    element: string
-}
 
 export async function POST(request: Request) {
     try {
-        const body = await request.json() as vremRequestBody
+        const body = await request.json() as VremRequestBody
         const { keyName, element } = body
 
         if (!keyName) {
@@ -33,15 +22,15 @@ export async function POST(request: Request) {
             )
         }
 
-        const url = getRedisUrl()
-        if (!url) {
+        const redisUrl = getRedisUrl()
+        if (!redisUrl) {
             return NextResponse.json(
                 { success: false, error: "No Redis connection available" },
                 { status: 401 }
             )
         }
 
-        const result = await redis.vrem(url, keyName, element)
+        const result = await redis.vrem(redisUrl, keyName, element)
 
         if (!result.success) {
             return NextResponse.json(

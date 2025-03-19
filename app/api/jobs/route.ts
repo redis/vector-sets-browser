@@ -1,23 +1,11 @@
-import { NextRequest, NextResponse } from "next/server"
-import { cookies } from "next/headers"
-import { JobQueueService } from "@/app/lib/server/job-queue"
 import { JobProcessor } from "@/app/lib/server/job-processor"
-import RedisClient from "@/app/lib/server/redis-client"
-import * as redis from "@/app/lib/server/redis-client"
-import { VectorSetMetadata } from "@/app/types/embedding"
-const REDIS_URL_COOKIE = "redis_url"
+import { JobQueueService } from "@/app/lib/server/job-queue"
+import RedisClient, * as redis from "@/app/redis-server/server/commands"
+import { VectorSetMetadata } from "@/app/embeddings/types/config"
+import { NextRequest, NextResponse } from "next/server"
 
 // Map to store active job processors
 const activeProcessors = new Map<string, JobProcessor>()
-
-// Helper to get Redis URL with error handling
-function getRedisUrlOrError(): { url: string } | { error: string } {
-    const url = cookies().get(REDIS_URL_COOKIE)?.value
-    if (!url) {
-        return { error: "Redis URL not configured" }
-    }
-    return { url }
-}
 
 // List all jobs and their status
 export async function GET(req: NextRequest) {
@@ -25,17 +13,18 @@ export async function GET(req: NextRequest) {
     const jobId = url.searchParams.get("jobId")
     const vectorSetName = url.searchParams.get("vectorSetName")
 
-    const redisResult = getRedisUrlOrError()
-    if ("error" in redisResult) {
-        return NextResponse.json({ success: false, error: redisResult.error }, { status: 400 })
+    const redisUrl = redis.getRedisUrl()
+
+    if (!redisUrl) {
+        return NextResponse.json({ success: false, error: "No Redis URL configured" }, { status: 400 })
     }
 
     try {
         // If jobId is provided, return specific job details
         if (jobId) {
             const [status, metadata] = await Promise.all([
-                JobQueueService.getJobProgress(redisResult.url, jobId),
-                JobQueueService.getJobMetadata(redisResult.url, jobId),
+                JobQueueService.getJobProgress(redisUrl, jobId),
+                JobQueueService.getJobMetadata(redisUrl, jobId),
             ])
 
             if (!status) {
@@ -53,7 +42,7 @@ export async function GET(req: NextRequest) {
 
         // Otherwise, list all jobs
         const result = await RedisClient.withConnection(
-            redisResult.url,
+            redisUrl,
             async (client) => {
                 const keys = await client.keys("job:*:status")
                 const jobs = []
@@ -61,8 +50,8 @@ export async function GET(req: NextRequest) {
                 for (const key of keys) {
                     const jobId = key.split(":")[1]
                     const [status, metadata] = await Promise.all([
-                        JobQueueService.getJobProgress(redisResult.url, jobId),
-                        JobQueueService.getJobMetadata(redisResult.url, jobId),
+                        JobQueueService.getJobProgress(redisUrl, jobId),
+                        JobQueueService.getJobMetadata(redisUrl, jobId),
                     ])
                     if (status && metadata) {
                         // If vectorSetName is provided, only include jobs for that vector set
@@ -99,9 +88,10 @@ export async function GET(req: NextRequest) {
 
 // Create a new job
 export async function POST(req: NextRequest) {
-    const redisResult = getRedisUrlOrError()
-    if ("error" in redisResult) {
-        return NextResponse.json({ error: redisResult.error }, { status: 400 })
+    const redisUrl = redis.getRedisUrl()
+
+    if (!redisUrl) {
+        return NextResponse.json({ success: false, error: "No Redis URL configured" }, { status: 400 })
     }
 
     try {
@@ -164,7 +154,7 @@ export async function POST(req: NextRequest) {
         console.log(`[Jobs API] Delimiter: ${delimiter}, Has header: ${hasHeader}, Skip rows: ${skipRows}`);
 
         // Get vector set metadata
-        const result = await redis.getMetadata(redisResult.url, vectorSetName)
+        const result = await redis.getMetadata(redisUrl, vectorSetName)
         const metadata = result.result as VectorSetMetadata | null
         
         if (!metadata?.embedding) {
@@ -180,7 +170,7 @@ export async function POST(req: NextRequest) {
 
         // Create and start the job
         const jobId = await JobQueueService.createJob(
-            redisResult.url,
+            redisUrl,
             file,
             vectorSetName,
             metadata.embedding,
@@ -197,7 +187,7 @@ export async function POST(req: NextRequest) {
         )
 
         // Start processing the job
-        const processor = new JobProcessor(redisResult.url, jobId)
+        const processor = new JobProcessor(redisUrl, jobId)
         activeProcessors.set(jobId, processor)
 
         // Start processing in the background
@@ -239,9 +229,9 @@ export async function PATCH(req: NextRequest) {
         )
     }
 
-    const redisResult = getRedisUrlOrError()
-    if ("error" in redisResult) {
-        return NextResponse.json({ error: redisResult.error }, { status: 400 })
+    const redisUrl = redis.getRedisUrl()
+    if (!redisUrl) {
+        return NextResponse.json({ success: false, error: "No Redis URL configured" }, { status: 400 })
     }
 
     try {
@@ -252,20 +242,20 @@ export async function PATCH(req: NextRequest) {
             if (processor) {
                 await processor.pause()
             }
-            await JobQueueService.pauseJob(redisResult.url, jobId)
+            await JobQueueService.pauseJob(redisUrl, jobId)
         } else {
             if (processor) {
                 await processor.resume()
             } else {
                 // If no active processor, create a new one and start it
-                const newProcessor = new JobProcessor(redisResult.url, jobId)
+                const newProcessor = new JobProcessor(redisUrl, jobId)
                 activeProcessors.set(jobId, newProcessor)
                 newProcessor.start().catch((error) => {
                     console.error("Job processing error:", error)
                     activeProcessors.delete(jobId)
                 })
             }
-            await JobQueueService.resumeJob(redisResult.url, jobId)
+            await JobQueueService.resumeJob(redisUrl, jobId)
         }
 
         return NextResponse.json({ success: true })
@@ -287,9 +277,9 @@ export async function DELETE(req: NextRequest) {
         )
     }
 
-    const redisResult = getRedisUrlOrError()
-    if ("error" in redisResult) {
-        return NextResponse.json({ error: redisResult.error }, { status: 400 })
+    const redisUrl = redis.getRedisUrl()
+    if (!redisUrl) {
+        return NextResponse.json({ success: false, error: "No Redis URL configured" }, { status: 400 })
     }
 
     try {
@@ -301,8 +291,8 @@ export async function DELETE(req: NextRequest) {
         }
 
         // Cancel and clean up the job in Redis
-        await JobQueueService.cancelJob(redisResult.url, jobId)
-        await JobQueueService.cleanupJob(redisResult.url, jobId)
+        await JobQueueService.cancelJob(redisUrl, jobId)
+        await JobQueueService.cleanupJob(redisUrl, jobId)
 
         return NextResponse.json({ success: true })
     } catch (error) {

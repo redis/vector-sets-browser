@@ -63,10 +63,11 @@ export const apiClient = {
             }
 
             // Return the result and execution time if available
-            if (responseData.executionTimeMs !== undefined) {
+            if (responseData.executionTimeMs !== undefined || responseData.executedCommand !== undefined) {
                 return {
                     result: responseData.result as TResponse,
-                    executionTimeMs: responseData.executionTimeMs
+                    executionTimeMs: responseData.executionTimeMs,
+                    executedCommand: responseData.executedCommand
                 };
             }
             

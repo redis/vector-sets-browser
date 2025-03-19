@@ -1,24 +1,5 @@
-import { useMemo, useEffect, useState, useRef } from "react"
-import { getEmbeddingDataFormat, VectorSetMetadata } from "../types/embedding"
-import * as React from "react"
-import { Input } from "@/components/ui/input"
-import {
-    Shuffle,
-    HelpCircle,
-    Settings,
-    X,
-    Check,
-    Copy,
-    Filter,
-} from "lucide-react"
+import { userSettings } from "@/app/utils/userSettings"
 import { Button } from "@/components/ui/button"
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/components/ui/select"
 import {
     Dialog,
     DialogContent,
@@ -31,8 +12,25 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Switch } from "@/components/ui/switch"
+import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select"
+import { Switch } from "@/components/ui/switch"
+import { Check, Filter, Settings, Shuffle, X } from "lucide-react"
+import { useEffect, useMemo, useRef, useState } from "react"
+import {
+    getEmbeddingDataFormat,
+    VectorSetMetadata,
+} from "@/app/embeddings/types/config"
+import SmartFilterInput from "./SmartFilterInput"
+import { VectorTuple } from "@/app/redis-server/api"
+import RedisCommandBox from "./RedisCommandBox"
 
 const searchTypes = [
     {
@@ -65,6 +63,9 @@ interface SearchBoxProps {
     clearError?: () => void
     expansionFactor?: number
     setExpansionFactor?: (value: number | undefined) => void
+    lastTextEmbedding?: number[]
+    executedCommand?: string
+    results?: VectorTuple[]
 }
 
 export default function SearchBox({
@@ -80,26 +81,33 @@ export default function SearchBox({
     searchCount,
     setSearchCount,
     error,
+    clearError,
     expansionFactor,
     setExpansionFactor,
+    lastTextEmbedding,
+    executedCommand,
+    results = [],
 }: SearchBoxProps) {
-    const [showFilters, setShowFilters] = useState(() => {
-        // Initialize from localStorage, default to true if not set
-        const stored = localStorage.getItem("showFilters")
-        return stored ? JSON.parse(stored) : true
-    })
+    const [showFilters, setShowFilters] = useState(true)
     const [showFilterHelp, setShowFilterHelp] = useState(false)
     const [showSearchOptions, setShowSearchOptions] = useState(false)
+    const [showRedisCommand, setShowRedisCommand] = useState(true)
     // Add local filter state to debounce filter changes
     const [localFilter, setLocalFilter] = useState(searchFilter)
     const filterTimeoutRef = useRef<NodeJS.Timeout>()
 
     // State for custom expansion factor
     const [useCustomEF, setUseCustomEF] = useState(() => {
-        return !!expansionFactor
+        // Get saved value or default to false
+        return userSettings.get("useCustomEF") ?? !!expansionFactor
     })
     const [efValue, setEFValue] = useState(() => {
-        return expansionFactor?.toString() || "200"
+        // Get saved value or default to expansion factor or 200
+        return (
+            userSettings.get("efValue")?.toString() ||
+            expansionFactor?.toString() ||
+            "200"
+        )
     })
 
     // Update local filter when searchFilter prop changes, but only on initial mount
@@ -125,10 +133,16 @@ export default function SearchBox({
     // Handle expansion factor changes
     const handleEFToggle = (checked: boolean) => {
         setUseCustomEF(checked)
+        // Save the toggle state
+        userSettings.set("useCustomEF", checked)
+
         if (setExpansionFactor) {
             if (checked) {
                 const value = parseInt(efValue)
-                setExpansionFactor(isNaN(value) ? 200 : value)
+                const efNumber = isNaN(value) ? 200 : value
+                setExpansionFactor(efNumber)
+                // Also save the value
+                userSettings.set("efValue", efNumber)
             } else {
                 setExpansionFactor(undefined)
             }
@@ -139,7 +153,10 @@ export default function SearchBox({
         setEFValue(value)
         if (setExpansionFactor && useCustomEF) {
             const numValue = parseInt(value)
-            setExpansionFactor(isNaN(numValue) ? 200 : numValue)
+            const efNumber = isNaN(numValue) ? 200 : numValue
+            setExpansionFactor(efNumber)
+            // Save the value when it changes
+            userSettings.set("efValue", efNumber)
         }
     }
 
@@ -175,7 +192,7 @@ export default function SearchBox({
                 return "Enter image data"
             case "Vector":
                 return supportsEmbeddings && isTextEmbedding
-                    ? "Enter search text OR Enter raw vector data (0.1, 0.2, ...)"
+                    ? "Enter search text or vector data (0.1, 0.2, ...)"
                     : "Enter vector data (0.1, 0.2, ...)"
             default:
                 return ""
@@ -196,72 +213,41 @@ export default function SearchBox({
         }
     }, [metadata]) // Only run when metadata changes
 
-    // Save showFilters state to localStorage whenever it changes
+    // Load user settings
     useEffect(() => {
-        localStorage.setItem("showFilters", JSON.stringify(showFilters))
+        const loadSettings = () => {
+            const storedFilters = userSettings.get("showFilters")
+            const storedCommand = userSettings.get("showRedisCommand")
+            setShowFilters(storedFilters ?? true)
+            setShowRedisCommand(storedCommand ?? true)
+        }
+        loadSettings()
+    }, [])
+
+    // Debug logging for results
+    useEffect(() => {
+        if (results && results.length > 0) {
+            console.log(`SearchBox received ${results.length} results`)
+            console.log("First result sample:", results[0])
+        }
+    }, [results])
+
+    // Save settings when they change
+    useEffect(() => {
+        userSettings.set("showFilters", showFilters)
     }, [showFilters])
 
-    const [showRedisCommand, setShowRedisCommand] = useState(() => {
-        // Initialize from localStorage, default to true if not set
-        const stored = localStorage.getItem("showRedisCommand")
-        return stored ? JSON.parse(stored) : true
-    })
-
-    // Save showRedisCommand state to localStorage whenever it changes
     useEffect(() => {
-        localStorage.setItem(
-            "showRedisCommand",
-            JSON.stringify(showRedisCommand)
-        )
+        userSettings.set("showRedisCommand", showRedisCommand)
     }, [showRedisCommand])
 
-    // Add this new function to generate the Redis command
-    const getRedisCommand = () => {
-        if (!searchQuery && !localFilter)
-            return `VSIM ${vectorSetName} VALUES [0.0000, 0.0000, ...] WITHSCORES COUNT 10`
-
-        const type = searchType === "Element" ? "ELE" : "VALUES"
-        const count = searchCount || "10"
-        const filterExpr = localFilter ? `"${localFilter}"` : ""
-
-        let command = `VSIM ${vectorSetName} ${type} `
-
-        // Add search query
-        if (type === "ELE") {
-            command += `"${searchQuery}"`
-        } else {
-            // For vector search, try to format the numbers nicely
-            let vectorStr = searchQuery
-                .split(",")
-                .map((v) => parseFloat(v.trim()))
-                .filter((v) => !isNaN(v))
-                .join(" ")
-            if (vectorStr.length === 0) {
-                if (searchQuery.length > 0) {
-                    vectorStr = "N.NNN, N.NNN, ..."
-                } else {
-                    vectorStr = "0.00, 0.00, ..."
-                }
-            }
-            command += `[${vectorStr}]`
-        }
-
-        command += ` WITHSCORES COUNT ${count}`
-
-        if (filterExpr) {
-            command += ` FILTER ${filterExpr}`
-        }
-
-        // Add EF parameter if custom expansion factor is enabled
-        if (useCustomEF && efValue) {
-            command += ` EF ${efValue}`
-        }
-
-        return command
-    }
+    // Add a useEffect to log when the executedCommand changes
+    useEffect(() => {
+        //console.log("Executed command updated:", executedCommand);
+    }, [executedCommand])
 
     return (
-        <section className="mb-6">
+        <section className="mb-2">
             <div className="bg-white p-4 rounded shadow-md flex flex-col gap-2 items-start">
                 <div className="flex gap-2 items-center w-full justify-between">
                     <div className="flex gap-2 items-center w-full">
@@ -322,7 +308,7 @@ export default function SearchBox({
                                 onClick={() => setShowFilters(!showFilters)}
                             >
                                 <div className="flex items-center justify-between w-full">
-                                    Show Filters
+                                    Show Attribute Filters
                                     {showFilters && (
                                         <Check className="h-4 w-4 ml-2" />
                                     )}
@@ -396,30 +382,23 @@ export default function SearchBox({
                     </div>
 
                     {showFilters && (
-                        <div className="flex gap-2 items-center w-full">
+                        <div className="flex gap-2 items-center w-full mt-2">
                             <div className="grow relative">
-                                <Input
-                                    type="text"
+                                <SmartFilterInput
                                     value={localFilter}
-                                    onChange={(e) =>
-                                        handleFilterChange(e.target.value)
+                                    onChange={handleFilterChange}
+                                    results={results}
+                                    placeholder="Enter filter (e.g. .year < 1982)."
+                                    error={
+                                        error
+                                            ? error.includes(
+                                                  "syntax error in FILTER"
+                                              )
+                                            : false
                                     }
-                                    placeholder="Enter a search filter (e.g. .year < 1982)"
-                                    className={
-                                        error &&
-                                        error.includes("syntax error in FILTER")
-                                            ? "border-red-500"
-                                            : ""
-                                    }
+                                    onHelp={() => setShowFilterHelp(true)}
+                                    vectorSetName={vectorSetName}
                                 />
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="absolute right-0 top-1/2 -translate-y-1/2"
-                                    onClick={() => setShowFilterHelp(true)}
-                                >
-                                    <HelpCircle className="h-8 w-8" />
-                                </Button>
                             </div>
                         </div>
                     )}
@@ -431,35 +410,29 @@ export default function SearchBox({
                         </div>
                     )}
                 </div>
+            {/* Use the new RedisCommandBox component */}
                 {showRedisCommand && (
-                    <div className="flex gap-2 items-center w-full bg-gray-100 rounded-md">
-                        <div className="text-grey-400 p-2 font-mono overflow-x-scroll text-sm grow">
-                            {getRedisCommand() ||
-                                "Enter search parameters to see the Redis command"}
-                        </div>
-                        <div className="grow"></div>
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-6 w-6 text-gray-500"
-                            onClick={() => {
-                                const command = getRedisCommand()
-                                navigator.clipboard.writeText(command)
-                            }}
-                        >
-                            <Copy className="h-4 w-4" />
-                        </Button>
-
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-6 w-6 text-gray-500"
-                            onClick={() => setShowRedisCommand(false)}
-                        >
-                            <X className="h-4 w-4" />
-                        </Button>
-                    </div>
-                )}
+            <div className="bg-white px-2 py-2 rounded border-t border-gray-200 flex flex-col gap-2 items-start mt-2">
+                <div className="flex items-center w-full">
+                    <label className="text-sm font-medium text-gray-700">
+                        Redis Command
+                    </label>
+                    <div className="grow"></div>
+                    <Button variant="ghost" size="icon" onClick={() => setShowRedisCommand(false)}>
+                        <X className="h-4 w-4" />
+                    </Button>
+                </div>
+                <RedisCommandBox
+                    vectorSetName={vectorSetName}
+                    dim={dim}
+                    executedCommand={executedCommand}
+                    searchQuery={searchQuery}
+                    searchFilter={localFilter}
+                    showRedisCommand={showRedisCommand}
+                    setShowRedisCommand={setShowRedisCommand}
+                    />
+                </div>
+            )}
             </div>
 
             {/* Filter Help Dialog */}
@@ -520,7 +493,10 @@ export default function SearchBox({
             </Dialog>
 
             {/* Search Options Dialog */}
-            <Dialog open={showSearchOptions} onOpenChange={setShowSearchOptions}>
+            <Dialog
+                open={showSearchOptions}
+                onOpenChange={setShowSearchOptions}
+            >
                 <DialogContent className="max-w-md">
                     <DialogHeader>
                         <DialogTitle className="text-lg font-bold">
@@ -535,7 +511,8 @@ export default function SearchBox({
                                         Custom Build Exploration Factor (EF)
                                     </Label>
                                     <p className="text-sm text-gray-500">
-                                        Enable to set a custom HNSW expansion factor
+                                        Enable to set a custom HNSW expansion
+                                        factor
                                     </p>
                                 </div>
                                 <Switch
@@ -544,7 +521,7 @@ export default function SearchBox({
                                     onCheckedChange={handleEFToggle}
                                 />
                             </div>
-                            
+
                             {useCustomEF && (
                                 <div className="space-y-2">
                                     <Label htmlFor="ef-value">EF Value</Label>
@@ -552,15 +529,20 @@ export default function SearchBox({
                                         id="ef-value"
                                         type="number"
                                         value={efValue}
-                                        onChange={(e) => handleEFValueChange(e.target.value)}
+                                        onChange={(e) =>
+                                            handleEFValueChange(e.target.value)
+                                        }
                                         min="1"
                                         className="w-full"
                                     />
                                     <p className="text-sm text-gray-500">
-                                        The Expansion Factor (EF) controls the search quality in HNSW graphs. 
-                                        Higher values (100-500) improve search quality at the cost of performance. 
-                                        Lower values (10-50) prioritize speed over accuracy. 
-                                        The default value of 200 provides a good balance.
+                                        The Expansion Factor (EF) controls the
+                                        search quality in HNSW graphs. Higher
+                                        values (100-500) improve search quality
+                                        at the cost of performance. Lower values
+                                        (10-50) prioritize speed over accuracy.
+                                        The default value of 200 provides a good
+                                        balance.
                                     </p>
                                 </div>
                             )}

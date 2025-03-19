@@ -1,0 +1,528 @@
+import { jobs, type ImportLogEntry, type Job } from "@/app/api/jobs"
+import { VectorSetMetadata, getModelName } from "@/app/embeddings/types/config"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Progress } from "@/components/ui/progress"
+import {
+    ArrowLeft,
+    CheckCircle2,
+    Database,
+    FileSpreadsheet,
+    RefreshCcw,
+    XCircle,
+} from "lucide-react"
+import { useCallback, useEffect, useState } from "react"
+import ImportFromCSV from "./ImportFromCSV"
+import ImportSampleData from "./ImportSampleData"
+
+// Helper function to format dates nicely
+const formatDate = (dateString: string): string => {
+    const date = new Date(dateString)
+    return date.toLocaleString(undefined, {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+    })
+}
+
+interface ImportTabProps {
+    vectorSetName: string
+    metadata: VectorSetMetadata | null
+}
+
+export default function ImportTab({ vectorSetName, metadata }: ImportTabProps) {
+    const [jobList, setJobList] = useState<Job[]>([])
+    // Keep error state for potential future use but mark it as intentionally unused
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const [error, setError] = useState<string | null>(null)
+    const [showImportCSV, setShowImportCSV] = useState(false)
+    const [showImportSample, setShowImportSample] = useState(false)
+    const [dismissedJobIds, setDismissedJobIds] = useState<Set<string>>(
+        new Set()
+    )
+    const [importLogs, setImportLogs] = useState<ImportLogEntry[]>([])
+
+    // Keep this for potential future use but mark it as intentionally unused
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const hasActiveJobs =
+        jobList &&
+        jobList.length > 0 &&
+        jobList.some(
+            (job) =>
+                job.status.status === "processing" ||
+                job.status.status === "paused" ||
+                job.status.status === "pending"
+        )
+
+    const fetchJobs = useCallback(async () => {
+        try {
+            const data = await jobs.getJobsByVectorSet(vectorSetName)
+            if (data) {
+                const filteredJobs = data.filter(
+                    (job) => !dismissedJobIds.has(job.jobId)
+                )
+
+                // Check for stuck jobs (paused for more than 5 minutes)
+                const now = new Date().getTime()
+                filteredJobs.forEach((job) => {
+                    if (job.status.status === "paused") {
+                        // If we have a timestamp in the message, check if it's been paused for too long
+                        const pausedTime =
+                            job.status.message?.match(/paused at (\d+)/)?.[1]
+                        if (pausedTime) {
+                            const pausedTimestamp = parseInt(pausedTime, 10)
+                            const elapsedMinutes =
+                                (now - pausedTimestamp) / (1000 * 60)
+
+                            // If paused for more than 5 minutes, mark it for cleanup
+                            if (elapsedMinutes > 5) {
+                                console.log(
+                                    `Job ${
+                                        job.jobId
+                                    } has been paused for ${elapsedMinutes.toFixed(
+                                        1
+                                    )} minutes, marking for cleanup`
+                                )
+                                dismissedJobIds.add(job.jobId)
+                            }
+                        }
+                    }
+                })
+
+                // Apply the updated dismissedJobIds filter
+                setJobList(
+                    filteredJobs.filter(
+                        (job) => !dismissedJobIds.has(job.jobId)
+                    )
+                )
+            }
+        } catch (error) {
+            console.error("Error fetching jobs:", error)
+            setError("Failed to fetch jobs")
+        }
+    }, [vectorSetName, metadata, dismissedJobIds])
+
+    const fetchImportLogs = useCallback(async () => {
+        try {
+            const logs = await jobs.getImportLogs(vectorSetName, 20)
+            setImportLogs(logs)
+        } catch (error) {
+            console.error("Error fetching import logs:", error)
+        }
+    }, [vectorSetName])
+
+    const cancelJob = async (jobId: string) => {
+        try {
+            jobs.cancelJob(jobId)
+            fetchJobs()
+        } catch (error) {
+            console.error("Error cancelling job:", error)
+            setError("Failed to cancel job")
+        }
+    }
+
+    const pauseJob = async (jobId: string) => {
+        try {
+            await jobs.pauseJob(jobId)
+            // Add a timestamp to track when the job was paused
+            const timestamp = new Date().getTime()
+            console.log(`Job ${jobId} paused at ${timestamp}`)
+            // Refresh the jobs list
+            fetchJobs()
+        } catch (error) {
+            console.error(`Error pausing job:`, error)
+            setError(`Failed to pause job`)
+        }
+    }
+
+    const resumeJob = async (jobId: string) => {
+        try {
+            await jobs.resumeJob(jobId)
+            // Refresh the jobs list
+            fetchJobs()
+        } catch (error) {
+            console.error(`Error resuming job:`, error)
+            setError(`Failed to resume job`)
+        }
+    }
+
+    const removeJob = (jobId: string) => {
+        setDismissedJobIds((prevIds) => {
+            const newIds = new Set(prevIds)
+            newIds.add(jobId)
+            return newIds
+        })
+        setJobList((prevJobs) => prevJobs.filter((job) => job.jobId !== jobId))
+    }
+
+    const forceCleanupJob = async (jobId: string) => {
+        try {
+            // Force cancel the job
+            await jobs.cancelJob(jobId)
+            // Remove it from the UI
+            removeJob(jobId)
+        } catch (error) {
+            console.error("Error force cleaning job:", error)
+            setError("Failed to force clean job")
+        }
+    }
+
+    useEffect(() => {
+        fetchJobs()
+        fetchImportLogs()
+        // Poll for updates every 2 seconds
+        const interval = setInterval(() => {
+            fetchJobs()
+            // Refresh import logs less frequently
+            if (Math.random() < 0.1) {
+                // ~10% chance each poll, so roughly every 20 seconds
+                fetchImportLogs()
+            }
+        }, 2000)
+        return () => clearInterval(interval)
+    }, [fetchJobs, fetchImportLogs])
+
+    return (
+        <div className="space-y-6">
+            <Card>
+                <CardHeader>
+                    <div className="flex justify-between items-center">
+                        <CardTitle>Import Data</CardTitle>
+                        <div className="flex gap-2">
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                    fetchJobs()
+                                    fetchImportLogs()
+                                }}
+                                className="flex items-center gap-2"
+                            >
+                                <RefreshCcw className="h-4 w-4" />
+                                Refresh
+                            </Button>
+                        </div>
+                    </div>
+                </CardHeader>
+                <CardContent>
+                    <div className="space-y-4">
+                        {!jobList || jobList.length === 0 ? (
+                            <div className="space-y-6">
+                                {showImportCSV ? (
+                                    <div className="bg-white p-2 rounded-lg shadow-sm">
+                                        <div className="mb-4">
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() =>
+                                                    setShowImportCSV(false)
+                                                }
+                                                className="flex items-center gap-2"
+                                            >
+                                                <ArrowLeft className="h-4 w-4" />
+                                                Back
+                                            </Button>
+                                        </div>
+                                        <ImportFromCSV
+                                            onClose={() =>
+                                                setShowImportCSV(false)
+                                            }
+                                            metadata={metadata}
+                                            vectorSetName={vectorSetName}
+                                        />
+                                    </div>
+                                ) : showImportSample ? (
+                                    <div className="bg-white p-2 rounded-lg shadow-sm">
+                                        <div className="mb-4">
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() =>
+                                                    setShowImportSample(false)
+                                                }
+                                                className="flex items-center gap-2"
+                                            >
+                                                <ArrowLeft className="h-4 w-4" />
+                                                Back
+                                            </Button>
+                                        </div>
+                                        <ImportSampleData
+                                            onClose={() =>
+                                                setShowImportSample(false)
+                                            }
+                                            metadata={metadata}
+                                            vectorSetName={vectorSetName}
+                                        />
+                                    </div>
+                                ) : (
+                                    <div>
+                                        <p className="p-4">
+                                            Import your data into this Vector
+                                            Set to get started.
+                                        </p>
+                                        <p className="p-4">
+                                            This vector set is configured to use{" "}
+                                            <strong>
+                                                {" "}
+                                                {metadata?.embedding.provider}
+                                            </strong>{" "}
+                                            model:{" "}
+                                            <strong>
+                                                {metadata
+                                                    ? getModelName(
+                                                          metadata.embedding
+                                                      )
+                                                    : "Unknown"}
+                                            </strong>
+                                            . You can change the embedding
+                                            engine on the Information tab.
+                                        </p>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <Card
+                                                className="p-6 cursor-pointer hover:shadow-md transition-shadow"
+                                                onClick={() =>
+                                                    setShowImportCSV(true)
+                                                }
+                                            >
+                                                <div className="flex flex-col items-center space-y-3">
+                                                    <FileSpreadsheet className="h-8 w-8 text-blue-500" />
+                                                    <h3 className="font-medium">
+                                                        Import from CSV
+                                                    </h3>
+                                                    <p className="text-sm text-gray-500 text-center">
+                                                        Upload your own CSV file
+                                                        with text data
+                                                    </p>
+                                                </div>
+                                            </Card>
+                                            <Card
+                                                className="p-6 cursor-pointer hover:shadow-md transition-shadow"
+                                                onClick={() =>
+                                                    setShowImportSample(true)
+                                                }
+                                            >
+                                                <div className="flex flex-col items-center space-y-3">
+                                                    <Database className="h-8 w-8 text-green-500" />
+                                                    <h3 className="font-medium">
+                                                        Load Sample Data
+                                                    </h3>
+                                                    <p className="text-sm text-gray-500 text-center">
+                                                        Try out with our
+                                                        pre-made dataset
+                                                    </p>
+                                                </div>
+                                            </Card>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        ) : (
+                            jobList.map((job) => (
+                                <Card key={job.jobId} className="p-4">
+                                    <div className="space-y-2">
+                                        <div className="flex justify-between items-center">
+                                            <div>
+                                                <p className="text-sm text-muted-foreground">
+                                                    {job.metadata.filename}
+                                                </p>
+                                            </div>
+                                            <div className="space-x-2">
+                                                {job.status.status ===
+                                                    "processing" && (
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() =>
+                                                            pauseJob(job.jobId)
+                                                        }
+                                                    >
+                                                        Pause
+                                                    </Button>
+                                                )}
+                                                {job.status.status ===
+                                                    "paused" && (
+                                                    <>
+                                                        <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            onClick={() =>
+                                                                resumeJob(
+                                                                    job.jobId
+                                                                )
+                                                            }
+                                                        >
+                                                            Resume
+                                                        </Button>
+                                                        <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            onClick={() =>
+                                                                forceCleanupJob(
+                                                                    job.jobId
+                                                                )
+                                                            }
+                                                        >
+                                                            Force Cleanup
+                                                        </Button>
+                                                    </>
+                                                )}
+                                                {(job.status.status ===
+                                                    "processing" ||
+                                                    job.status.status ===
+                                                        "paused" ||
+                                                    job.status.status ===
+                                                        "pending") && (
+                                                    <Button
+                                                        variant="destructive"
+                                                        size="sm"
+                                                        onClick={() =>
+                                                            cancelJob(job.jobId)
+                                                        }
+                                                    >
+                                                        Cancel
+                                                    </Button>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <div className="flex justify-between items-center">
+                                                <div className="text-sm">
+                                                    {job.status.message ||
+                                                        job.status.status}
+                                                </div>
+                                                <div className="text-sm text-muted-foreground">
+                                                    {job.status.current} of{" "}
+                                                    {job.status.total} records
+                                                </div>
+                                            </div>
+                                            <Progress
+                                                value={
+                                                    (job.status.current /
+                                                        job.status.total) *
+                                                    100
+                                                }
+                                                className="w-full"
+                                            />
+                                        </div>
+
+                                        {job.status.status === "completed" && (
+                                            <Alert
+                                                variant="default"
+                                                className="mt-2"
+                                            >
+                                                <CheckCircle2 className="h-4 w-4" />
+                                                <AlertDescription className="flex justify-between items-center">
+                                                    <span>
+                                                        Import completed
+                                                        successfully!
+                                                    </span>
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() =>
+                                                            forceCleanupJob(
+                                                                job.jobId
+                                                            )
+                                                        }
+                                                    >
+                                                        Dismiss
+                                                    </Button>
+                                                </AlertDescription>
+                                            </Alert>
+                                        )}
+
+                                        {job.status.status === "failed" && (
+                                            <Alert
+                                                variant="destructive"
+                                                className="mt-2"
+                                            >
+                                                <XCircle className="h-4 w-4" />
+                                                <AlertDescription className="flex justify-between items-center">
+                                                    <span>
+                                                        {job.status.error ||
+                                                            "Import failed"}
+                                                    </span>
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() =>
+                                                            removeJob(job.jobId)
+                                                        }
+                                                    >
+                                                        Dismiss
+                                                    </Button>
+                                                </AlertDescription>
+                                            </Alert>
+                                        )}
+
+                                        {job.status.status === "cancelled" && (
+                                            <Alert
+                                                variant="default"
+                                                className="mt-2"
+                                            >
+                                                <XCircle className="h-4 w-4" />
+                                                <AlertDescription className="flex justify-between items-center">
+                                                    <span>
+                                                        Import cancelled by user
+                                                    </span>
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() =>
+                                                            removeJob(job.jobId)
+                                                        }
+                                                    >
+                                                        Dismiss
+                                                    </Button>
+                                                </AlertDescription>
+                                            </Alert>
+                                        )}
+                                    </div>
+                                </Card>
+                            ))
+                        )}
+                    </div>
+                </CardContent>
+            </Card>
+
+            {/* Import History Card - Always visible */}
+            <Card>
+                <CardHeader>
+                    <CardTitle>Import History</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    {importLogs.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">
+                            No import history available.
+                        </p>
+                    ) : (
+                        <div className="space-y-2">
+                            {importLogs.map((log) => (
+                                <Card key={log.jobId} className="p-3">
+                                    <div className="flex justify-between items-center">
+                                        <div>
+                                            <p className="font-medium">
+                                                {log.filename}
+                                            </p>
+                                            <p className="text-sm text-muted-foreground">
+                                                {formatDate(log.timestamp)}
+                                            </p>
+                                        </div>
+                                        <div className="text-sm text-muted-foreground">
+                                            {log.recordsProcessed} records
+                                        </div>
+                                    </div>
+                                </Card>
+                            ))}
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
+        </div>
+    )
+}

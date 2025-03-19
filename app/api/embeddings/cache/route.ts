@@ -1,32 +1,25 @@
-import { NextRequest, NextResponse } from "next/server"
-import { cookies } from "next/headers"
-import { RedisClient } from "@/app/lib/server/redis-client"
+import { RedisClient, getRedisUrl } from "@/app/redis-server/server/commands"
+import { NextResponse } from "next/server"
+import { EMBEDDING_CACHE_KEY, EMBEDDING_CACHE_LOG_KEY } from "@/app/embeddings/cache/redis-cache"
 
-const REDIS_URL_COOKIE = "redis_url"
-const EMBEDDING_CACHE_KEY = "embeddingCache"
-const EMBEDDING_CACHE_LOG_KEY = "embeddingCache:log"
-
-// Helper to get Redis URL from cookies
-function getRedisUrl(): string | null {
-    const url = cookies().get(REDIS_URL_COOKIE)?.value
-    return url || null
-}
-
-export async function GET(request: NextRequest) {
+export async function GET() {
     try {
-        const url = getRedisUrl()
-        if (!url) {
+        const redisUrl = getRedisUrl()
+        if (!redisUrl) {
             return NextResponse.json(
                 { success: false, error: "No Redis URL configured" },
                 { status: 400 }
             )
         }
 
-        const result = await RedisClient.withConnection(url, async (client) => {
-            // Get the total number of cached embeddings
-            const size = await client.hLen(EMBEDDING_CACHE_KEY)
-            return { size }
-        })
+        const result = await RedisClient.withConnection(
+            redisUrl,
+            async (client) => {
+                // Get the total number of cached embeddings
+                const size = await client.hLen(EMBEDDING_CACHE_KEY)
+                return { size }
+            }
+        )
 
         if (!result.success) {
             return NextResponse.json(
@@ -48,22 +41,25 @@ export async function GET(request: NextRequest) {
     }
 }
 
-export async function DELETE(request: NextRequest) {
+export async function DELETE() {
     try {
-        const url = getRedisUrl()
-        if (!url) {
+        const redisUrl = getRedisUrl()
+        if (!redisUrl) {
             return NextResponse.json(
                 { success: false, error: "No Redis URL configured" },
                 { status: 400 }
             )
         }
 
-        const result = await RedisClient.withConnection(url, async (client) => {
-            // Delete both the cache and the log
-            await client.del(EMBEDDING_CACHE_KEY)
-            await client.del(EMBEDDING_CACHE_LOG_KEY)
-            return true
-        })
+        const result = await RedisClient.withConnection(
+            redisUrl,
+            async (client) => {
+                // Delete both the cache and the log
+                await client.del(EMBEDDING_CACHE_KEY)
+                await client.del(EMBEDDING_CACHE_LOG_KEY)
+                return true
+            }
+        )
 
         if (!result.success) {
             return NextResponse.json(

@@ -1,11 +1,11 @@
+import { VlinksRequestBody } from "@/app/redis-server/api"
+import * as redis from "@/app/redis-server/server/commands"
+import { getRedisUrl } from "@/app/redis-server/server/commands"
 import { NextResponse } from "next/server"
-import { cookies } from "next/headers"
-import * as redis from "@/app/lib/server/redis-client"
-import { getRedisUrl } from "@/app/lib/server/redis-client"
-import { VlinkRequest } from "@/app/api/types"
+
 export async function POST(request: Request) {
     try {
-        const body = (await request.json()) as VlinkRequest
+        const body = (await request.json()) as VlinksRequestBody
         const { keyName, element, count = 10, withEmbeddings = false } = body
 
         if (!keyName || !element) {
@@ -15,29 +15,21 @@ export async function POST(request: Request) {
             )
         }
 
-        const url = getRedisUrl()
-        if (!url) {
+        const redisUrl = getRedisUrl()
+        if (!redisUrl) {
             return NextResponse.json(
                 { success: false, error: "No Redis connection available" },
                 { status: 401 }
             )
         }
 
-        const result = await redis.vlinks(url, keyName, element, count)
+        const result = await redis.vlinks(redisUrl, keyName, element, count)
 
         if (!result.success) {
             return NextResponse.json(
                 { success: false, error: result.error },
                 { status: 500 }
             )
-        }
-        // format of result.result is [[[id, score, vector], [id, score, vector]], [[id, score, vector], [id, score, vector]]]
-        // lets output it for debugging
-        // output the first element of the first sub-array
-        for (const subArray of result.result) { 
-            for (const el of subArray) {
-                //console.log(`VLINKS result (${element})`, el)
-            }
         }
 
         let links = result.result || []
@@ -49,7 +41,7 @@ export async function POST(request: Request) {
             ));
             
             // Single batch fetch for all embeddings
-            const embResults = await redis.vemb_multi(url, keyName, allIds);
+            const embResults = await redis.vemb_multi(redisUrl, keyName, allIds)
             
             if (embResults.success) {
                 // Create a map of id -> embedding for quick lookup
@@ -65,7 +57,7 @@ export async function POST(request: Request) {
                 );
                 links = processedLinks;
             } else {
-                console.log("EMBEDDINGS FAILURE")
+                console.error("EMBEDDINGS FAILURE")
             }
         }
 
@@ -134,7 +126,7 @@ export async function GET(request: Request) {
             ));
             
             // Single batch fetch for all embeddings
-            const embResults = await redis.vemb_multi(redisUrl, keyName, allIds);
+            const embResults = await redis.vemb_multi(redisUrl, keyName, allIds)
             
             if (embResults.success) {
                 // Create a map of id -> embedding for quick lookup

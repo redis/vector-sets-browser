@@ -1,19 +1,6 @@
+import { VembRequestBody } from "@/app/redis-server/api"
+import * as redis from "@/app/redis-server/server/commands"
 import { NextResponse } from "next/server"
-import { cookies } from "next/headers"
-import * as redis from "@/app/lib/server/redis-client"
-
-// Helper to get Redis URL from cookies
-function getRedisUrl(): string | null {
-    const url = cookies().get("redis_url")?.value
-    return url || null
-}
-
-// Type definitions for the request body
-interface VembRequestBody {
-    keyName: string
-    element?: string
-    elements?: string[]
-}
 
 export async function POST(request: Request) {
     try {
@@ -27,8 +14,8 @@ export async function POST(request: Request) {
             )
         }
 
-        const url = getRedisUrl()
-        if (!url) {
+        const redisUrl = redis.getRedisUrl()
+        if (!redisUrl) {
             return NextResponse.json(
                 { success: false, error: "No Redis connection available" },
                 { status: 401 }
@@ -37,13 +24,15 @@ export async function POST(request: Request) {
 
         // Handle single element case
         if (element) {
-            const result = await redis.vemb(url, keyName, element)
+            const result = await redis.vemb(redisUrl, keyName, element)
             return NextResponse.json({ success: true, result: result })
         }
 
         // Handle multiple elements case
         if (elements) {
-            const promises = elements.map(el => redis.vemb(url, keyName, el))
+            const promises = elements.map((el) =>
+                redis.vemb(redisUrl, keyName, el)
+            )
             const results = await Promise.all(promises)
             return NextResponse.json({ success: true, result: results })
         }
@@ -81,7 +70,7 @@ export async function GET(request: Request) {
         )
     }
     
-    const redisUrl = getRedisUrl()
+    const redisUrl = redis.getRedisUrl()
     if (!redisUrl) {
         return NextResponse.json(
             { success: false, error: "No Redis connection available" },

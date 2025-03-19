@@ -1,11 +1,10 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import TopNav from "./components/TopNav"
+import { useEffect, useState } from "react"
+import { toast, Toaster } from "sonner"
+import TopNav from "./TopNav"
 import "./globals.css"
-import { Toaster } from "sonner"
-import { RedisService } from "./lib/redis-service"
-import { toast } from "sonner"
+import { RedisService } from "./redis-server/connect"
 
 export default function RootLayout({
     children,

@@ -1,6 +1,6 @@
-import { NextResponse } from 'next/server';
-import { RedisClient } from '@/app/lib/server/redis-client';
+import { RedisClient } from '@/app/redis-server/server/commands';
 import { cookies } from 'next/headers';
+import { NextResponse } from 'next/server';
 
 const REDIS_URL_COOKIE = 'redis_url';
 const COOKIE_OPTIONS = {

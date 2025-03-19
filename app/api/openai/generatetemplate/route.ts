@@ -1,10 +1,10 @@
+import {
+    EmbeddingTemplateRequestBody,
+    EmbeddingTemplateResponseObject,
+} from "@/app/api/openai"
 import { NextRequest, NextResponse } from "next/server"
 import OpenAI from "openai"
 import { zodResponseFormat } from "openai/helpers/zod"
-import {
-    EmbeddingTemplateResponseObject,
-    EmbeddingTemplateRequestBody,
-} from "../../openai"
 
 export async function POST(request: NextRequest) {
     try {

@@ -1,23 +1,7 @@
+import { VaddRequestBody } from "@/app/redis-server/api"
+import * as redis from "@/app/redis-server/server/commands"
+import { validateAndNormalizeVector } from "@/app/embeddings/utils/validation"
 import { NextResponse } from "next/server"
-import { cookies } from "next/headers"
-import * as redis from "@/app/lib/server/redis-client"
-import { validateAndNormalizeVector } from "@/app/utils/vectorValidation"
-
-// Helper to get Redis URL from cookies
-function getRedisUrl(): string | null {
-    const url = cookies().get("redis_url")?.value
-    return url || null
-}
-
-// Type definitions for the request body
-interface VaddRequestBody {
-    keyName: string
-    element: string
-    vector: number[]
-    attributes?: string
-    reduceDimensions?: number
-    useCAS?: boolean
-}
 
 export async function POST(request: Request) {
     try {
@@ -54,15 +38,23 @@ export async function POST(request: Request) {
             )
         }
 
-        const url = getRedisUrl()
-        if (!url) {
+        const redisUrl = redis.getRedisUrl()
+        if (!redisUrl) {
             return NextResponse.json(
                 { success: false, error: "No Redis connection available" },
                 { status: 401 }
             )
         }
 
-        const result = await redis.vadd(url, keyName, element, validationResult.vector, attributes, useCAS, reduceDimensions)
+        const result = await redis.vadd(
+            redisUrl,
+            keyName,
+            element,
+            validationResult.vector,
+            attributes,
+            useCAS,
+            reduceDimensions
+        )
 
         // If the operation failed, return the error with an appropriate status code
         if (!result.success) {
