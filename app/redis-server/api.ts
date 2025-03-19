@@ -61,7 +61,8 @@ export async function vcard(request: VcardRequestBody) {
 // VREM command
 export interface VremRequestBody {
     keyName: string;
-    element: string;
+    element?: string;
+    elements?: string[];
 }
 
 export async function vrem(request: VremRequestBody) {

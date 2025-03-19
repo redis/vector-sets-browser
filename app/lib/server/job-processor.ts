@@ -5,6 +5,8 @@ import {
 } from "@/app/types/job-queue"
 import { JobQueueService } from "./job-queue"
 import RedisClient from "../../redis-server/server/commands"
+import eventBus, { AppEvents } from "@/app/utils/eventEmitter"
+import { registerCompletedJob } from "@/app/api/jobs/completed/route"
 
 export class JobProcessor {
     private url: string
@@ -243,6 +245,24 @@ export class JobProcessor {
 
                     // Create an import log entry before cleaning up the job
                     await this.createImportLogEntry()
+                    
+                    // Notify about the import completing
+                    if (this.metadata?.vectorSetName) {
+                        console.log(`[JobProcessor] Emitting VECTORS_IMPORTED event for ${this.metadata.vectorSetName}`)
+                        
+                        // Try to emit an event, which only works client-side
+                        try {
+                            eventBus.emit(AppEvents.VECTORS_IMPORTED, {
+                                vectorSetName: this.metadata.vectorSetName,
+                                jobId: this.jobId
+                            })
+                        } catch (error) {
+                            console.warn("Could not emit event directly (expected in server context)", error)
+                        }
+                        
+                        // Register the completed job for client polling
+                        registerCompletedJob(this.jobId, this.metadata.vectorSetName)
+                    }
 
                     // Clean up the job data from Redis
                     await JobQueueService.cleanupJob(this.url, this.jobId)

@@ -50,6 +50,7 @@ interface VectorResultsProps {
     onRowClick: (element: string) => void
     onDeleteClick: (e: React.MouseEvent, element: string) => void
     onShowVectorClick: (e: React.MouseEvent, element: string) => void
+    onBulkDeleteClick?: (elements: string[]) => void
     searchTime?: string
     keyName: string
     searchFilter?: string
@@ -195,6 +196,7 @@ export default function VectorResults({
     onRowClick,
     onDeleteClick,
     onShowVectorClick,
+    onBulkDeleteClick,
     keyName,
     searchFilter,
     searchQuery,
@@ -244,6 +246,54 @@ export default function VectorResults({
     ])
     const [isAttributeColumnsDialogOpen, setIsAttributeColumnsDialogOpen] =
         useState(false)
+
+    // Add new state variables for selection mode
+    const [selectMode, setSelectMode] = useState(false)
+    const [selectedElements, setSelectedElements] = useState<Set<string>>(new Set())
+    
+    // Clear selections when the keyName (vector set) changes
+    useEffect(() => {
+        setSelectMode(false)
+        setSelectedElements(new Set())
+    }, [keyName])
+    
+    // Handle individual selection toggle
+    const handleSelectToggle = (element: string) => {
+        setSelectedElements(prev => {
+            const newSet = new Set(prev)
+            if (newSet.has(element)) {
+                newSet.delete(element)
+            } else {
+                newSet.add(element)
+            }
+            return newSet
+        })
+    }
+    
+    // Handle "Select All" action
+    const handleSelectAll = () => {
+        const allElements = filteredAndSortedResults.map(row => row[0])
+        setSelectedElements(new Set(allElements))
+    }
+    
+    // Handle "Deselect All" action
+    const handleDeselectAll = () => {
+        setSelectedElements(new Set())
+    }
+    
+    // Handle exiting select mode
+    const handleExitSelectMode = () => {
+        setSelectMode(false)
+        setSelectedElements(new Set())
+    }
+    
+    // Handle bulk delete action
+    const handleBulkDelete = () => {
+        if (onBulkDeleteClick && selectedElements.size > 0) {
+            onBulkDeleteClick(Array.from(selectedElements))
+            setSelectedElements(new Set())
+        }
+    }
 
     // Add this effect to reset states when vectorSet changes
     useEffect(() => {
@@ -611,6 +661,20 @@ export default function VectorResults({
         updateAttributeColumnVisibility(columnName, visible)
     }
 
+    // Fetch attributes for a single result
+    const fetchAttributes = async (keyName: string, element: string) => {
+        try {
+            const attributes = await vgetattr({
+                keyName,
+                element,
+            })
+            return attributes
+        } catch (error) {
+            console.error("Error fetching attributes:", error)
+            return null
+        }
+    }
+
     // Update the early return to handle both empty results and loading state
     if (!isLoaded || isLoading || isSearching) {
         return (
@@ -683,42 +747,6 @@ export default function VectorResults({
                     strokeWidth={2.5}
                 />
             )
-        }
-    }
-
-    // Fetch attributes for all results
-    const fetchAllAttributes = async (
-        keyName: string,
-        results: VectorTuple[]
-    ) => {
-        try {
-            // Extract elements from results
-            const elements = results.map((result) => result[0])
-            
-            // Fetch attributes for all elements
-            const attributes = await vgetattr_multi({
-                keyName,
-                elements,
-            })
-            
-            return attributes
-        } catch (error) {
-            console.error("Error fetching attributes:", error)
-            return null
-        }
-    }
-
-    // Fetch attributes for a single result
-    const fetchAttributes = async (keyName: string, element: string) => {
-        try {
-            const attributes = await vgetattr({
-                keyName,
-                element,
-            })
-            return attributes
-        } catch (error) {
-            console.error("Error fetching attributes:", error)
-            return null
         }
     }
 
@@ -815,141 +843,208 @@ export default function VectorResults({
                     )}
                 </div>
                 <div className="flex items-center space-x-2">
-                    {onAddVector && (
-                        <Button variant="default" onClick={handleAddVector}>
-                            <svg
-                                className="w-5 h-5"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
+                    {/* Selection mode controls */}
+                    {selectMode ? (
+                        <div className="flex items-center space-x-2">
+                            <span className="text-sm font-medium">
+                                {selectedElements.size} selected
+                            </span>
+                            <Button 
+                                variant="outline" 
+                                size="sm" 
+                                onClick={handleSelectAll}
+                                className="text-xs"
                             >
-                                <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth={2}
-                                    d="M12 4v16m8-8H4"
-                                />
-                            </svg>
-                            Add Vector
-                        </Button>
-                    )}
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <Button variant="outline" size="icon">
-                                <Settings className="h-4 w-4" />
+                                Select All
                             </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-56">
-                            <DropdownMenuCheckboxItem
-                                checked={isCompact}
-                                onCheckedChange={setIsCompact}
+                            <Button 
+                                variant="outline" 
+                                size="sm" 
+                                onClick={handleDeselectAll}
+                                className="text-xs"
+                                disabled={selectedElements.size === 0}
                             >
-                                Compact View
-                            </DropdownMenuCheckboxItem>
-                            <DropdownMenuCheckboxItem
-                                checked={showAttributes}
-                                onCheckedChange={(checked) => {
-                                    console.log(
-                                        "Setting showAttributes to:",
-                                        checked
-                                    )
-                                    setShowAttributes(checked)
-                                }}
+                                Deselect All
+                            </Button>
+                            <Button
+                                variant="destructive"
+                                size="sm"
+                                onClick={handleBulkDelete}
+                                disabled={selectedElements.size === 0}
+                                className="text-xs"
                             >
-                                Show Attributes
-                            </DropdownMenuCheckboxItem>
-                            {showAttributes && (
-                                <DropdownMenuCheckboxItem
-                                    checked={showOnlyFilteredAttributes}
-                                    onCheckedChange={(checked) => {
-                                        console.log(
-                                            "Setting showOnlyFilteredAttributes to:",
-                                            checked
-                                        )
-                                        setShowOnlyFilteredAttributes(checked)
-                                    }}
-                                    disabled={!showAttributes}
+                                Delete Selected
+                            </Button>
+                            <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                onClick={handleExitSelectMode}
+                                className="text-xs"
+                            >
+                                Cancel
+                            </Button>
+                        </div>
+                    ) : (
+                        <div className="flex items-center space-x-2">
+                            {/* Add a "Select" button to enable selection mode */}
+                            <Button 
+                                variant="outline" 
+                                onClick={() => setSelectMode(true)}
+                                disabled={results.length === 0}
+                            >
+                                <svg
+                                    className="w-5 h-5 mr-1"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
                                 >
-                                    Show Only Filtered Attributes
-                                </DropdownMenuCheckboxItem>
+                                    <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={2}
+                                        d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
+                                    />
+                                </svg>
+                                Select
+                            </Button>
+                            
+                            {onAddVector && (
+                                <Button variant="default" onClick={handleAddVector}>
+                                    <svg
+                                        className="w-5 h-5"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        viewBox="0 0 24 24"
+                                    >
+                                        <path
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            strokeWidth={2}
+                                            d="M12 4v16m8-8H4"
+                                        />
+                                    </svg>
+                                    Add Vector
+                                </Button>
                             )}
-                            <DropdownMenuSeparator />
-                            <DropdownMenuLabel>Columns</DropdownMenuLabel>
-                            {/* System Columns */}
-                            <DropdownMenuLabel className="text-xs text-gray-500 pl-2">
-                                System
-                            </DropdownMenuLabel>
-                            {availableColumns
-                                .filter((col) => col.type === "system")
-                                .map((col) => (
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button variant="outline" size="icon">
+                                        <Settings className="h-4 w-4" />
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-56">
                                     <DropdownMenuCheckboxItem
-                                        key={col.name}
-                                        checked={col.visible}
+                                        checked={isCompact}
+                                        onCheckedChange={setIsCompact}
+                                    >
+                                        Compact View
+                                    </DropdownMenuCheckboxItem>
+                                    <DropdownMenuCheckboxItem
+                                        checked={showAttributes}
                                         onCheckedChange={(checked) => {
-                                            // Update local state
-                                            setAvailableColumns((prev) =>
-                                                prev.map((c) =>
-                                                    c.name === col.name
-                                                        ? {
-                                                              ...c,
-                                                              visible: checked,
-                                                          }
-                                                        : c
-                                                )
-                                            )
-
-                                            // Persist the change
-                                            updateAttributeColumnVisibility(
-                                                col.name,
+                                            console.log(
+                                                "Setting showAttributes to:",
                                                 checked
                                             )
+                                            setShowAttributes(checked)
                                         }}
                                     >
-                                        {col.name.charAt(0).toUpperCase() +
-                                            col.name.slice(1)}
+                                        Show Attributes
                                     </DropdownMenuCheckboxItem>
-                                ))}
-
-                            {/* Attribute Columns Menu Item */}
-                            {availableColumns.some(
-                                (col) => col.type === "attribute"
-                            ) && (
-                                <>
+                                    {showAttributes && (
+                                        <DropdownMenuCheckboxItem
+                                            checked={showOnlyFilteredAttributes}
+                                            onCheckedChange={(checked) => {
+                                                console.log(
+                                                    "Setting showOnlyFilteredAttributes to:",
+                                                    checked
+                                                )
+                                                setShowOnlyFilteredAttributes(checked)
+                                            }}
+                                            disabled={!showAttributes}
+                                        >
+                                            Show Only Filtered Attributes
+                                        </DropdownMenuCheckboxItem>
+                                    )}
                                     <DropdownMenuSeparator />
-                                    <DropdownMenuItem
-                                        onClick={() =>
-                                            setIsAttributeColumnsDialogOpen(
-                                                true
-                                            )
-                                        }
-                                        className="cursor-pointer"
-                                    >
-                                        <div className="flex items-center justify-between w-full">
-                                            <span>Attribute Columns</span>
-                                            <span className="text-xs text-gray-500">
-                                                {
-                                                    availableColumns.filter(
-                                                        (col) =>
-                                                            col.type ===
-                                                                "attribute" &&
-                                                            col.visible
-                                                    ).length
-                                                }{" "}
-                                                /{" "}
-                                                {
-                                                    availableColumns.filter(
-                                                        (col) =>
-                                                            col.type ===
-                                                            "attribute"
-                                                    ).length
+                                    <DropdownMenuLabel>Columns</DropdownMenuLabel>
+                                    {/* System Columns */}
+                                    <DropdownMenuLabel className="text-xs text-gray-500 pl-2">
+                                        System
+                                    </DropdownMenuLabel>
+                                    {availableColumns
+                                        .filter((col) => col.type === "system")
+                                        .map((col) => (
+                                            <DropdownMenuCheckboxItem
+                                                key={col.name}
+                                                checked={col.visible}
+                                                onCheckedChange={(checked) => {
+                                                    // Update local state
+                                                    setAvailableColumns((prev) =>
+                                                        prev.map((c) =>
+                                                            c.name === col.name
+                                                                ? {
+                                                                      ...c,
+                                                                      visible: checked,
+                                                                  }
+                                                                : c
+                                                        )
+                                                    )
+
+                                                    // Persist the change
+                                                    updateAttributeColumnVisibility(
+                                                        col.name,
+                                                        checked
+                                                    )
+                                                }}
+                                            >
+                                                {col.name.charAt(0).toUpperCase() +
+                                                    col.name.slice(1)}
+                                            </DropdownMenuCheckboxItem>
+                                        ))}
+
+                                    {/* Attribute Columns Menu Item */}
+                                    {availableColumns.some(
+                                        (col) => col.type === "attribute"
+                                    ) && (
+                                        <>
+                                            <DropdownMenuSeparator />
+                                            <DropdownMenuItem
+                                                onClick={() =>
+                                                    setIsAttributeColumnsDialogOpen(
+                                                        true
+                                                    )
                                                 }
-                                            </span>
-                                        </div>
-                                    </DropdownMenuItem>
-                                </>
-                            )}
-                        </DropdownMenuContent>
-                    </DropdownMenu>
+                                                className="cursor-pointer"
+                                            >
+                                                <div className="flex items-center justify-between w-full">
+                                                    <span>Attribute Columns</span>
+                                                    <span className="text-xs text-gray-500">
+                                                        {
+                                                            availableColumns.filter(
+                                                                (col) =>
+                                                                    col.type ===
+                                                                        "attribute" &&
+                                                                    col.visible
+                                                            ).length
+                                                        }{" "}
+                                                        /{" "}
+                                                        {
+                                                            availableColumns.filter(
+                                                                (col) =>
+                                                                    col.type ===
+                                                                    "attribute"
+                                                            ).length
+                                                        }
+                                                    </span>
+                                                </div>
+                                            </DropdownMenuItem>
+                                        </>
+                                    )}
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                        </div>
+                    )}
                 </div>
             </div>
 
@@ -957,6 +1052,20 @@ export default function VectorResults({
                 <Table>
                     <TableHeader>
                         <TableRow>
+                            {/* Add a checkbox column when in select mode */}
+                            {selectMode && (
+                                <TableHead className="w-12">
+                                    <div className="flex items-center justify-center">
+                                        <input
+                                            type="checkbox"
+                                            checked={selectedElements.size === filteredAndSortedResults.length && filteredAndSortedResults.length > 0}
+                                            onChange={(e) => e.target.checked ? handleSelectAll() : handleDeselectAll()}
+                                            className="h-4 w-4 rounded border-gray-300"
+                                        />
+                                    </div>
+                                </TableHead>
+                            )}
+                            
                             {availableColumns
                                 .filter((col) => col.visible)
                                 .map((col) => {
@@ -1023,11 +1132,33 @@ export default function VectorResults({
                     </TableHeader>
                     <TableBody>
                         {filteredAndSortedResults.map((row, index) => (
-                            <TableRow key={index} className="group">
+                            <TableRow 
+                                key={index} 
+                                className={`group ${selectedElements.has(row[0]) ? 'bg-blue-50' : ''}`}
+                            >
+                                {/* Add a checkbox cell when in select mode */}
+                                {selectMode && (
+                                    <TableCell className="w-12">
+                                        <div className="flex items-center justify-center">
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedElements.has(row[0])}
+                                                onChange={() => handleSelectToggle(row[0])}
+                                                className="h-4 w-4 rounded border-gray-300"
+                                                onClick={(e) => e.stopPropagation()} // Prevent row click when clicking checkbox
+                                            />
+                                        </div>
+                                    </TableCell>
+                                )}
+                                
                                 {availableColumns
                                     .filter((col) => col.visible)
                                     .map((col) => (
-                                        <TableCell key={col.name}>
+                                        <TableCell 
+                                            key={col.name} 
+                                            onClick={selectMode ? () => handleSelectToggle(row[0]) : undefined}
+                                            className={selectMode ? 'cursor-pointer' : ''}
+                                        >
                                             {col.type === "system" ? (
                                                 col.name === "element" ? (
                                                     <div className="line-clamp-2 break-words">
@@ -1050,98 +1181,102 @@ export default function VectorResults({
                                     ))}
                                 <TableCell className="text-right">
                                     <div className="flex justify-end -space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            onClick={() =>
-                                                handleSearchSimilar(row[0])
-                                            }
-                                            className="h-8 w-8"
-                                            title="Search similar vectors"
-                                        >
-                                            <svg
-                                                className="w-4 h-4"
-                                                fill="none"
-                                                stroke="currentColor"
-                                                viewBox="0 0 24 24"
-                                            >
-                                                <path
-                                                    strokeLinecap="round"
-                                                    strokeLinejoin="round"
-                                                    strokeWidth={2}
-                                                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                                                />
-                                            </svg>
-                                        </Button>
-                                        <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            onClick={(e) =>
-                                                onShowVectorClick(e, row[0])
-                                            }
-                                            className="h-8 w-8"
-                                            title="Copy vector"
-                                        >
-                                            <svg
-                                                className="w-4 h-4"
-                                                fill="none"
-                                                stroke="currentColor"
-                                                viewBox="0 0 24 24"
-                                            >
-                                                <path
-                                                    strokeLinecap="round"
-                                                    strokeLinejoin="round"
-                                                    strokeWidth={2}
-                                                    d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
-                                                />
-                                            </svg>
-                                        </Button>
-                                        <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            onClick={() =>
-                                                setEditingAttributes(row[0])
-                                            }
-                                            className="h-8 w-8"
-                                            title="Edit attributes"
-                                        >
-                                            <svg
-                                                className="w-4 h-4"
-                                                fill="none"
-                                                stroke="currentColor"
-                                                viewBox="0 0 24 24"
-                                            >
-                                                <path
-                                                    strokeLinecap="round"
-                                                    strokeLinejoin="round"
-                                                    strokeWidth={2}
-                                                    d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                                                />
-                                            </svg>
-                                        </Button>
-                                        <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            onClick={(e) =>
-                                                onDeleteClick(e, row[0])
-                                            }
-                                            className="h-8 w-8 text-red-600"
-                                            title="Delete vector"
-                                        >
-                                            <svg
-                                                className="w-4 h-4"
-                                                fill="none"
-                                                stroke="currentColor"
-                                                viewBox="0 0 24 24"
-                                            >
-                                                <path
-                                                    strokeLinecap="round"
-                                                    strokeLinejoin="round"
-                                                    strokeWidth={2}
-                                                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                                                />
-                                            </svg>
-                                        </Button>
+                                        {!selectMode && (
+                                            <>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    onClick={() =>
+                                                        handleSearchSimilar(row[0])
+                                                    }
+                                                    className="h-8 w-8"
+                                                    title="Search similar vectors"
+                                                >
+                                                    <svg
+                                                        className="w-4 h-4"
+                                                        fill="none"
+                                                        stroke="currentColor"
+                                                        viewBox="0 0 24 24"
+                                                    >
+                                                        <path
+                                                            strokeLinecap="round"
+                                                            strokeLinejoin="round"
+                                                            strokeWidth={2}
+                                                            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                                                        />
+                                                    </svg>
+                                                </Button>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    onClick={(e) =>
+                                                        onShowVectorClick(e, row[0])
+                                                    }
+                                                    className="h-8 w-8"
+                                                    title="Copy vector"
+                                                >
+                                                    <svg
+                                                        className="w-4 h-4"
+                                                        fill="none"
+                                                        stroke="currentColor"
+                                                        viewBox="0 0 24 24"
+                                                    >
+                                                        <path
+                                                            strokeLinecap="round"
+                                                            strokeLinejoin="round"
+                                                            strokeWidth={2}
+                                                            d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
+                                                        />
+                                                    </svg>
+                                                </Button>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    onClick={() =>
+                                                        setEditingAttributes(row[0])
+                                                    }
+                                                    className="h-8 w-8"
+                                                    title="Edit attributes"
+                                                >
+                                                    <svg
+                                                        className="w-4 h-4"
+                                                        fill="none"
+                                                        stroke="currentColor"
+                                                        viewBox="0 0 24 24"
+                                                    >
+                                                        <path
+                                                            strokeLinecap="round"
+                                                            strokeLinejoin="round"
+                                                            strokeWidth={2}
+                                                            d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                                                        />
+                                                    </svg>
+                                                </Button>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    onClick={(e) =>
+                                                        onDeleteClick(e, row[0])
+                                                    }
+                                                    className="h-8 w-8 text-red-600"
+                                                    title="Delete vector"
+                                                >
+                                                    <svg
+                                                        className="w-4 h-4"
+                                                        fill="none"
+                                                        stroke="currentColor"
+                                                        viewBox="0 0 24 24"
+                                                    >
+                                                        <path
+                                                            strokeLinecap="round"
+                                                            strokeLinejoin="round"
+                                                            strokeWidth={2}
+                                                            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                                                        />
+                                                    </svg>
+                                                </Button>
+                                            </>
+                                        )}
                                     </div>
                                 </TableCell>
                             </TableRow>
@@ -1153,9 +1288,24 @@ export default function VectorResults({
                     {filteredAndSortedResults.map((row, index) => (
                         <div
                             key={index}
-                            className="bg-white rounded-lg border p-4 hover:shadow-md group"
+                            className={`bg-white rounded-lg border p-4 hover:shadow-md group ${
+                                selectedElements.has(row[0]) ? 'border-blue-400 bg-blue-50' : ''
+                            }`}
+                            onClick={selectMode ? () => handleSelectToggle(row[0]) : undefined}
                         >
                             <div className="flex items-start justify-between w-full">
+                                {/* Add checkbox in non-compact view */}
+                                {selectMode && (
+                                    <div className="mr-2 mt-1">
+                                        <input
+                                            type="checkbox"
+                                            checked={selectedElements.has(row[0])}
+                                            onChange={() => handleSelectToggle(row[0])}
+                                            className="h-4 w-4 rounded border-gray-300"
+                                            onClick={(e) => e.stopPropagation()}
+                                        />
+                                    </div>
+                                )}
                                 <div className="flex items-start space-x-4 w-full">
                                     <div className="bg-gray-100 rounded-lg p-2 text-gray-600">
                                         {index + 1}
@@ -1181,61 +1331,15 @@ export default function VectorResults({
                                         </div>
                                     </div>
                                 </div>
-                                <div className="flex flex-col items-end space-y--1 text-sm opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <Button
-                                        variant="ghost"
-                                        onClick={() =>
-                                            handleSearchSimilar(row[0])
-                                        }
-                                        className="p-2 hover:bg-gray-100 rounded-full flex items-center gap-2 text-gray-500"
-                                        title="Search similar vectors"
-                                    >
-                                        <svg
-                                            className="w-5 h-5"
-                                            fill="none"
-                                            stroke="currentColor"
-                                            viewBox="0 0 24 24"
-                                        >
-                                            <path
-                                                strokeLinecap="round"
-                                                strokeLinejoin="round"
-                                                strokeWidth={2}
-                                                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                                            />
-                                        </svg>
-                                        Find Similar
-                                    </Button>
-                                    <Button
-                                        variant="ghost"
-                                        onClick={(e) =>
-                                            onShowVectorClick(e, row[0])
-                                        }
-                                        className="p-2 hover:bg-gray-100 rounded-full text-gray-500 flex items-center gap-2"
-                                        title="Copy vector"
-                                    >
-                                        <svg
-                                            className="w-5 h-5"
-                                            fill="none"
-                                            stroke="currentColor"
-                                            viewBox="0 0 24 24"
-                                        >
-                                            <path
-                                                strokeLinecap="round"
-                                                strokeLinejoin="round"
-                                                strokeWidth={2}
-                                                d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
-                                            />
-                                        </svg>
-                                        Copy Vector
-                                    </Button>
-                                    {!showAttributes && (
+                                {!selectMode && (
+                                    <div className="flex flex-col items-end space-y--1 text-sm opacity-0 group-hover:opacity-100 transition-opacity">
                                         <Button
                                             variant="ghost"
                                             onClick={() =>
-                                                setEditingAttributes(row[0])
+                                                handleSearchSimilar(row[0])
                                             }
-                                            className="p-2 hover:bg-gray-100 rounded-full text-gray-500 flex items-center gap-2"
-                                            title="Edit attributes"
+                                            className="p-2 hover:bg-gray-100 rounded-full flex items-center gap-2 text-gray-500"
+                                            title="Search similar vectors"
                                         >
                                             <svg
                                                 className="w-5 h-5"
@@ -1247,36 +1351,84 @@ export default function VectorResults({
                                                     strokeLinecap="round"
                                                     strokeLinejoin="round"
                                                     strokeWidth={2}
-                                                    d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                                                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
                                                 />
                                             </svg>
-                                            Edit Attributes
+                                            Find Similar
                                         </Button>
-                                    )}
-                                    <Button
-                                        variant="ghost"
-                                        onClick={(e) =>
-                                            onDeleteClick(e, row[0])
-                                        }
-                                        className="p-2 hover:bg-gray-100 rounded-full text-red-600 flex items-center gap-2"
-                                        title="Delete vector"
-                                    >
-                                        <svg
-                                            className="w-5 h-5"
-                                            fill="none"
-                                            stroke="currentColor"
-                                            viewBox="0 0 24 24"
+                                        <Button
+                                            variant="ghost"
+                                            onClick={(e) =>
+                                                onShowVectorClick(e, row[0])
+                                            }
+                                            className="p-2 hover:bg-gray-100 rounded-full text-gray-500 flex items-center gap-2"
+                                            title="Copy vector"
                                         >
-                                            <path
-                                                strokeLinecap="round"
-                                                strokeLinejoin="round"
-                                                strokeWidth={2}
-                                                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                                            />
-                                        </svg>
-                                        Delete
-                                    </Button>
-                                </div>
+                                            <svg
+                                                className="w-5 h-5"
+                                                fill="none"
+                                                stroke="currentColor"
+                                                viewBox="0 0 24 24"
+                                            >
+                                                <path
+                                                    strokeLinecap="round"
+                                                    strokeLinejoin="round"
+                                                    strokeWidth={2}
+                                                    d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
+                                                />
+                                            </svg>
+                                            Copy Vector
+                                        </Button>
+                                        {!showAttributes && (
+                                            <Button
+                                                variant="ghost"
+                                                onClick={() =>
+                                                    setEditingAttributes(row[0])
+                                                }
+                                                className="p-2 hover:bg-gray-100 rounded-full text-gray-500 flex items-center gap-2"
+                                                title="Edit attributes"
+                                            >
+                                                <svg
+                                                    className="w-5 h-5"
+                                                    fill="none"
+                                                    stroke="currentColor"
+                                                    viewBox="0 0 24 24"
+                                                >
+                                                    <path
+                                                        strokeLinecap="round"
+                                                        strokeLinejoin="round"
+                                                        strokeWidth={2}
+                                                        d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                                                    />
+                                                </svg>
+                                                Edit Attributes
+                                            </Button>
+                                        )}
+                                        <Button
+                                            variant="ghost"
+                                            onClick={(e) =>
+                                                onDeleteClick(e, row[0])
+                                            }
+                                            className="p-2 hover:bg-gray-100 rounded-full text-red-600 flex items-center gap-2"
+                                            title="Delete vector"
+                                        >
+                                            <svg
+                                                className="w-5 h-5"
+                                                fill="none"
+                                                stroke="currentColor"
+                                                viewBox="0 0 24 24"
+                                            >
+                                                <path
+                                                    strokeLinecap="round"
+                                                    strokeLinejoin="round"
+                                                    strokeWidth={2}
+                                                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                                                />
+                                            </svg>
+                                            Delete
+                                        </Button>
+                                    </div>
+                                )}
                             </div>
                             {showOnlyFilteredAttributes &&
                                 filteredFields.map((field) => (

@@ -16,7 +16,6 @@ import InfoPanel from "./InfoTab/InfoPanel"
 import VectorSearchTab from "./SearchTab/VectorSearchTab"
 import VectorSetHeader from "./VectorSetHeader"
 import VectorSetNav from "./VectorSetNav"
-import VectorSetVisualization from "./VisualizationTab/VectorSetVisualization"
 
 /**
  * VectorSetPage handles the display and management of vector sets.
@@ -72,6 +71,7 @@ export default function VectorSetPage() {
         metadata,
         handleAddVector,
         handleDeleteVector,
+        handleDeleteVector_multi,
         handleShowVector,
         results,
         setResults,
@@ -267,9 +267,6 @@ export default function VectorSetPage() {
                             <TabsTrigger className="w-full" value="search">
                                 Search / Explore
                             </TabsTrigger>
-                            <TabsTrigger className="w-full" value="visualize">
-                                Visualize
-                            </TabsTrigger>
                             <TabsTrigger className="w-full" value="info">
                                 Information
                             </TabsTrigger>
@@ -308,19 +305,10 @@ export default function VectorSetPage() {
                                     }
                                     onShowVector={handleShowVector}
                                     onDeleteVector={handleDeleteVector}
+                                    onDeleteVector_multi={handleDeleteVector_multi}
                                     isLoading={isVectorSetChanging}
                                     results={results}
                                     setResults={setResults}
-                                />
-                            )}
-                        </TabsContent>
-
-                        <TabsContent value="visualize">
-                            {!isVectorSetChanging && (
-                                <VectorSetVisualization
-                                    vectorSetName={vectorSetName}
-                                    dim={dim || 0}
-                                    metadata={metadata}
                                 />
                             )}
                         </TabsContent>

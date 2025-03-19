@@ -2,12 +2,13 @@ import { ApiError } from "@/app/api/client"
 import { jobs } from "@/app/api/jobs"
 import { vectorSets } from "@/app/api/vector-sets"
 import { VectorSetMetadata } from "@/app/embeddings/types/config"
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import EditEmbeddingConfigModal from "../components/EmbeddingConfig/EditEmbeddingConfigDialog"
 import CreateVectorSetModal from "./CreateVectorSetDialog"
 import DeleteVectorSetDialog from "./DeleteVectorSetDialog"
 
 import { vcard, vdim } from "@/app/redis-server/api"
+import eventBus, { AppEvents } from "@/app/utils/eventEmitter"
 import {
     estimateVectorSetMemoryUsage,
     formatBytes,
@@ -59,7 +60,7 @@ export default function VectorSetNav({
         null
     )
     const [isInitialLoad, setIsInitialLoad] = useState(true)
-
+    const lastPollTimeRef = useRef<number>(Date.now())
     const loadVectorSets = useCallback(async () => {
         if (!isConnected) {
             console.error("Not connected, can't load vector sets")
@@ -157,6 +158,98 @@ export default function VectorSetNav({
             setLoading(false)
         }
     }, [isConnected])
+
+    // Poll for completed import jobs
+    useEffect(() => {
+        if (!isConnected) return;
+        
+        const checkForCompletedJobs = async () => {
+            try {
+                const response = await fetch(`/api/jobs/completed?since=${lastPollTimeRef.current}`);
+                if (!response.ok) return;
+                
+                const data = await response.json();
+                if (data.success && data.result.length > 0) {
+                    console.log("Detected completed jobs:", data.result);
+                    // Refresh vector sets when we detect a completed job
+                    await loadVectorSets();
+                }
+                
+                // Update the last poll time
+                lastPollTimeRef.current = data.serverTime || Date.now();
+            } catch (error) {
+                console.error("Error polling for completed jobs:", error);
+            }
+        };
+        
+        // Poll every 5 seconds
+        const intervalId = setInterval(checkForCompletedJobs, 5000);
+        
+        // Initial check
+        checkForCompletedJobs();
+        
+        return () => clearInterval(intervalId);
+    }, [isConnected, loadVectorSets]);
+
+    // Listen to vector set update events
+    useEffect(() => {
+        const handleVectorAdded = async (data: { 
+            vectorSetName: string, 
+            element: string, 
+            newCount: number 
+        }) => {
+            console.log(`Vector added to ${data.vectorSetName}`, data);
+            
+            if (vectorSetInfo[data.vectorSetName]) {
+                // Update the count directly in state to be immediately responsive
+                setVectorSetInfo(prev => ({
+                    ...prev,
+                    [data.vectorSetName]: {
+                        ...prev[data.vectorSetName],
+                        vectorCount: data.newCount
+                    }
+                }));
+            }
+        };
+
+        const handleVectorDeleted = async (data: { 
+            vectorSetName: string, 
+            element?: string, 
+            elements?: string[], 
+            newCount: number 
+        }) => {
+            console.log(`Vector(s) deleted from ${data.vectorSetName}`, data);
+            
+            if (vectorSetInfo[data.vectorSetName]) {
+                // Update the count directly in state to be immediately responsive
+                setVectorSetInfo(prev => ({
+                    ...prev,
+                    [data.vectorSetName]: {
+                        ...prev[data.vectorSetName],
+                        vectorCount: data.newCount
+                    }
+                }));
+            }
+        };
+
+        const handleVectorsImported = () => {
+            // When vectors are imported in bulk, do a full refresh
+            loadVectorSets();
+        };
+
+        // Subscribe to events
+        const unsubscribeAdded = eventBus.on(AppEvents.VECTOR_ADDED, handleVectorAdded);
+        const unsubscribeDeleted = eventBus.on(AppEvents.VECTOR_DELETED, handleVectorDeleted);
+        const unsubscribeImported = eventBus.on(AppEvents.VECTORS_IMPORTED, handleVectorsImported);
+
+        // Cleanup subscriptions when component unmounts
+        return () => {
+            unsubscribeAdded();
+            unsubscribeDeleted();
+            unsubscribeImported();
+        };
+    }, [vectorSetInfo]);
+
 
     useEffect(() => {
         if (isConnected && redisUrl) {

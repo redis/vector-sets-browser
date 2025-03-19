@@ -412,7 +412,7 @@ export default function SearchBox({
                 </div>
             {/* Use the new RedisCommandBox component */}
                 {showRedisCommand && (
-            <div className="bg-white px-2 py-2 rounded border-t border-gray-200 flex flex-col gap-2 items-start mt-2">
+            <div className="bg-white w-full px-2 py-2 rounded border-t border-gray-200 flex flex-col gap-2 items-start mt-2">
                 <div className="flex items-center w-full">
                     <label className="text-sm font-medium text-gray-700">
                         Redis Command

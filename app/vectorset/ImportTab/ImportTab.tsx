@@ -5,6 +5,13 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog"
+import {
     ArrowLeft,
     CheckCircle2,
     Database,
@@ -45,6 +52,8 @@ export default function ImportTab({ vectorSetName, metadata }: ImportTabProps) {
         new Set()
     )
     const [importLogs, setImportLogs] = useState<ImportLogEntry[]>([])
+    const [successJob, setSuccessJob] = useState<Job | null>(null)
+    const [showSuccessDialog, setShowSuccessDialog] = useState(false)
 
     // Keep this for potential future use but mark it as intentionally unused
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -65,6 +74,20 @@ export default function ImportTab({ vectorSetName, metadata }: ImportTabProps) {
                 const filteredJobs = data.filter(
                     (job) => !dismissedJobIds.has(job.jobId)
                 )
+
+                // Check for recently completed jobs
+                const previousJobs = jobList || []
+                for (const job of filteredJobs) {
+                    // Find if this job was previously in progress but now is completed
+                    const prevJob = previousJobs.find(j => j.jobId === job.jobId)
+                    if (prevJob && 
+                        prevJob.status.status !== "completed" && 
+                        job.status.status === "completed") {
+                        // This job just completed, show success dialog
+                        setSuccessJob(job)
+                        setShowSuccessDialog(true)
+                    }
+                }
 
                 // Check for stuck jobs (paused for more than 5 minutes)
                 const now = new Date().getTime()
@@ -104,7 +127,7 @@ export default function ImportTab({ vectorSetName, metadata }: ImportTabProps) {
             console.error("Error fetching jobs:", error)
             setError("Failed to fetch jobs")
         }
-    }, [vectorSetName, metadata, dismissedJobIds])
+    }, [vectorSetName, metadata, dismissedJobIds, jobList])
 
     const fetchImportLogs = useCallback(async () => {
         try {
@@ -523,6 +546,41 @@ export default function ImportTab({ vectorSetName, metadata }: ImportTabProps) {
                     )}
                 </CardContent>
             </Card>
+
+            {/* Success Dialog */}
+            <Dialog
+                open={showSuccessDialog}
+                onOpenChange={(open) => setShowSuccessDialog(open)}
+            >
+                <DialogContent className="sm:max-w-[425px]">
+                    <DialogHeader>
+                        <DialogTitle>Import Completed Successfully</DialogTitle>
+                        <DialogDescription>
+                            {successJob && (
+                                <div className="space-y-4 p-4">
+                                    <div className="flex items-center gap-2">
+                                        <CheckCircle2 className="h-6 w-6 text-green-500" />
+                                        <p className="font-medium">
+                                            {successJob.metadata.filename}
+                                        </p>
+                                    </div>
+                                    <p>
+                                        Your data has been successfully imported. 
+                                        {successJob.status.total} records have been processed.
+                                    </p>
+                                </div>
+                            )}
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="mt-4 flex justify-end">
+                        <Button
+                            onClick={() => setShowSuccessDialog(false)}
+                        >
+                            Close
+                        </Button>
+                    </div>
+                </DialogContent>
+            </Dialog>
         </div>
     )
 }

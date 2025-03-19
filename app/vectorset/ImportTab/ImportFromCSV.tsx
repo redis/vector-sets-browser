@@ -253,15 +253,15 @@ export default function ImportFromCSV({
 
             // Parse numeric values and handle comma-separated numbers
             const processValue = (value: string): string | number => {
-                // Remove commas from numbers (e.g., "1,234.56" → 1234.56)
-                if (/^[\d,]+(\.\d+)?$/.test(value)) {
+                // Remove commas from numbers (e.g., "1,234.56" or "123,100,000" → numeric value)
+                if (/^-?[\d,]+(\.\d+)?$/.test(value)) {
                     const numberWithoutCommas = value.replace(/,/g, '')
                     const parsedNumber = parseFloat(numberWithoutCommas)
                     return isNaN(parsedNumber) ? value : parsedNumber
                 }
                 
                 // Extract numbers from text with units (e.g., "160 min" → 160)
-                const numberWithUnitsMatch = value.match(/^(\d+(?:,\d+)?(?:\.\d+)?)\s+\w+/)
+                const numberWithUnitsMatch = value.match(/^-?(\d+(?:,\d+)*(?:\.\d+)?)\s+\w+/)
                 if (numberWithUnitsMatch) {
                     const numberPart = numberWithUnitsMatch[1].replace(/,/g, '')
                     const parsedNumber = parseFloat(numberPart)

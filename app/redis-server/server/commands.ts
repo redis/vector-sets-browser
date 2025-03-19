@@ -120,11 +120,13 @@ export class RedisClient {
         const expiredUrls: string[] = []
 
         // Find expired connections
-        Array.from(this.connectionPool.entries()).forEach(([url, connection]) => {
-            if (now - connection.lastUsed > this.CONNECTION_TIMEOUT) {
-                expiredUrls.push(url)
+        Array.from(this.connectionPool.entries()).forEach(
+            ([url, connection]) => {
+                if (now - connection.lastUsed > this.CONNECTION_TIMEOUT) {
+                    expiredUrls.push(url)
+                }
             }
-        })
+        )
 
         // Close expired connections
         for (const url of expiredUrls) {
@@ -189,17 +191,21 @@ export class RedisClient {
     // Add a method to explicitly close all connections (useful for cleanup)
     public static async closeAllConnections(): Promise<void> {
         await Promise.all(
-            Array.from(this.connectionPool.entries()).map(async ([url, connection]) => {
-                try {
-                    await connection.client.quit()
-                    console.log(`[RedisClient] Closed connection for ${url}`)
-                } catch (error) {
-                    console.error(
-                        `[RedisClient] Error closing connection for ${url}:`,
-                        error
-                    )
+            Array.from(this.connectionPool.entries()).map(
+                async ([url, connection]) => {
+                    try {
+                        await connection.client.quit()
+                        console.log(
+                            `[RedisClient] Closed connection for ${url}`
+                        )
+                    } catch (error) {
+                        console.error(
+                            `[RedisClient] Error closing connection for ${url}:`,
+                            error
+                        )
+                    }
                 }
-            })
+            )
         )
 
         this.connectionPool.clear()
@@ -515,6 +521,25 @@ export async function vrem(
 ): Promise<VectorOperationResult> {
     return RedisClient.withConnection(url, async (client) => {
         return client.sendCommand(["VREM", String(keyName), String(element)])
+    })
+}
+export async function vrem_multi(
+    url: string,
+    keyName: string,
+    elements: string[]
+): Promise<VectorOperationResult> {
+    return RedisClient.withConnection(url, async (client) => {
+        const multi = client.multi()
+        // Map elements to promises of VEMB commands
+        elements.forEach((element) =>
+            multi.addCommand(["VREM", String(keyName), String(element)])
+        )
+
+        // Execute all commands in parallel
+        const results = await multi.exec()
+        console.log("Results:", results)
+        return true 
+
     })
 }
 

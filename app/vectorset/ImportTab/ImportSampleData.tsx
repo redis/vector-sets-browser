@@ -3,6 +3,7 @@
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { AlertCircle, BookOpen, Film } from "lucide-react"
 import { useState } from "react"
+import { VectorSetMetadata } from "@/app/embeddings/types/config"
 
 interface SampleDataset {
     name: string
@@ -13,7 +14,13 @@ interface SampleDataset {
     recordCount: number
 }
 
-export default function ImportSampleData() {
+interface ImportSampleDataProps {
+    onClose: () => void
+    metadata: VectorSetMetadata | null
+    vectorSetName: string
+}
+
+export default function ImportSampleData({ onClose, metadata, vectorSetName }: ImportSampleDataProps) {
     const [error, setError] = useState<string | null>(null)
 
     const sampleDatasets: SampleDataset[] = [

@@ -12,6 +12,7 @@ import { vectorSets } from "@/app/api/vector-sets"
 import { embeddings } from "@/app/embeddings/client"
 import { VectorSetMetadata } from "@/app/embeddings/types/config"
 import { validateAndNormalizeVector } from "@/app/embeddings/utils/validation"
+import eventBus, { AppEvents } from "@/app/utils/eventEmitter"
 import { useEffect, useRef, useState } from "react"
 
 interface UseVectorSetReturn {
@@ -30,6 +31,7 @@ interface UseVectorSetReturn {
         useCAS?: boolean
     ) => Promise<void>
     handleDeleteVector: (element: string) => Promise<void>
+    handleDeleteVector_multi: (elements: string[]) => Promise<void>
     handleShowVector: (element: string) => Promise<number[] | null>
 }
 
@@ -143,78 +145,70 @@ export function useVectorSet(): UseVectorSetReturn {
         useCAS?: boolean
     ) => {
         if (!vectorSetName) {
-            throw new Error("Please select a vector set first")
+            setStatusMessage("Please select a vector set first")
+            throw new Error("No vector set selected")
         }
 
         try {
-            let vector: number[]
+            setStatusMessage(`Creating vector for "${element}"...`)
+            let newVector: number[]
 
+            // If the data is already a vector, validate it
             if (Array.isArray(elementData)) {
-                // Validate and normalize the raw vector data
-                const validationResult = validateAndNormalizeVector(
-                    elementData,
-                    "unknown"
-                )
-                if (!validationResult.isValid) {
+                if (dim && elementData.length !== dim) {
                     throw new Error(
-                        `Invalid vector data: ${validationResult.error}`
+                        `Vector dimensions mismatch: expected ${dim}, got ${elementData.length}`
                     )
                 }
-                vector = validationResult.vector
-            } else if (
-                metadata?.embedding &&
-                metadata.embedding.provider !== "none"
-            ) {
-                // Determine if we're using an image embedding model
-                const isImageEmbedding = metadata.embedding.provider === "image"
-
-                // Get embedding using our embeddings API client
-                const response = await embeddings.getEmbedding(
-                    metadata.embedding,
-                    isImageEmbedding ? undefined : elementData,
-                    isImageEmbedding ? elementData : undefined
-                )
                 
-                if (!response.success || !response.result) {
+                newVector = elementData
+            } else {
+                // Assume elementData is text that needs to be embedded
+                if (!metadata?.embedding) {
                     throw new Error(
-                        `Failed to get embedding: ${
-                            response.error || "Unknown error"
-                        }`
+                        "Embedding configuration is required for text input"
                     )
                 }
-                vector = response.result
 
-            } else if (
-                metadata?.embedding &&
-                metadata.embedding.provider === "none"
-            ) {
-                vector = validateAndNormalizeVector(
-                    elementData,
-                    "unknown"
-                ).vector
-            } else {
-                throw new Error("Error with Vector Set configuration.")
+                setStatusMessage(`Generating embedding for "${element}"...`)
+                const embeddingResult = await embeddings.generateEmbedding({
+                    input: elementData,
+                    config: metadata.embedding,
+                })
+
+                if (!embeddingResult.embedding) {
+                    throw new Error("Failed to generate embedding")
+                }
+
+                newVector = embeddingResult.embedding
             }
-            const reduceDimensions = metadata?.redisConfig?.reduceDimensions
-                ? metadata?.redisConfig?.reduceDimensions
-                : undefined
-            // Add the vector using Redis commands
-            await vadd({
+
+            // Validate and normalize the vector
+            let normalizedVector = validateAndNormalizeVector(newVector)
+
+            // If the vector is not valid, throw an error
+            if (!normalizedVector) {
+                throw new Error("Invalid vector: contains NaN or Infinity values")
+            }
+
+            // Add the vector to Redis
+            const options = useCAS ? { nx: true } : {}
+            const result = await vadd({
                 keyName: vectorSetName,
                 element,
-                vector,
-                attributes: undefined,
-                useCAS,
-                reduceDimensions
+                vector: normalizedVector,
+                ...options,
             })
+
+            if (result === 0 && useCAS) {
+                throw new Error(
+                    `Element "${element}" already exists in vector set "${vectorSetName}"`
+                )
+            }
 
             setStatusMessage("Vector created successfully")
 
-            // Add the new vector to the results list
-            const newVector = await vemb({
-                keyName: vectorSetName,
-                element,
-            })
+            // Get the attributes for the added vector
             const attributes = await vgetattr({
                 keyName: vectorSetName,
                 element,
@@ -235,6 +229,13 @@ export function useVectorSet(): UseVectorSetReturn {
                 vectorSetCacheRef.current[vectorSetName].recordCount =
                     newRecordCount
             }
+
+            // Emit event to notify other components
+            eventBus.emit(AppEvents.VECTOR_ADDED, { 
+                vectorSetName, 
+                element, 
+                newCount: newRecordCount 
+            })
         } catch (error) {
             console.error("Error creating vector:", error)
             setStatusMessage(
@@ -280,8 +281,63 @@ export function useVectorSet(): UseVectorSetReturn {
                 vectorSetCacheRef.current[vectorSetName].recordCount =
                     newRecordCount
             }
+
+            // Emit event to notify other components
+            eventBus.emit(AppEvents.VECTOR_DELETED, { 
+                vectorSetName, 
+                element, 
+                newCount: newRecordCount 
+            })
         } catch (error) {
             console.error("Error deleting vector:", error)
+            setStatusMessage(
+                error instanceof ApiError
+                    ? error.message
+                    : "Error deleting vector"
+            )
+        }
+    }
+
+    const handleDeleteVector_multi = async (elements: string[]) => {
+        if (!vectorSetName) {
+            setStatusMessage("Please select a vector set first")
+            return
+        }
+         try {
+             setStatusMessage(`Deleting elements "${elements}"...`)
+             // Delete the vectors from Redis
+                 
+             await vrem({
+                 keyName: vectorSetName,
+                 elements,
+             })
+             setStatusMessage("Vectors deleted successfully")
+
+             // Remove the vector from the results list
+             setResults((prevResults) =>
+                 prevResults.filter(([id]) => !elements.includes(id))
+             )
+
+             // Update the record count
+             const newRecordCount = await vcard({
+                 keyName: vectorSetName,
+             })
+             setRecordCount(newRecordCount)
+
+             // Update the cache
+             if (vectorSetCacheRef.current[vectorSetName]) {
+                 vectorSetCacheRef.current[vectorSetName].recordCount =
+                     newRecordCount
+             }
+
+             // Emit event to notify other components
+             eventBus.emit(AppEvents.VECTOR_DELETED, { 
+                 vectorSetName, 
+                 elements, 
+                 newCount: newRecordCount 
+             })
+         } catch (error) {
+            console.error("Error deleting vectors:", error)
             setStatusMessage(
                 error instanceof ApiError
                     ? error.message
@@ -401,6 +457,7 @@ export function useVectorSet(): UseVectorSetReturn {
         loadVectorSet,
         handleAddVector,
         handleDeleteVector,
+        handleDeleteVector_multi,
         handleShowVector,
     }
 }

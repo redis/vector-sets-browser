@@ -5,8 +5,8 @@ import { NextResponse } from "next/server"
 
 export async function POST(request: Request) {
     try {
-        const body = await request.json() as VremRequestBody
-        const { keyName, element } = body
+        const body = (await request.json()) as VremRequestBody
+        const { keyName, element, elements } = body
 
         if (!keyName) {
             return NextResponse.json(
@@ -15,9 +15,22 @@ export async function POST(request: Request) {
             )
         }
 
-        if (!element) {
+        if (!element && !elements) {
             return NextResponse.json(
-                { success: false, error: "Element is required" },
+                {
+                    success: false,
+                    error: "Element or elements array is required",
+                },
+                { status: 400 }
+            )
+        }
+
+        if (element && elements) {
+            return NextResponse.json(
+                {
+                    success: false,
+                    error: "Only one of element or elements array should be provided",
+                },
                 { status: 400 }
             )
         }
@@ -29,26 +42,36 @@ export async function POST(request: Request) {
                 { status: 401 }
             )
         }
+        let result
 
-        const result = await redis.vrem(redisUrl, keyName, element)
+        if (element) {
+            result = await redis.vrem(redisUrl, keyName, element)
+        } else if (elements) {
+            result = await redis.vrem_multi(redisUrl, keyName, elements)
+        }
 
-        if (!result.success) {
+        if (result && !result.success) {
             return NextResponse.json(
                 { success: false, error: result.error },
                 { status: 500 }
             )
+        } else if (result && result.success) {
+            return NextResponse.json({
+                success: true,
+                result: result.result,
+            })
+        } else {
+            return NextResponse.json({
+                success: false,
+                error: "Unknown error",
+            })
         }
-
-        return NextResponse.json({
-            success: true,
-            result: result.result
-        })
     } catch (error) {
         console.error("Error in VREM API:", error)
         return NextResponse.json(
-            { 
+            {
                 success: false,
-                error: error instanceof Error ? error.message : String(error) 
+                error: error instanceof Error ? error.message : String(error),
             },
             { status: 500 }
         )
