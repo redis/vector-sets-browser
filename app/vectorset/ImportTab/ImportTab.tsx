@@ -193,18 +193,18 @@ export default function ImportTab({ vectorSetName, metadata }: ImportTabProps) {
             setError("Failed to force clean job")
         }
     }
-
     useEffect(() => {
         fetchJobs()
         fetchImportLogs()
+    }, [vectorSetName])
+    
+    useEffect(() => {
+        //fetchJobs()
+        //fetchImportLogs()
         // Poll for updates every 2 seconds
         const interval = setInterval(() => {
             fetchJobs()
-            // Refresh import logs less frequently
-            if (Math.random() < 0.1) {
-                // ~10% chance each poll, so roughly every 20 seconds
-                fetchImportLogs()
-            }
+            fetchImportLogs()
         }, 2000)
         return () => clearInterval(interval)
     }, [fetchJobs, fetchImportLogs])
@@ -215,7 +215,7 @@ export default function ImportTab({ vectorSetName, metadata }: ImportTabProps) {
                 <CardHeader>
                     <div className="flex justify-between items-center">
                         <CardTitle>Import Data</CardTitle>
-                        <div className="flex gap-2">
+                        {/* <div className="flex gap-2">
                             <Button
                                 variant="outline"
                                 size="sm"
@@ -228,7 +228,7 @@ export default function ImportTab({ vectorSetName, metadata }: ImportTabProps) {
                                 <RefreshCcw className="h-4 w-4" />
                                 Refresh
                             </Button>
-                        </div>
+                        </div> */}
                     </div>
                 </CardHeader>
                 <CardContent>
@@ -331,11 +331,10 @@ export default function ImportTab({ vectorSetName, metadata }: ImportTabProps) {
                                                 <div className="flex flex-col items-center space-y-3">
                                                     <Database className="h-8 w-8 text-green-500" />
                                                     <h3 className="font-medium">
-                                                        Load Sample Data
+                                                        Sample Data
                                                     </h3>
                                                     <p className="text-sm text-gray-500 text-center">
-                                                        Try out with our
-                                                        pre-made dataset
+                                                        Import pre-configured datasets with one click
                                                     </p>
                                                 </div>
                                             </Card>

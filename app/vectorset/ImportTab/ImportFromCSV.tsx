@@ -613,13 +613,7 @@ export default function ImportFromCSV({
                         </Button>
                     </div>
 
-                    <Alert className="mt-4">
-                        <Info className="h-4 w-4" />
-                        <AlertDescription>
-                            Numeric values like "1,234.56" will be automatically converted to numbers.
-                            Values with units like "160 min" will be converted to their numeric part (160).
-                        </AlertDescription>
-                    </Alert>
+
 
                     {!metadata?.embedding && (
                         <Alert variant="destructive" className="mt-4">
