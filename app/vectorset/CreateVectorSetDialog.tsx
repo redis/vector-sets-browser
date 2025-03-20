@@ -20,122 +20,19 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { ArrowLeft, ChevronRight, Database, BookOpen, Film, User, ChevronLeft } from "lucide-react"
-import { useState } from "react"
-import { FormProvider, useForm } from "react-hook-form"
+import { useState, useEffect } from "react"
+import { FormProvider, useForm, UseFormReturn } from "react-hook-form"
 import { z } from "zod"
 import EditEmbeddingConfigModal from "../components/EmbeddingConfig/EditEmbeddingConfigDialog"
 import ImportSampleData from "./ImportTab/ImportSampleData"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import ImportSampleDataDialog from "./ImportTab/ImportSampleDataDialog"
-
-
-// Define the Sample Dataset interface for type safety
-interface SampleDataset {
-    name: string;
-    description: string;
-    icon: React.ReactNode;
-    fileUrl: string;
-    columns: string[];
-    recordCount: number;
-    elementTemplate: string;
-    vectorTemplate: string;
-    attributeColumns: string[];
-    dataType: "text" | "image";
-    recommendedEmbedding: EmbeddingConfig;
-}
+import { getDefaultTextEmbeddingConfig, getDefaultEmbeddingConfig } from "@/app/utils/embeddingUtils"
+import { SampleDataset, sampleDatasets as configuredDatasets } from "./ImportTab/SampleDataSelect"
+import AdvancedConfigurationPanel, { vectorSetSchema, FormValues } from "./AdvancedConfigurationPanel"
 
 // Define sample datasets for use in the component
-const sampleDatasets: SampleDataset[] = [
-    {
-        name: "Goodreads Books",
-        description:
-            "A collection of popular books with titles, authors, descriptions, and ratings from Goodreads",
-        icon: <BookOpen className="h-5 w-5 text-blue-500" />,
-        fileUrl: "/sample-data/top2k_book_descriptions.csv",
-        columns: [
-            "title",
-            "authors",
-            "description",
-            "average_rating",
-            "isbn",
-            "original_publication_year",
-            "ratings_count",
-            "language_code",
-        ],
-        recordCount: 2000,
-        elementTemplate: "${title} (ISBN: ${isbn})",
-        vectorTemplate: "The book titled \"${title}\", authored by ${authors}, was initially published in ${original_publication_year}. It has an average rating of ${average_rating} across ${ratings_count} ratings, and is available under ISBN ${isbn}. The description is as follows: ${description}.",
-        attributeColumns: ["average_rating", "original_publication_year", "authors", "isbn", "ratings_count", "language_code"],
-        dataType: "text",
-        recommendedEmbedding: {
-            provider: "openai",
-            openai: {
-                apiKey: "",
-                model: "text-embedding-3-small"
-            }
-        } as EmbeddingConfig
-    },
-    {
-        name: "IMDB Movies",
-        description:
-            "A dataset of the top 1000 movies with titles, plot synopses, directors, and ratings from IMDB",
-        icon: <Film className="h-5 w-5 text-amber-500" />,
-        fileUrl: "/sample-data/imdb_top_1000.csv",
-        columns: [
-            "Poster_Link",
-            "Series_Title",
-            "Released_Year",
-            "Certificate",
-            "Runtime",
-            "Genre",
-            "IMDB_Rating",
-            "Overview",
-            "Meta_score",
-            "Director",
-            "Star1",
-            "Star2",
-            "Star3",
-            "Star4",
-            "No_of_Votes",
-            "Gross"
-        ],
-        recordCount: 1000,
-        elementTemplate: "${Series_Title} (${Released_Year})",
-        vectorTemplate: "Movie '${Series_Title}' was released in ${Released_Year} with a runtime of ${Runtime} minutes. Directed by ${Director}, this ${Genre} film has a rating of ${IMDB_Rating} on IMDB. Overview: ${Overview}. It stars ${Star1}, ${Star2}, ${Star3}, and ${Star4}.",
-        attributeColumns: ["IMDB_Rating", "Released_Year", "Director", "Genre", "Runtime", "Meta_score"],
-        dataType: "text",
-        recommendedEmbedding: {
-            provider: "tensorflow",
-            tensorflow: {
-                model: "universal-sentence-encoder"
-            }
-        } as EmbeddingConfig
-    },
-    {
-        name: "UTK Faces",
-        description:
-            "UTKFace dataset with over 20,000 face images annotated with age, gender, and ethnicity. The images cover large variation in pose, facial expression, illumination, occlusion, and resolution.",
-        icon: <User className="h-5 w-5 text-violet-500" />,
-        fileUrl: "/sample-data/UTKFace/images",
-        columns: [
-            "image",
-            "age",
-            "gender",
-            "ethnicity"
-        ],
-        recordCount: 20000,
-        elementTemplate: "Face ${index}",
-        vectorTemplate: "",
-        attributeColumns: ["age", "gender", "ethnicity"],
-        dataType: "image",
-        recommendedEmbedding: {
-            provider: "image",
-            image: {
-                model: "mobilenet"
-            }
-        } as EmbeddingConfig
-    },
-];
+const sampleDatasets = configuredDatasets;
 
 interface CreateVectorSetModalProps {
     isOpen: boolean
@@ -147,27 +44,6 @@ interface CreateVectorSetModalProps {
         customData?: { element: string; vector: number[] }
     ) => Promise<void>
 }
-
-const vectorSetSchema = z.object({
-    name: z
-        .string()
-        .min(1, "Please enter a name for the vector set")
-        .refine(
-            (name) => !/\s/.test(name),
-            "Vector name cannot contain spaces"
-        ),
-    dimensions: z.coerce.number(),
-    customElement: z.string().optional(),
-    customVector: z.string().optional(),
-    quantization: z.enum(["Q8", "BIN", "NOQUANT"]).optional(),
-    reduceDimensions: z.string().optional(),
-    defaultCAS: z.boolean().optional(),
-    buildExplorationFactor: z.string().optional(),
-    loadSampleData: z.boolean().optional(),
-    selectedDataset: z.string().optional(),
-})
-
-type FormValues = z.infer<typeof vectorSetSchema>
 
 export default function CreateVectorSetModal({
     isOpen,
@@ -182,6 +58,31 @@ export default function CreateVectorSetModal({
             model: "universal-sentence-encoder",
         },
     })
+    const [isOllamaAvailable, setIsOllamaAvailable] = useState(false)
+    const [embeddingConfigs, setEmbeddingConfigs] = useState<Record<string, EmbeddingConfig>>({})
+
+    // Use the utility function to get the default text embedding config
+    useEffect(() => {
+        async function initEmbeddingConfig() {
+            try {
+                const defaultConfig = await getDefaultTextEmbeddingConfig();
+                setEmbeddingConfig(defaultConfig);
+                setIsOllamaAvailable(defaultConfig.provider === "ollama");
+                
+                // Also load embedding configs for all sample datasets
+                const configs: Record<string, EmbeddingConfig> = {};
+                for (const dataset of sampleDatasets) {
+                    const config = await getDefaultEmbeddingConfig(dataset.embeddingType);
+                    configs[dataset.name] = config;
+                }
+                setEmbeddingConfigs(configs);
+            } catch (error) {
+                console.error("Error initializing embedding config:", error);
+            }
+        }
+        
+        initEmbeddingConfig();
+    }, []);
 
     const [activeTab, setActiveTab] = useState("automatic")
     const [isEditConfigModalOpen, setIsEditConfigModalOpen] = useState(false)
@@ -236,6 +137,59 @@ export default function CreateVectorSetModal({
         setEmbeddingConfig(config)
     }
 
+    // Building metadata based on vector data choice
+    const getMetadataForSubmit = async (values: FormValues): Promise<VectorSetMetadata> => {
+        // Build redisConfig object only with defined values
+        const redisConfig: Record<string, string | number | boolean> = {};
+
+        // Only add properties that are explicitly set
+        if (values.quantization) {
+            redisConfig.quantization = values.quantization;
+        }
+
+        if (values.reduceDimensions) {
+            redisConfig.reduceDimensions = parseInt(values.reduceDimensions, 10);
+        }
+
+        if (values.defaultCAS !== undefined) {
+            redisConfig.defaultCAS = values.defaultCAS;
+        }
+
+        if (values.buildExplorationFactor) {
+            redisConfig.buildExplorationFactor = parseInt(values.buildExplorationFactor, 10);
+        }
+
+        // Create metadata based on vector data choice
+        if (vectorDataChoice === "embedding") {
+            return {
+                ...createVectorSetMetadata(embeddingConfig),
+                redisConfig: Object.keys(redisConfig).length > 0 ? redisConfig : undefined,
+            };
+        } else if (vectorDataChoice === "sample" && selectedSampleDataset) {
+            // Find the selected sample dataset
+            const selectedDataset = sampleDatasets.find(ds => ds.name === selectedSampleDataset);
+            if (selectedDataset) {
+                // Use the pre-loaded embedding config for this dataset
+                const datasetEmbeddingConfig = embeddingConfigs[selectedDataset.name] || 
+                    await getDefaultEmbeddingConfig(selectedDataset.embeddingType);
+                
+                return {
+                    ...createVectorSetMetadata(datasetEmbeddingConfig),
+                    redisConfig: Object.keys(redisConfig).length > 0 ? redisConfig : undefined,
+                };
+            }
+        }
+        
+        // Fallback for manual mode or if dataset not found
+        return {
+            embedding: {
+                provider: "none" as EmbeddingProvider,
+            },
+            created: new Date().toISOString(),
+            redisConfig: Object.keys(redisConfig).length > 0 ? redisConfig : undefined,
+        };
+    };
+
     const onSubmit = async (values: FormValues) => {
         try {
             setError(null)
@@ -276,96 +230,25 @@ export default function CreateVectorSetModal({
                 }
             }
 
-            // Build redisConfig object only with defined values
-            const redisConfig: Record<string, string | number | boolean> = {}
-
-            // Only add properties that are explicitly set
-            if (values.quantization) {
-                redisConfig.quantization = values.quantization
-            }
-
-            if (values.reduceDimensions) {
-                redisConfig.reduceDimensions = parseInt(
-                    values.reduceDimensions,
-                    10
-                )
-            }
-
-            if (values.defaultCAS !== undefined) {
-                redisConfig.defaultCAS = values.defaultCAS
-            }
-
-            if (values.buildExplorationFactor) {
-                redisConfig.buildExplorationFactor = parseInt(
-                    values.buildExplorationFactor,
-                    10
-                )
-            }
-
-            let metadata;
+            // Get metadata based on selection
+            const metadata = await getMetadataForSubmit(values);
             
-            if (vectorDataChoice === "embedding") {
-                metadata = {
-                    ...createVectorSetMetadata(embeddingConfig),
-                    redisConfig:
-                        Object.keys(redisConfig).length > 0
-                            ? redisConfig
-                            : undefined,
-                }
-            } else if (vectorDataChoice === "sample" && selectedSampleDataset) {
-                // Find the selected sample dataset to get its recommended embedding config
-                const selectedDataset = sampleDatasets.find(ds => ds.name === selectedSampleDataset);
-                if (selectedDataset) {
-                    metadata = {
-                        ...createVectorSetMetadata(selectedDataset.recommendedEmbedding as EmbeddingConfig),
-                        redisConfig:
-                            Object.keys(redisConfig).length > 0
-                                ? redisConfig
-                                : undefined,
-                    }
-                } else {
-                    // Fallback if dataset not found
-                    metadata = {
-                        embedding: {
-                            provider: "none" as EmbeddingProvider,
-                        },
-                        created: new Date().toISOString(),
-                        redisConfig:
-                            Object.keys(redisConfig).length > 0
-                                ? redisConfig
-                                : undefined,
-                    }
-                }
-            } else {
-                // For manual mode
-                metadata = {
-                    embedding: {
-                        provider: "none" as EmbeddingProvider,
-                    },
-                    created: new Date().toISOString(),
-                    redisConfig:
-                        Object.keys(redisConfig).length > 0
-                            ? redisConfig
-                            : undefined,
-                }
-            }
-
             // Update currentMetadata with the final metadata
-            setCurrentMetadata(metadata)
+            setCurrentMetadata(metadata);
 
             // Use manual dimensions or get dimensions from metadata
             const effectiveDimensions =
                 vectorDataChoice === "manual"
                     ? values.dimensions
-                    : metadata.dimensions || values.dimensions || 256
+                    : metadata.dimensions || values.dimensions || 256;
 
             // For manual mode, create a zero vector of correct dimensions
-            let customData = undefined
+            let customData = undefined;
             if (vectorDataChoice === "manual") {
                 customData = {
                     element: `initial_vector_${Date.now()}`,
                     vector: Array(effectiveDimensions).fill(0),
-                }
+                };
             }
 
             const result = await onCreate(
@@ -373,33 +256,33 @@ export default function CreateVectorSetModal({
                 effectiveDimensions,
                 metadata,
                 customData
-            )
+            );
 
             // Don't close dialog if sample data import is selected
             if (vectorDataChoice === "sample") {
                 console.log(`[CreateVectorSetDialog] Setting up sample data import for: ${selectedSampleDataset}`);
                 // Set state to show the import panel
-                setIsSampleDataImportStarted(true)
+                setIsSampleDataImportStarted(true);
             } else {
-                onClose()
+                onClose();
             }
         } catch (err) {
-            console.error("Error in CreateVectorSetModal handleSubmit:", err)
+            console.error("Error in CreateVectorSetModal handleSubmit:", err);
             setError(
                 err instanceof Error
                     ? err.message
                     : "Failed to create vector set"
-            )
+            );
         } finally {
-            setIsCreating(false)
+            setIsCreating(false);
         }
-    }
+    };
 
     if (!isOpen) return null
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg p-6 w-[900px] min-h-[600px] max-h-[90vh] overflow-hidden relative">
+            <div className="bg-[white] rounded-lg p-6 w-[900px] min-h-[600px] max-h-[90vh] overflow-hidden relative">
                 <FormProvider {...form}>
                     {/* Main Form Content */}
                     <div
@@ -552,7 +435,7 @@ export default function CreateVectorSetModal({
 
                     {/* Vector Data Panel */}
                     <div
-                        className={`absolute top-0 left-0 w-full h-full bg-white p-6 transition-transform duration-300 transform ${
+                        className={`absolute top-0 left-0 w-full h-full bg-[white] p-6 transition-transform duration-300 transform ${
                             activePanel === "vectorData"
                                 ? "translate-x-0"
                                 : "translate-x-full"
@@ -602,7 +485,7 @@ export default function CreateVectorSetModal({
                                             }`}
                                         >
                                             {vectorDataChoice === "manual" && (
-                                                <div className="w-3 h-3 rounded-full bg-customRed-500"></div>
+                                                <div className="w-3 h-3 rounded-full bg-red-500"></div>
                                             )}
                                         </div>
                                         <div>
@@ -671,7 +554,7 @@ export default function CreateVectorSetModal({
                                         >
                                             {vectorDataChoice ===
                                                 "embedding" && (
-                                                <div className="w-3 h-3 rounded-full bg-customRed-500"></div>
+                                                <div className="w-3 h-3 rounded-full bg-red-500"></div>
                                             )}
                                         </div>
                                         <div>
@@ -696,6 +579,11 @@ export default function CreateVectorSetModal({
                                                 Text Embeddings (default)
                                             </div>
                                             <div className="flex flex-col gap-2">
+                                                {isOllamaAvailable && (
+                                                    <div className="text-xs text-green-600 font-medium mb-2">
+                                                        ✓ Using locally installed Ollama
+                                                    </div>
+                                                )}
                                                 {embeddingConfig.provider === "openai" && embeddingConfig.openai && (
                                                     <div className="flex items-center gap-2">
                                                         <span className="px-2 py-1 rounded bg-green-100 text-green-800 text-xs font-medium">OpenAI</span>
@@ -761,7 +649,7 @@ export default function CreateVectorSetModal({
                                             >
                                                 {vectorDataChoice ===
                                                     "sample" && (
-                                                    <div className="w-3 h-3 rounded-full bg-customRed-500"></div>
+                                                    <div className="w-3 h-3 rounded-full bg-red-500"></div>
                                                 )}
                                             </div>
                                             <h4 className="text-lg font-medium">
@@ -792,9 +680,23 @@ export default function CreateVectorSetModal({
                         </div>
                     </div>
 
+                    {/* Advanced Configuration Panel */}
+                    <div
+                        className={`absolute top-0 left-0 w-full h-full bg-[white] p-6 transition-transform duration-300 transform ${
+                            activePanel === "advancedConfiguration"
+                                ? "translate-x-0"
+                                : "translate-x-full"
+                        } overflow-y-auto`}
+                    >
+                        <AdvancedConfigurationPanel
+                            form={form}
+                            onBack={() => setActivePanel(null)}
+                        />
+                    </div>
+
                     {/* Sample Data Import Panel - This is shown after vector set is created */}
                     <div
-                        className={`absolute top-0 left-0 w-full h-full bg-white p-6 transition-transform duration-300 transform ${
+                        className={`absolute top-0 left-0 w-full h-full bg-[white] p-6 transition-transform duration-300 transform ${
                             isSampleDataImportStarted
                                 ? "translate-x-0"
                                 : "translate-x-full"
@@ -838,7 +740,12 @@ export default function CreateVectorSetModal({
                                               return selectedDataset 
                                                   ? {
                                                         ...createVectorSetMetadata(
-                                                            selectedDataset.recommendedEmbedding as EmbeddingConfig
+                                                            embeddingConfigs[selectedDataset.name] || {
+                                                                provider: "tensorflow",
+                                                                tensorflow: {
+                                                                    model: "universal-sentence-encoder",
+                                                                }
+                                                            }
                                                         ),
                                                         redisConfig: form.getValues("quantization")
                                                             ? {

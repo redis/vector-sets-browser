@@ -269,7 +269,7 @@ export default function SearchBox({
 
     return (
         <section className="mb-2">
-            <div className="bg-white p-4 rounded shadow-md flex flex-col gap-2 items-start">
+            <div className="bg-[white] p-4 rounded shadow-md flex flex-col gap-2 items-start">
                 <div className="flex gap-2 items-center w-full justify-between">
                     <div className="flex gap-2 items-center w-full">
                         <label className="text-sm font-medium text-gray-700">
@@ -366,16 +366,16 @@ export default function SearchBox({
                 <div className="flex flex-col gap-2 grow w-full">
                     {searchType === "Image" ? (
                         // Show ImageUploader for Image search type
-                        <ImageUploader 
+                        (<ImageUploader 
                             onImageSelect={handleImageSelect}
                             onEmbeddingGenerated={handleImageEmbeddingGenerated}
                             config={metadata?.embedding?.image || { model: "mobilenet" }}
                             className="w-full"
                             allowMultiple={false}
-                        />
+                        />)
                     ) : (
                         // Show regular search input for other types
-                        <div className="relative flex gap-2">
+                        (<div className="relative flex gap-2">
                             <div className="flex-1 relative">
                                 <Input
                                     type="text"
@@ -411,13 +411,13 @@ export default function SearchBox({
                                 className={`h-9 ${
                                     showFilters
                                         ? "bg-gray-500 hover:bg-gray-600 text-white"
-                                        : "bg-white hover:bg-gray-100"
+                                        : "bg-[white] hover:bg-gray-100"
                                 }`}
                                 onClick={() => setShowFilters(!showFilters)}
                             >
                                 <Filter className="h-4 w-4" />
                             </Button>
-                        </div>
+                        </div>)
                     )}
 
                     {showFilters && (
@@ -451,7 +451,7 @@ export default function SearchBox({
                 </div>
             {/* Use the new RedisCommandBox component */}
                 {showRedisCommand && (
-            <div className="bg-white w-full px-2 py-2 rounded border-t border-gray-200 flex flex-col gap-2 items-start mt-2">
+            <div className="bg-[white] w-full px-2 py-2 rounded border-t border-gray-200 flex flex-col gap-2 items-start mt-2">
                 <div className="flex items-center w-full">
                     <label className="text-sm font-medium text-gray-700">
                         Redis Command
@@ -473,7 +473,6 @@ export default function SearchBox({
                 </div>
             )}
             </div>
-
             {/* Filter Help Dialog */}
             <Dialog open={showFilterHelp} onOpenChange={setShowFilterHelp}>
                 <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
@@ -530,7 +529,6 @@ export default function SearchBox({
                     </div>
                 </DialogContent>
             </Dialog>
-
             {/* Search Options Dialog */}
             <Dialog
                 open={showSearchOptions}
@@ -590,5 +588,5 @@ export default function SearchBox({
                 </DialogContent>
             </Dialog>
         </section>
-    )
+    );
 }

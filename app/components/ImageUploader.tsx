@@ -567,7 +567,7 @@ export default function ImageUploader({
     return (
         <div className={`flex flex-col items-center space-y-4 ${className}`}>
             <div
-                className="w-full h-64 border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center p-4 cursor-pointer hover:bg-gray-50 transition-colors relative overflow-hidden"
+                className="w-full h-32 border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center p-4 cursor-pointer hover:bg-gray-50 transition-colors relative overflow-hidden"
                 onClick={handleButtonClick}
                 onDragOver={handleDragOver}
                 onDrop={handleDrop}
@@ -639,7 +639,7 @@ export default function ImageUploader({
                 {/* Show loading overlay if needed */}
                 {(isLoading || isProcessingEmbedding) && (
                     <div className="absolute inset-0 bg-black bg-opacity-30 flex items-center justify-center">
-                        <div className="bg-white px-4 py-2 rounded-lg">
+                        <div className="bg-[white] px-4 py-2 rounded-lg">
                             {isProcessingEmbedding ? "Processing embedding..." : "Processing image..."}
                         </div>
                     </div>

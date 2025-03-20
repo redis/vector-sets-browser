@@ -19,7 +19,7 @@ export abstract class BaseDatasetImporter {
             const { vectorSetName, chunkSize = 100, onProgress, metadata } = options
             
             // Get Redis URL (needs to be done server-side)
-            const redisUrl = getRedisUrl()
+            const redisUrl = await getRedisUrl()
             if (!redisUrl) {
                 return {
                     success: false,

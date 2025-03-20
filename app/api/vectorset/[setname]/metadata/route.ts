@@ -11,17 +11,19 @@ export async function GET(
     try {
         console.log("GET /api/vectorset/[setname]/metadata", params)
         
-        if (!params || !params.setname) {
-            console.error("Missing setname parameter:", params)
+        const parsedParams = await params;
+        
+        if (!parsedParams || !parsedParams.setname) {
+            console.error("Missing setname parameter:", parsedParams)
             return NextResponse.json(
                 { success: false, error: "Key name is required" },
                 { status: 400 }
             )
         }
         
-        const keyName = params.setname
+        const keyName = parsedParams.setname
         
-        const redisUrl = getRedisUrl()
+        const redisUrl = await getRedisUrl()
         if (!redisUrl) {
             return NextResponse.json(
                 { success: false, error: "No Redis connection available" },
@@ -62,15 +64,17 @@ export async function PUT(
     try {
         console.log("PUT /api/vectorset/[setname]/metadata", params)
         
-        if (!params || !params.setname) {
-            console.error("Missing setname parameter:", params)
+        const parsedParams = await params;
+        
+        if (!parsedParams || !parsedParams.setname) {
+            console.error("Missing setname parameter:", parsedParams)
             return NextResponse.json(
                 { success: false, error: "Key name is required" },
                 { status: 400 }
             )
         }
         
-        const keyName = params.setname
+        const keyName = parsedParams.setname
         const body = await request.json() as SetMetadataRequestBody
         const { metadata } = body
 
@@ -81,7 +85,7 @@ export async function PUT(
             )
         }
 
-        const redisUrl = getRedisUrl()
+        const redisUrl = await getRedisUrl()
         if (!redisUrl) {
             return NextResponse.json(
                 { success: false, error: "No Redis connection available" },

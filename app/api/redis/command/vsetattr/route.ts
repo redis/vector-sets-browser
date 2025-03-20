@@ -5,7 +5,7 @@ import { NextRequest, NextResponse } from "next/server"
 export async function POST(request: NextRequest) {
     try {
         const { keyName, element, attributes } = (await request.json()) as VsetAttrRequestBody
-        const redisUrl = getRedisUrl()
+        const redisUrl = await getRedisUrl()
         if (!redisUrl) {
             return NextResponse.json(
                 { success: false, error: "No Redis connection available" },

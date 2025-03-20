@@ -4,7 +4,7 @@ import { EMBEDDING_CACHE_KEY, EMBEDDING_CACHE_LOG_KEY } from "@/app/embeddings/c
 
 export async function GET() {
     try {
-        const redisUrl = getRedisUrl()
+        const redisUrl = await getRedisUrl()
         if (!redisUrl) {
             return NextResponse.json(
                 { success: false, error: "No Redis URL configured" },
@@ -43,7 +43,7 @@ export async function GET() {
 
 export async function DELETE() {
     try {
-        const redisUrl = getRedisUrl()
+        const redisUrl = await getRedisUrl()
         if (!redisUrl) {
             return NextResponse.json(
                 { success: false, error: "No Redis URL configured" },

@@ -24,8 +24,8 @@ export interface VectorOperationResult {
 }
 
 // Helper to get Redis URL from cookies
-export function getRedisUrl(): string | null {
-    const url = cookies().get("redis_url")?.value
+export async function getRedisUrl(): Promise<string | null> {
+    const url = (await cookies()).get("redis_url")?.value
     return url || null
 }
 

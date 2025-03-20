@@ -603,7 +603,7 @@ export default function SmartFilterInput({
             {showDropdown && filteredAttributes.length > 0 && (
                 <div
                     ref={dropdownRef}
-                    className="absolute z-50 mt-1 w-full rounded-md border border-gray-200 bg-white shadow-lg"
+                    className="absolute z-50 mt-1 w-full rounded-md border border-gray-200 bg-[white] shadow-lg"
                 >
                     <div className="max-h-60 overflow-auto py-1">
                         <div className="px-2 py-1 text-xs font-semibold text-gray-500">
@@ -621,7 +621,7 @@ export default function SmartFilterInput({
                                     index === selectedIndex
                                         ? "bg-gray-100"
                                         : "hover:bg-gray-100"
-                                } focus:outline-none`}
+                                } focus:outline-hidden`}
                                 onClick={() => handleSelect(attr)}
                             >
                                 {attr}

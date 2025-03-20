@@ -1,7 +1,9 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { VectorSetMetadata } from "@/app/embeddings/types/config";
+import { VectorSetMetadata, EmbeddingConfig } from "@/app/embeddings/types/config";
 import ImportSampleData from "./ImportSampleData";
+import { SampleDataSelect } from "./SampleDataSelect";
+import { getDefaultEmbeddingConfig } from "@/app/utils/embeddingUtils";
 
 interface ImportSampleDataDialogProps {
   isOpen: boolean;
@@ -20,6 +22,8 @@ export default function ImportSampleDataDialog({
   onUpdateMetadata,
   onSelectDataset,
 }: ImportSampleDataDialogProps) {
+  const [embeddingConfigs, setEmbeddingConfigs] = useState<Record<string, EmbeddingConfig>>({});
+  
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-[850px] w-[90vw] max-h-[90vh] p-0 overflow-hidden">
@@ -28,14 +32,20 @@ export default function ImportSampleDataDialog({
         </DialogHeader>
         
         <div className="p-6 pt-2 w-full overflow-visible">
-          <ImportSampleData
-            onClose={onClose}
-            metadata={metadata}
-            vectorSetName={vectorSetName}
-            onUpdateMetadata={onUpdateMetadata}
-            selectionMode={true}
-            onSelectDataset={onSelectDataset}
-            useShadcnCarousel={true}
+          <SampleDataSelect
+            onSelect={(dataset, embeddingConfig) => {
+              onSelectDataset(dataset.name);
+              // Also update the metadata with the appropriate embedding config
+              if (metadata && onUpdateMetadata) {
+                onUpdateMetadata({
+                  ...metadata,
+                  embedding: embeddingConfig
+                });
+              }
+              onClose();
+            }}
+            onCancel={onClose}
+            useCarousel={true}
           />
         </div>
       </DialogContent>

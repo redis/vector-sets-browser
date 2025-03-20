@@ -3,7 +3,7 @@
 export default function DocsPage() {
     return (
 
-        <section id="gettingstarted" className="mb-8 p-4 bg-white">
+        <section id="gettingstarted" className="mb-8 p-4 bg-[white]">
                 <h2 className="text-2xl font-semibold mb-4">Getting Started</h2>
                 <div className="space-y-4">
                     <div>

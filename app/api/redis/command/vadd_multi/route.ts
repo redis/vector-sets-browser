@@ -5,7 +5,7 @@ import { VaddMultiRequestBody } from "@/app/redis-server/api"
 export async function POST(request: Request) {
     try {
         // Get Redis URL from cookies
-        const redisUrl = getRedisUrl()
+        const redisUrl = await getRedisUrl()
         if (!redisUrl) {
             return NextResponse.json(
                 { success: false, error: "Redis URL not found in cookies" },

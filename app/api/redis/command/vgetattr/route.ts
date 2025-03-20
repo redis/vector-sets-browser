@@ -11,7 +11,7 @@ export async function POST(request: NextRequest) {
         const { keyName, element, elements } =
             (await request.json()) as VgetAttrRequestBody
 
-        const redisUrl = getRedisUrl()
+        const redisUrl = await getRedisUrl()
         if (!redisUrl) {
             return NextResponse.json(
                 { success: false, error: "No Redis connection available" },

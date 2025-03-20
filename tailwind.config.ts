@@ -6,6 +6,19 @@ const config: Config = {
         "./pages/**/*.{js,ts,jsx,tsx,mdx}",
         "./components/**/*.{js,ts,jsx,tsx,mdx}",
         "./app/**/*.{js,ts,jsx,tsx,mdx}",
+        "./src/**/*.{js,ts,jsx,tsx,mdx}",
+    ],
+    safelist: [
+        'max-w-3xl',
+        'm-0',
+        'border-0',
+        'h-auto',
+        'overflow-hidden',
+        'p-0',
+        'absolute',
+        'w-px',
+        'whitespace-nowrap',
+        'bg-[white]'
     ],
     theme: {
         container: {

@@ -18,7 +18,7 @@ export default function Home() {
     const [activeTab, setActiveTab] = useState("javascript")
 
     return (
-        <div className="flex min-h-screen flex-col bg-white">
+        <div className="flex min-h-screen flex-col bg-[white]">
             {/* Hero Section */}
             <section className="container py-6 md:py-12 lg:py-14">
                 <div className="mx-auto flex max-w-[980px] flex-col items-center gap-4 text-center">
@@ -37,25 +37,24 @@ export default function Home() {
                         The Speed you need, the API you love.
                     </p>
                     <div className="flex flex-col gap-4 sm:flex-row">
-                        <Link href="/console">
+                        <Link href="/console" legacyBehavior>
                             <Button size="lg">
                                 Get Started
                                 <ChevronRight className="ml-2 h-4 w-4" />
                             </Button>
                         </Link>
-                        <Button variant="outline" size="lg">
-                            <Link
-                                href="https://github.com/redis/redis-vector-sets"
-                                className="flex items-center"
-                            >
+                        <Link
+                            href="https://github.com/redis/redis-vector-sets"
+                            legacyBehavior
+                        >
+                            <Button variant="outline" size="lg">
                                 <Github className="mr-2 h-4 w-4" />
                                 View on GitHub
-                            </Link>
-                        </Button>
+                            </Button>
+                        </Link>
                     </div>
                 </div>
             </section>
-
             {/* Main Content */}
             <section className="container py-12">
                 <div className="grid gap-6 lg:grid-cols-2">
@@ -177,7 +176,6 @@ export default function Home() {
                     </div>
                 </div>
             </section>
-
             {/* Features Section */}
             <section className="container py-12 md:py-24">
                 <div className="mx-auto flex max-w-[980px] flex-col items-center gap-4 text-center">
@@ -216,7 +214,6 @@ export default function Home() {
                     />
                 </div>
             </section>
-
             {/* CTA Section */}
             <section className="bg-primary/5 py-12 md:py-24">
                 <div className="container">
@@ -228,7 +225,7 @@ export default function Home() {
                             Try Redis Vector Sets today and see how easy it is
                             to add vector search to your applications.
                         </p>
-                        <Link href="/console">
+                        <Link href="/console" legacyBehavior>
                             <Button size="lg" className="mt-4">
                                 Get Started
                                 <ChevronRight className="ml-2 h-4 w-4" />
@@ -241,7 +238,13 @@ export default function Home() {
     )
 }
 
-function FeatureCard({ title, description }: { title: string, description: string }) {
+function FeatureCard({
+    title,
+    description,
+}: {
+    title: string
+    description: string
+}) {
     return (
         <Card>
             <CardHeader>
@@ -259,7 +262,7 @@ function CodeExample({ language }: { language: string }) {
         return (
             <div className="space-y-4">
                 <div>
-                    <CodeBlock 
+                    <CodeBlock
                         title="Adding vectors with VADD"
                         language="javascript"
                         code={`// Connect to Redis
@@ -286,7 +289,7 @@ async function addVectors() {
                 </div>
 
                 <div>
-                    <CodeBlock 
+                    <CodeBlock
                         title="Finding similar vectors with VSIM"
                         language="javascript"
                         code={`// Find similar vectors
@@ -318,7 +321,7 @@ async function findSimilarProducts() {
         return (
             <div className="space-y-4">
                 <div>
-                    <CodeBlock 
+                    <CodeBlock
                         title="Adding vectors with VADD"
                         language="php"
                         code={`<?php
@@ -364,7 +367,7 @@ addVectors($redis);
                 </div>
 
                 <div>
-                    <CodeBlock 
+                    <CodeBlock
                         title="Finding similar vectors with VSIM"
                         language="php"
                         code={`<?php
@@ -396,7 +399,7 @@ findSimilarImages($redis);
                 </div>
 
                 <div>
-                    <CodeBlock 
+                    <CodeBlock
                         title="Advanced Vector Operations"
                         language="php"
                         code={`<?php
@@ -441,7 +444,7 @@ advancedVectorOperations($redis);
         return (
             <div className="space-y-4">
                 <div>
-                    <CodeBlock 
+                    <CodeBlock
                         title="Adding vectors with VADD"
                         language="c"
                         code={`#include <stdio.h>
@@ -481,7 +484,7 @@ int main() {
                 </div>
 
                 <div>
-                    <CodeBlock 
+                    <CodeBlock
                         title="Finding similar vectors with VSIM"
                         language="c"
                         code={`// Find similar vectors

@@ -444,7 +444,7 @@ export default function EditAttributesDialog({
                                         setNewType(value)
                                     }
                                 >
-                                    <SelectTrigger className="bg-white">
+                                    <SelectTrigger className="bg-[white]">
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -464,7 +464,7 @@ export default function EditAttributesDialog({
                                 <Label>Key</Label>
                                 <Input
                                     value={newKey}
-                                    className="bg-white"
+                                    className="bg-[white]"
                                     onChange={(e) => setNewKey(e.target.value)}
                                     onKeyPress={handleKeyPress}
                                     placeholder="Enter key"
@@ -477,7 +477,7 @@ export default function EditAttributesDialog({
                                         value={newValue}
                                         onValueChange={setNewValue}
                                     >
-                                        <SelectTrigger className="bg-white">
+                                        <SelectTrigger className="bg-[white]">
                                             <SelectValue />
                                         </SelectTrigger>
                                         <SelectContent>
@@ -492,7 +492,7 @@ export default function EditAttributesDialog({
                                 ) : (
                                     <Input
                                         value={newValue}
-                                        className="bg-white"
+                                        className="bg-[white]"
                                         onChange={(e) =>
                                             setNewValue(e.target.value)
                                         }

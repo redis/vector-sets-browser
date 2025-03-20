@@ -461,7 +461,7 @@ const RedisConnectionList = forwardRef<
                     </Dialog>
 
                     {recentConnections.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center h-[400px] bg-white rounded-lg border border-dashed border-gray-300 p-8">
+                        <div className="flex flex-col items-center justify-center h-[400px] bg-[white] rounded-lg border border-dashed border-gray-300 p-8">
                             <div className="text-center space-y-4">
                                 <h3 className="text-lg font-medium text-gray-900">
                                     Welcome to VectorSet Browser
@@ -494,7 +494,7 @@ const RedisConnectionList = forwardRef<
                             </div>
                         </div>
                     ) : (
-                        <div className="w-full list-container bg-white">
+                        <div className="w-full list-container bg-[white]">
                             <Table>
                                 <TableHeader>
                                     <TableRow className="bg-gray-100">
@@ -513,7 +513,7 @@ const RedisConnectionList = forwardRef<
                                             key={connection.id}
                                             className={`group hover:bg-gray-50 border-b transition-colors ${
                                                 currentUrl === connection.id
-                                                    ? "bg-gray-200 border-l-4 border-l-customRed-500"
+                                                    ? "bg-gray-200 border-l-4 border-l-red-500"
                                                     : ""
                                             }`}
                                         >

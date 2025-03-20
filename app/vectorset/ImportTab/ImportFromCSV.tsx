@@ -1108,7 +1108,7 @@ export default function ImportFromCSV({
                                                             )}
                                                         </tr>
                                                     </thead>
-                                                    <tbody className="bg-white divide-y divide-gray-200">
+                                                    <tbody className="bg-[white] divide-y divide-gray-200">
                                                         {csvPreview.sampleRows.map(
                                                             (row, i) => (
                                                                 <tr key={i}>

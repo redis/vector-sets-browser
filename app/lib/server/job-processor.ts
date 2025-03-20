@@ -172,7 +172,7 @@ export class JobProcessor {
             return rowData[columnName] !== undefined
                 ? rowData[columnName]
                 : match
-        })
+        });
     }
 
     public async start(): Promise<void> {
@@ -209,9 +209,9 @@ export class JobProcessor {
             while (this.isRunning) {
                 // Check if job is paused
                 if (this.isPaused) {
-                    console.log(
-                        `[JobProcessor] Job ${this.jobId} is paused, waiting...`
-                    )
+                    // console.log(
+                    //     `[JobProcessor] Job ${this.jobId} is paused, waiting...`
+                    // )
 
                     // Check if job was cancelled while paused
                     const progress = await JobQueueService.getJobProgress(

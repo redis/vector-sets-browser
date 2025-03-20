@@ -300,7 +300,7 @@ export function SampleDataImporter({
                 <h3 className="text-lg mb-4">`Importing ${dataset.name}`</h3>
             )}
 
-            <div className="bg-white rounded-lg border p-4 mb-4">
+            <div className="bg-[white] rounded-lg border p-4 mb-4">
                 <div className="flex items-center mb-4">
                     <div className="mr-3 bg-gray-50 p-2 rounded-full">
                         {dataset.icon}

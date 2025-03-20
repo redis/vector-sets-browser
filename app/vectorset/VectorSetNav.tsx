@@ -14,7 +14,12 @@ import {
     formatBytes,
 } from "@/app/utils/vectorSetMemory"
 import { Button } from "@/components/ui/button"
-import { Sidebar, SidebarContent, SidebarHeader } from "@/components/ui/sidebar"
+import {
+    Sidebar,
+    SidebarContent,
+    SidebarHeader,
+    SidebarProvider,
+} from "@/components/ui/sidebar"
 
 interface VectorSetNavProps {
     redisUrl: string | null
@@ -33,6 +38,7 @@ interface VectorSetInfo {
     dimensions: number
     vectorCount: number
     activeJobs: number
+    metadata?: VectorSetMetadata
 }
 
 export default function VectorSetNav({
@@ -71,7 +77,26 @@ export default function VectorSetNav({
         setError(null)
         try {
             const sets = await vectorSets.list()
-            setVectorSetList(sets as unknown as Array<string>)
+
+            // Handle both direct array response or result wrapped response
+            let vectorSetsArray: string[] = []
+
+            if (sets && Array.isArray(sets)) {
+                // Direct array response
+                vectorSetsArray = sets
+            } else if (sets && sets.result && Array.isArray(sets.result)) {
+                // Result property wrapped response
+                vectorSetsArray = sets.result
+            } else {
+                console.error(
+                    "Invalid response structure from vector sets API:",
+                    sets
+                )
+                setVectorSetList([])
+                throw new Error("Invalid API response structure")
+            }
+
+            setVectorSetList(vectorSetsArray)
 
             // Fetch info for each vector set
             const info: Record<string, VectorSetInfo> = {}
@@ -83,8 +108,20 @@ export default function VectorSetNav({
                 try {
                     // First get the basic vector set info
                     const [dimensions, vectorCount] = await Promise.all([
-                        vdim({ keyName: set }),
-                        vcard({ keyName: set }),
+                        vdim({ keyName: set }).catch((err) => {
+                            console.error(
+                                `Error fetching dimensions for ${set}:`,
+                                err
+                            )
+                            return 0
+                        }),
+                        vcard({ keyName: set }).catch((err) => {
+                            console.error(
+                                `Error fetching vector count for ${set}:`,
+                                err
+                            )
+                            return 0
+                        }),
                     ])
 
                     // Calculate estimated memory usage
@@ -142,7 +179,9 @@ export default function VectorSetNav({
             }
 
             // Fetch info for all sets with retries
-            await Promise.all(sets.map((set) => fetchVectorSetInfo(set)))
+            await Promise.all(
+                vectorSetsArray.map((set) => fetchVectorSetInfo(set))
+            )
 
             setVectorSetInfo(info)
         } catch (error) {
@@ -161,97 +200,99 @@ export default function VectorSetNav({
 
     // Poll for completed import jobs
     useEffect(() => {
-        if (!isConnected) return;
-        
+        if (!isConnected) return
+
         const checkForCompletedJobs = async () => {
             try {
-                const response = await fetch(`/api/jobs/completed?since=${lastPollTimeRef.current}`);
-                if (!response.ok) return;
-                
-                const data = await response.json();
+                const response = await fetch(
+                    `/api/jobs/completed?since=${lastPollTimeRef.current}`
+                )
+                if (!response.ok) return
+
+                const data = await response.json()
                 if (data.success && data.result.length > 0) {
-                    console.log("Detected completed jobs:", data.result);
+                    console.log("Detected completed jobs:", data.result)
                     // Refresh vector sets when we detect a completed job
-                    await loadVectorSets();
+                    await loadVectorSets()
                 }
-                
+
                 // Update the last poll time
-                lastPollTimeRef.current = data.serverTime || Date.now();
+                lastPollTimeRef.current = data.serverTime || Date.now()
             } catch (error) {
-                console.error("Error polling for completed jobs:", error);
+                console.error("Error polling for completed jobs:", error)
             }
-        };
-        
+        }
+
         // Poll every 5 seconds
-        const intervalId = setInterval(checkForCompletedJobs, 5000);
-        
+        const intervalId = setInterval(checkForCompletedJobs, 5000)
+
         // Initial check
-        checkForCompletedJobs();
-        
-        return () => clearInterval(intervalId);
-    }, [isConnected, loadVectorSets]);
+        checkForCompletedJobs()
+
+        return () => clearInterval(intervalId)
+    }, [isConnected, loadVectorSets])
 
     // Listen to vector set update events
     useEffect(() => {
-        const handleVectorAdded = async (data: { 
-            vectorSetName: string, 
-            element: string, 
-            newCount: number 
+        const handleVectorAdded = async (data: {
+            vectorSetName: string
+            element: string
+            newCount: number
         }) => {
-            console.log(`Vector added to ${data.vectorSetName}`, data);
-            
-            if (vectorSetInfo[data.vectorSetName]) {
-                // Update the count directly in state to be immediately responsive
-                setVectorSetInfo(prev => ({
-                    ...prev,
-                    [data.vectorSetName]: {
-                        ...prev[data.vectorSetName],
-                        vectorCount: data.newCount
-                    }
-                }));
-            }
-        };
+            console.log(`Vector added to ${data.vectorSetName}`, data)
 
-        const handleVectorDeleted = async (data: { 
-            vectorSetName: string, 
-            element?: string, 
-            elements?: string[], 
-            newCount: number 
-        }) => {
-            console.log(`Vector(s) deleted from ${data.vectorSetName}`, data);
-            
             if (vectorSetInfo[data.vectorSetName]) {
                 // Update the count directly in state to be immediately responsive
-                setVectorSetInfo(prev => ({
+                setVectorSetInfo((prev) => ({
                     ...prev,
                     [data.vectorSetName]: {
                         ...prev[data.vectorSetName],
-                        vectorCount: data.newCount
-                    }
-                }));
+                        vectorCount: data.newCount,
+                    },
+                }))
             }
-        };
+        }
+
+        const handleVectorDeleted = async (data: {
+            vectorSetName: string
+            element?: string
+            elements?: string[]
+            newCount: number
+        }) => {
+            console.log(`Vector(s) deleted from ${data.vectorSetName}`, data)
+
+            if (vectorSetInfo[data.vectorSetName]) {
+                // Update the count directly in state to be immediately responsive
+                setVectorSetInfo((prev) => ({
+                    ...prev,
+                    [data.vectorSetName]: {
+                        ...prev[data.vectorSetName],
+                        vectorCount: data.newCount,
+                    },
+                }))
+            }
+        }
 
         const handleVectorsImported = () => {
             // When vectors are imported in bulk, do a full refresh
-            loadVectorSets();
-        };
+            loadVectorSets()
+        }
 
         // New handler to update job status
         const checkForActiveJobs = async () => {
-            if (!isConnected || vectorSetList.length === 0) return;
-            
+            if (!isConnected || vectorSetList.length === 0) return
+
             try {
                 // Fetch all jobs
-                const response = await fetch('/api/jobs');
-                if (!response.ok) return;
-                
-                const data = await response.json();
-                if (!data.success) return;
-                
+                const response = await fetch("/api/jobs")
+                if (!response.ok) return
+
+                const data = await response.json()
+                if (!data.success) return
+
                 // Group active jobs by vector set
-                const activeJobsByVectorSet: Record<string, number> = {};
-                
+                const activeJobsByVectorSet: Record<string, number> = {}
+
                 for (const job of data.result) {
                     // Count only jobs that are processing, paused, or pending
                     if (
@@ -259,56 +300,69 @@ export default function VectorSetNav({
                         job.status.status === "paused" ||
                         job.status.status === "pending"
                     ) {
-                        const vectorSetName = job.metadata.vectorSetName;
-                        activeJobsByVectorSet[vectorSetName] = (activeJobsByVectorSet[vectorSetName] || 0) + 1;
+                        const vectorSetName = job.metadata.vectorSetName
+                        activeJobsByVectorSet[vectorSetName] =
+                            (activeJobsByVectorSet[vectorSetName] || 0) + 1
                     }
                 }
-                
+
                 // Update the active jobs count for each vector set
-                let hasUpdates = false;
-                const updatedInfo = { ...vectorSetInfo };
-                
+                let hasUpdates = false
+                const updatedInfo = { ...vectorSetInfo }
+
                 for (const setName of vectorSetList) {
-                    const activeJobs = activeJobsByVectorSet[setName] || 0;
-                    
+                    const activeJobs = activeJobsByVectorSet[setName] || 0
+
                     // Only update if the count changed
-                    if (updatedInfo[setName] && updatedInfo[setName].activeJobs !== activeJobs) {
+                    if (
+                        updatedInfo[setName] &&
+                        updatedInfo[setName].activeJobs !== activeJobs
+                    ) {
                         updatedInfo[setName] = {
                             ...updatedInfo[setName],
-                            activeJobs
-                        };
-                        hasUpdates = true;
+                            activeJobs,
+                        }
+                        hasUpdates = true
                     }
                 }
-                
+
                 // Only update state if there were changes
                 if (hasUpdates) {
-                    setVectorSetInfo(updatedInfo);
+                    setVectorSetInfo(updatedInfo)
                 }
             } catch (error) {
-                console.error("Error checking for active jobs:", error);
+                console.error("Error checking for active jobs:", error)
             }
-        };
-        
+        }
+
         // Subscribe to events
-        const unsubscribeAdded = eventBus.on(AppEvents.VECTOR_ADDED, handleVectorAdded);
-        const unsubscribeDeleted = eventBus.on(AppEvents.VECTOR_DELETED, handleVectorDeleted);
-        const unsubscribeImported = eventBus.on(AppEvents.VECTORS_IMPORTED, handleVectorsImported);
-        
+        const unsubscribeAdded = eventBus.on(
+            AppEvents.VECTOR_ADDED,
+            handleVectorAdded
+        )
+        const unsubscribeDeleted = eventBus.on(
+            AppEvents.VECTOR_DELETED,
+            handleVectorDeleted
+        )
+        const unsubscribeImported = eventBus.on(
+            AppEvents.VECTORS_IMPORTED,
+            handleVectorsImported
+        )
+
         // Poll for active jobs every 3 seconds
-        const intervalId = setInterval(checkForActiveJobs, 3000);
-        
+        const intervalId = setInterval(checkForActiveJobs, 3000)
+
         // Initial check for active jobs
-        checkForActiveJobs();
-        
+        checkForActiveJobs()
+
         // Cleanup subscriptions when component unmounts
         return () => {
-            unsubscribeAdded();
-            unsubscribeDeleted();
-            unsubscribeImported();
-            clearInterval(intervalId);
-        };
-    }, [vectorSetInfo, vectorSetList, isConnected, loadVectorSets]);
+            unsubscribeAdded()
+            unsubscribeDeleted()
+            unsubscribeImported()
+            clearInterval(intervalId)
+        }
+    }, [vectorSetInfo, vectorSetList, isConnected, loadVectorSets])
 
     useEffect(() => {
         if (isConnected && redisUrl) {
@@ -421,7 +475,12 @@ export default function VectorSetNav({
     }
 
     return (
-        <Sidebar>
+        <Sidebar 
+            defaultWidth={300}
+            minWidth={200}
+            maxWidth={500}
+            className="sidebar-with-visible-handle"
+        >
             <SidebarHeader>
                 <div className="flex items-center -ml-4 truncate">
                     <Button variant="ghost" onClick={onBack}>
@@ -514,8 +573,8 @@ export default function VectorSetNav({
                                     selectedVectorSet === setName
                                         ? "list-item-selected"
                                         : index % 2 === 0
-                                        ? "list-item-alt"
-                                        : "list-item-default"
+                                          ? "list-item-alt"
+                                          : "list-item-default"
                                 }`}
                             >
                                 <div

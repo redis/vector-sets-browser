@@ -11,15 +11,17 @@ export async function POST(
     try {
         console.log("POST /api/vectorset/[setname]", params)
 
-        if (!params || !params.setname) {
-            console.error("Missing setname parameter:", params)
+        const parsedParams = await params;
+
+        if (!parsedParams || !parsedParams.setname) {
+            console.error("Missing setname parameter:", parsedParams)
             return NextResponse.json(
                 { success: false, error: "Key name is required" },
                 { status: 400 }
             )
         }
 
-        const keyName = params.setname
+        const keyName = parsedParams.setname
         const body = (await request.json()) as VectorSetCreateRequestBody
         const { dimensions, metadata, customData } = body
 
@@ -33,7 +35,7 @@ export async function POST(
             )
         }
 
-        const redisUrl = getRedisUrl()
+        const redisUrl = await getRedisUrl()
         if (!redisUrl) {
             return NextResponse.json(
                 { success: false, error: "No Redis connection available" },
@@ -80,17 +82,19 @@ export async function DELETE(
     try {
         console.log("DELETE /api/vectorset/[setname]", params)
 
-        if (!params || !params.setname) {
-            console.error("Missing setname parameter:", params)
+        const parsedParams = await params;
+
+        if (!parsedParams || !parsedParams.setname) {
+            console.error("Missing setname parameter:", parsedParams)
             return NextResponse.json(
                 { success: false, error: "Key name is required" },
                 { status: 400 }
             )
         }
 
-        const keyName = params.setname
+        const keyName = parsedParams.setname
 
-        const redisUrl = getRedisUrl()
+        const redisUrl = await getRedisUrl()
         if (!redisUrl) {
             return NextResponse.json(
                 { success: false, error: "No Redis connection available" },

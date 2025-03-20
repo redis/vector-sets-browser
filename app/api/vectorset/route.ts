@@ -4,7 +4,7 @@ import { NextResponse } from "next/server"
 
 // GET /api/vectorset - List all vector sets (scanVectorSets)
 export async function GET() {
-    const redisUrl = getRedisUrl()
+    const redisUrl = await getRedisUrl()
     if (!redisUrl) {
         return NextResponse.json(
             { success: false, error: "No Redis connection available" },

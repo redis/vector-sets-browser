@@ -142,7 +142,7 @@ export interface NoEmbeddingConfig {
 
 export interface VectorSetMetadata {
     embedding: EmbeddingConfig
-    created: string
+    created?: string
     description?: string
     lastUpdated?: string
     totalVectors?: number

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { AlertCircle, BookOpen, Film, User } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -14,6 +14,7 @@ import {
     CarouselPrevious,
 } from "@/components/ui/carousel"
 import { EmbeddingConfig } from "@/app/embeddings/types/config"
+import { getDefaultEmbeddingConfig } from "@/app/utils/embeddingUtils"
 
 // Define the sample dataset interface
 export interface SampleDataset {
@@ -27,7 +28,7 @@ export interface SampleDataset {
     vectorTemplate: string
     attributeColumns: string[]
     dataType: "text" | "image"
-    recommendedEmbedding: EmbeddingConfig
+    embeddingType: "text" | "image"
 }
 
 // Pre-defined sample datasets
@@ -61,14 +62,22 @@ export const sampleDatasets: SampleDataset[] = [
             "language_code",
         ],
         dataType: "text",
-        recommendedEmbedding: {
-            provider: "openai",
-            openai: {
-                apiKey: "",
-                model: "text-embedding-3-small",
-            },
-        } as EmbeddingConfig,
+        embeddingType: "text",
     },
+    {
+        name: "UTK Faces",
+        description: "UTKFace dataset with over 20,000 face images.",
+        icon: <User className="h-5 w-5 text-violet-500" />,
+        fileUrl: "/sample-data/UTKFace/images",
+        columns: ["image", "age", "gender", "ethnicity"],
+        recordCount: 20000,
+        elementTemplate: "Face ${index}",
+        vectorTemplate: "",
+        attributeColumns: ["age", "gender", "ethnicity"],
+        dataType: "image",
+        embeddingType: "image",
+    },
+
     {
         name: "IMDB Movies",
         description:
@@ -106,36 +115,12 @@ export const sampleDatasets: SampleDataset[] = [
             "Meta_score",
         ],
         dataType: "text",
-        recommendedEmbedding: {
-            provider: "tensorflow",
-            tensorflow: {
-                model: "universal-sentence-encoder",
-            },
-        } as EmbeddingConfig,
-    },
-    {
-        name: "UTK Faces",
-        description:
-            "UTKFace dataset with over 20,000 face images annotated with age, gender, and ethnicity. The images cover large variation in pose, facial expression, illumination, occlusion, and resolution.",
-        icon: <User className="h-5 w-5 text-violet-500" />,
-        fileUrl: "/sample-data/UTKFace/images",
-        columns: ["image", "age", "gender", "ethnicity"],
-        recordCount: 20000,
-        elementTemplate: "Face ${index}",
-        vectorTemplate: "",
-        attributeColumns: ["age", "gender", "ethnicity"],
-        dataType: "image",
-        recommendedEmbedding: {
-            provider: "image",
-            image: {
-                model: "mobilenet",
-            },
-        } as EmbeddingConfig,
+        embeddingType: "text",
     },
 ]
 
 interface SampleDataSelectProps {
-    onSelect: (dataset: SampleDataset) => void
+    onSelect: (dataset: SampleDataset, embeddingConfig: EmbeddingConfig) => void
     onCancel: () => void
     selectedDataset?: string | null
     useCarousel?: boolean
@@ -149,10 +134,45 @@ export function SampleDataSelect({
 }: SampleDataSelectProps) {
     const [selectedDataset, setSelectedDataset] = useState<string | null>(initialSelectedDataset)
     const [error, setError] = useState<string | null>(null)
+    const [embeddingConfigs, setEmbeddingConfigs] = useState<Record<string, EmbeddingConfig | null>>({})
+    const [isLoading, setIsLoading] = useState(true)
+
+    // Load embedding configs for all datasets when component mounts
+    useEffect(() => {
+        async function loadEmbeddingConfigs() {
+            setIsLoading(true)
+            const configs: Record<string, EmbeddingConfig> = {}
+            
+            for (const dataset of sampleDatasets) {
+                const config = await getDefaultEmbeddingConfig(dataset.embeddingType)
+                configs[dataset.name] = config
+            }
+            
+            setEmbeddingConfigs(configs)
+            setIsLoading(false)
+        }
+        
+        loadEmbeddingConfigs()
+    }, [])
 
     const handleSelectDataset = (dataset: SampleDataset) => {
         setSelectedDataset(dataset.name)
-        onSelect(dataset)
+    }
+
+    const handleContinue = async () => {
+        if (!selectedDataset) {
+            setError("Please select a dataset first")
+            return
+        }
+        
+        const selected = sampleDatasets.find(d => d.name === selectedDataset)
+        if (!selected) {
+            setError("Dataset not found")
+            return
+        }
+        
+        const embeddingConfig = embeddingConfigs[selected.name] || await getDefaultEmbeddingConfig(selected.embeddingType)
+        onSelect(selected, embeddingConfig)
     }
 
     return (
@@ -163,7 +183,11 @@ export function SampleDataSelect({
                 Select a sample dataset to import into your vector set
             </p>
 
-            {useCarousel ? (
+            {isLoading ? (
+                <div className="flex justify-center items-center h-40">
+                    <p>Loading embedding configurations...</p>
+                </div>
+            ) : useCarousel ? (
                 <div className="relative w-full overflow-visible px-6">
                     <Carousel 
                         className="w-full"
@@ -179,12 +203,13 @@ export function SampleDataSelect({
                                         dataset={dataset} 
                                         isSelected={selectedDataset === dataset.name}
                                         onSelect={handleSelectDataset}
+                                        embeddingConfig={embeddingConfigs[dataset.name]}
                                     />
                                 </CarouselItem>
                             ))}
                         </CarouselContent>
-                        <CarouselPrevious className="absolute -left-10 top-1/2 -translate-y-1/2 h-8 w-8 md:h-9 md:w-9 bg-white border shadow-sm" />
-                        <CarouselNext className="absolute -right-10 top-1/2 -translate-y-1/2 h-8 w-8 md:h-9 md:w-9 bg-white border shadow-sm" />
+                        <CarouselPrevious className="absolute -left-10 top-1/2 -translate-y-1/2 h-8 w-8 md:h-9 md:w-9 bg-[white] border shadow-xs" />
+                        <CarouselNext className="absolute -right-10 top-1/2 -translate-y-1/2 h-8 w-8 md:h-9 md:w-9 bg-[white] border shadow-xs" />
                     </Carousel>
                 </div>
             ) : (
@@ -195,6 +220,7 @@ export function SampleDataSelect({
                             dataset={dataset} 
                             isSelected={selectedDataset === dataset.name}
                             onSelect={handleSelectDataset}
+                            embeddingConfig={embeddingConfigs[dataset.name]}
                         />
                     ))}
                 </div>
@@ -206,15 +232,8 @@ export function SampleDataSelect({
                 </Button>
                 <Button 
                     variant="default" 
-                    onClick={() => {
-                        const selected = sampleDatasets.find(d => d.name === selectedDataset)
-                        if (selected) {
-                            onSelect(selected)
-                        } else {
-                            setError("Please select a dataset first")
-                        }
-                    }}
-                    disabled={!selectedDataset}
+                    onClick={handleContinue}
+                    disabled={!selectedDataset || isLoading}
                 >
                     Continue
                 </Button>
@@ -234,15 +253,16 @@ interface DatasetCardProps {
     dataset: SampleDataset
     isSelected: boolean
     onSelect: (dataset: SampleDataset) => void
+    embeddingConfig: EmbeddingConfig | null
 }
 
-function DatasetCard({ dataset, isSelected, onSelect }: DatasetCardProps) {
+function DatasetCard({ dataset, isSelected, onSelect, embeddingConfig }: DatasetCardProps) {
     return (
         <div
-            className={`bg-white rounded-lg border shadow-sm overflow-hidden flex flex-col h-full
+            className={`bg-[white] rounded-lg border shadow-sm overflow-hidden flex flex-col h-full
               ${isSelected ? "ring-2 ring-primary border-primary" : ""}`}
         >
-            <div className="p-4 flex-grow">
+            <div className="p-4 grow">
                 <div className="flex items-center mb-4">
                     <div className="mr-3 bg-gray-50 p-2 rounded-full">
                         {dataset.icon}
@@ -262,26 +282,42 @@ function DatasetCard({ dataset, isSelected, onSelect }: DatasetCardProps) {
                     {dataset.description}
                 </p>
 
-                <div className="flex items-center text-xs text-gray-500 mb-2">
-                    <span className="font-medium mr-1">
-                        Embedding Model:
-                    </span>
-                    <Badge
-                        variant="secondary"
-                        className="text-xs"
-                        title="Recommended embedding provider and model"
-                    >
-                        {dataset.recommendedEmbedding.provider}
-                        {dataset.recommendedEmbedding.provider === "openai" &&
-                            dataset.recommendedEmbedding.openai?.model &&
-                            `: ${dataset.recommendedEmbedding.openai.model}`}
-                        {dataset.recommendedEmbedding.provider === "tensorflow" &&
-                            dataset.recommendedEmbedding.tensorflow?.model &&
-                            `: ${dataset.recommendedEmbedding.tensorflow.model}`}
-                        {dataset.recommendedEmbedding.provider === "image" &&
-                            dataset.recommendedEmbedding.image?.model &&
-                            `: ${dataset.recommendedEmbedding.image.model}`}
-                    </Badge>
+                <div className="flex flex-col gap-1">
+                    <div className="flex items-center text-xs text-gray-500 mb-1">
+                        <span className="font-medium mr-1">
+                            Embedding Engine:
+                        </span>
+                        {embeddingConfig ? (
+                            <Badge
+                                variant="secondary"
+                                className="text-xs"
+                            >
+                                {embeddingConfig.provider}
+                                {embeddingConfig.provider === "ollama" && 
+                                    embeddingConfig.ollama?.modelName && 
+                                    `: ${embeddingConfig.ollama.modelName}`}
+                                {embeddingConfig.provider === "openai" &&
+                                    embeddingConfig.openai?.model &&
+                                    `: ${embeddingConfig.openai.model}`}
+                                {embeddingConfig.provider === "tensorflow" &&
+                                    embeddingConfig.tensorflow?.model &&
+                                    `: ${embeddingConfig.tensorflow.model}`}
+                                {embeddingConfig.provider === "image" &&
+                                    embeddingConfig.image?.model &&
+                                    `: ${embeddingConfig.image.model}`}
+                            </Badge>
+                        ) : (
+                            <Badge variant="outline" className="text-xs animate-pulse">
+                                Loading...
+                            </Badge>
+                        )}
+                    </div>
+                    
+                    {embeddingConfig?.provider === "ollama" && (
+                        <div className="text-xs text-green-600 font-medium">
+                            ✓ Using locally installed Ollama
+                        </div>
+                    )}
                 </div>
 
                 {dataset.name === "UTK Faces" && (
@@ -296,7 +332,7 @@ function DatasetCard({ dataset, isSelected, onSelect }: DatasetCardProps) {
                     </div>
                 )}
 
-                <div className="text-xs text-gray-500">
+                <div className="text-xs text-gray-500 mt-3">
                     <span className="font-medium">
                         Includes:
                     </span>{" "}

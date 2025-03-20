@@ -198,7 +198,7 @@ export default function VectorSearchTab({
                 executedCommand={executedCommand}
                 results={results}
             />
-            <div className="bg-white p-4 rounded shadow-md">
+            <div className="bg-[white] p-4 rounded shadow-md">
                 <Tabs
                     value={activeResultsTab}
                     onValueChange={setActiveResultsTab}

@@ -38,7 +38,7 @@ export async function POST(request: Request) {
         }
 
         // Set the cookie with the Redis URL
-        cookies().set(REDIS_URL_COOKIE, url, COOKIE_OPTIONS);
+        (await cookies()).set(REDIS_URL_COOKIE, url, COOKIE_OPTIONS);
         
         return NextResponse.json({ 
             success: true,
@@ -58,7 +58,7 @@ export async function POST(request: Request) {
 
 export async function GET() {
     try {
-        const storedUrl = cookies().get(REDIS_URL_COOKIE)?.value;
+        const storedUrl = (await cookies()).get(REDIS_URL_COOKIE)?.value;
         
         if (!storedUrl) {
             return NextResponse.json(
@@ -70,7 +70,7 @@ export async function GET() {
         // Verify the connection is still valid
         const isConnected = await testConnection(storedUrl);
         if (!isConnected) {
-            cookies().delete(REDIS_URL_COOKIE);
+            (await cookies()).delete(REDIS_URL_COOKIE);
             return NextResponse.json(
                 { error: "Stored connection is no longer valid" },
                 { status: 404 }
@@ -95,7 +95,7 @@ export async function GET() {
 
 export async function DELETE() {
     try {
-        cookies().delete(REDIS_URL_COOKIE);
+        (await cookies()).delete(REDIS_URL_COOKIE);
         return NextResponse.json({ 
             success: true,
             message: "Disconnected successfully" 

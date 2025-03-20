@@ -9,11 +9,23 @@ const activeProcessors = new Map<string, JobProcessor>()
 
 // List all jobs and their status
 export async function GET(req: NextRequest) {
-    const url = new URL(req.url)
-    const jobId = url.searchParams.get("jobId")
-    const vectorSetName = url.searchParams.get("vectorSetName")
+    let url;
+    let jobId;
+    let vectorSetName;
+    
+    try {
+        url = new URL(req.url);
+        jobId = url.searchParams.get("jobId");
+        vectorSetName = url.searchParams.get("vectorSetName");
+    } catch (error) {
+        console.error("Error parsing URL:", error, "URL:", req.url);
+        return NextResponse.json({ 
+            success: false, 
+            error: `Invalid URL format: ${error instanceof Error ? error.message : String(error)}` 
+        }, { status: 400 });
+    }
 
-    const redisUrl = redis.getRedisUrl()
+    const redisUrl = await redis.getRedisUrl()
 
     if (!redisUrl) {
         return NextResponse.json({ success: false, error: "No Redis URL configured" }, { status: 400 })
@@ -88,7 +100,7 @@ export async function GET(req: NextRequest) {
 
 // Create a new job
 export async function POST(req: NextRequest) {
-    const redisUrl = redis.getRedisUrl()
+    const redisUrl = await redis.getRedisUrl()
 
     if (!redisUrl) {
         return NextResponse.json({ success: false, error: "No Redis URL configured" }, { status: 400 })
@@ -153,7 +165,9 @@ export async function POST(req: NextRequest) {
         if (rawVectorsString) {
             try {
                 rawVectors = JSON.parse(rawVectorsString);
-                console.log(`[Jobs API] Received ${rawVectors.length} raw vectors`);
+                if (rawVectors) {
+                    console.log(`[Jobs API] Received ${rawVectors.length} raw vectors`);
+                }
             } catch (error) {
                 console.error("[Jobs API] Error parsing raw vectors:", error);
             }
@@ -227,9 +241,21 @@ export async function POST(req: NextRequest) {
 
 // Pause/Resume a job
 export async function PATCH(req: NextRequest) {
-    const url = new URL(req.url)
-    const jobId = url.searchParams.get("jobId")
-    const action = url.searchParams.get("action")
+    let url;
+    let jobId;
+    let action;
+    
+    try {
+        url = new URL(req.url);
+        jobId = url.searchParams.get("jobId");
+        action = url.searchParams.get("action");
+    } catch (error) {
+        console.error("Error parsing URL:", error, "URL:", req.url);
+        return NextResponse.json({ 
+            success: false, 
+            error: `Invalid URL format: ${error instanceof Error ? error.message : String(error)}` 
+        }, { status: 400 });
+    }
 
     if (!jobId) {
         return NextResponse.json(
@@ -245,7 +271,7 @@ export async function PATCH(req: NextRequest) {
         )
     }
 
-    const redisUrl = redis.getRedisUrl()
+    const redisUrl = await redis.getRedisUrl()
     if (!redisUrl) {
         return NextResponse.json({ success: false, error: "No Redis URL configured" }, { status: 400 })
     }
@@ -283,8 +309,19 @@ export async function PATCH(req: NextRequest) {
 
 // Cancel a specific job
 export async function DELETE(req: NextRequest) {
-    const url = new URL(req.url)
-    const jobId = url.searchParams.get("jobId")
+    let url;
+    let jobId;
+    
+    try {
+        url = new URL(req.url);
+        jobId = url.searchParams.get("jobId");
+    } catch (error) {
+        console.error("Error parsing URL:", error, "URL:", req.url);
+        return NextResponse.json({ 
+            success: false, 
+            error: `Invalid URL format: ${error instanceof Error ? error.message : String(error)}` 
+        }, { status: 400 });
+    }
 
     if (!jobId) {
         return NextResponse.json(
@@ -293,7 +330,7 @@ export async function DELETE(req: NextRequest) {
         )
     }
 
-    const redisUrl = redis.getRedisUrl()
+    const redisUrl = await redis.getRedisUrl()
     if (!redisUrl) {
         return NextResponse.json({ success: false, error: "No Redis URL configured" }, { status: 400 })
     }

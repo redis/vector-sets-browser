@@ -141,7 +141,7 @@ export default function RedisCommandBox({
                             >
                                 <span className="px-1 max-w-[100px] overflow-hidden whitespace-nowrap relative">
                                     {commandData.vectors}
-                                    <span className="absolute inset-y-0 right-0 w-8 bg-gradient-to-r from-transparent to-yellow-50"></span>
+                                    <span className="absolute inset-y-0 right-0 w-8 bg-linear-to-r from-transparent to-yellow-50"></span>
                                 </span>
                                 <span className="text-yellow-800 px-1 bg-yellow-50 rounded-r">...</span>
                             </span>

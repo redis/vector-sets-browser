@@ -242,7 +242,7 @@ export default function ImportTab({ vectorSetName, metadata }: ImportTabProps) {
                         {!jobList || jobList.length === 0 ? (
                             <div className="space-y-6">
                                 {showImportCSV ? (
-                                    <div className="bg-white p-2 rounded-lg shadow-sm">
+                                    <div className="bg-[white] p-2 rounded-lg shadow-xs">
                                         <div className="mb-4">
                                             <Button
                                                 variant="ghost"
@@ -265,7 +265,7 @@ export default function ImportTab({ vectorSetName, metadata }: ImportTabProps) {
                                         />
                                     </div>
                                 ) : showImportSample ? (
-                                    <div className="bg-white p-2 rounded-lg shadow-sm">
+                                    <div className="bg-[white] p-2 rounded-lg shadow-xs">
                                         <div className="mb-4">
                                             <Button
                                                 variant="ghost"

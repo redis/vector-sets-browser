@@ -28,7 +28,7 @@ interface CacheConfig {
 
 export async function GET() {
     try {
-        const redisUrl = getRedisUrl()
+        const redisUrl = await getRedisUrl()
         if (!redisUrl) {
             return NextResponse.json(
                 { success: false, error: "No Redis URL configured" },
@@ -78,7 +78,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
     try {
-        const redisUrl = getRedisUrl()
+        const redisUrl = await getRedisUrl()
         if (!redisUrl) {
             return NextResponse.json(
                 { success: false, error: "No Redis URL configured" },

@@ -7,7 +7,7 @@ export async function GET(req: NextRequest) {
     const vectorSetName = url.searchParams.get("vectorSetName");
     const limit = parseInt(url.searchParams.get("limit") || "10", 10);
     
-    const redisUrl = getRedisUrl();
+    const redisUrl = await getRedisUrl();
 
     if (!redisUrl) {
         return NextResponse.json({ success: false, error: "No Redis URL configured" }, { status: 400 });

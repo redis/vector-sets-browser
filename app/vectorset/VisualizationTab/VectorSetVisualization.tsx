@@ -149,7 +149,7 @@ export default function VectorSetVisualization({
                     setSearchState({ ...searchState, expansionFactor: factor })
                 }
             />
-            <div className="bg-white rounded shadow-md h-[calc(100vh-300px)]">
+            <div className="bg-[white] rounded shadow-md h-[calc(100vh-300px)]">
                 <div className="p-4 rounded shadow-md flex-1 flex flex-col">
                     <div className="flex mb-4 items-center">
                         <div className="flex items-center gap-4 w-full">
@@ -195,7 +195,7 @@ export default function VectorSetVisualization({
                         </div>
                     </div>
                     <div
-                        className="flex-grow flex-1"
+                        className="grow flex-1"
                         style={{ minHeight: "calc(100vh - 400px)" }}
                     >
                         {results[0] && !isVectorSetChanging ? (

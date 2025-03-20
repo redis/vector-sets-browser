@@ -1,345 +1,298 @@
-@font-face {
-  font-family: 'Geist';
-  src: url('/fonts/GeistVF.woff') format('woff');
-  font-weight: 100 900;
-  font-style: normal;
-  font-display: swap;
+@import "tailwindcss";
+
+@import url("https://fonts.googleapis.com/css2?family=Space+Mono&display=swap")
+layer(base);
+@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;700&display=swap")
+layer(base);
+
+@config '../tailwind.config.ts';
+
+/*
+  The default border color has changed to `currentColor` in Tailwind CSS v4,
+  so we've added these compatibility styles to make sure everything still
+  looks the same as it did with Tailwind CSS v3.
+
+  If we ever want to remove these styles, we need to add an explicit border
+  color utility to any element that depends on these defaults.
+*/
+@layer base {
+    *,
+    ::after,
+    ::before,
+    ::backdrop,
+    ::file-selector-button {
+        border-color: var(--color-gray-200, currentColor);
+    }
 }
 
-@font-face {
-  font-family: 'Geist Mono';
-  src: url('/fonts/GeistMonoVF.woff') format('woff');
-  font-weight: 100 900;
-  font-style: normal;
-  font-display: swap;
-}
-
-@import url('https://fonts.googleapis.com/css2?family=Space+Mono&display=swap');
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;700&display=swap');
-
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
-@layer utilities {
-  .text-balance {
+@utility text-balance {
     text-wrap: balance;
-  }
+}
 
+@utility text-column {
+    /* 
   .redis-mono {
     font-family: "Geist Mono", "Space Mono", monospace;
   }
     
   .redis-grotesk {
     font-family: "Geist", "Space Grotesk", sans-serif;
-  }
+  } */
+    @apply flex flex-[0.6] flex-col justify-center mx-auto;
+    max-width: 48rem; /* 3xl is 48rem in Tailwind v3 */
+}
 
-  .text-column {
-    @apply flex max-w-3xl flex-[0.6] flex-col justify-center mx-auto;
-  }
-
-  .visually-hidden {
-    @apply border-0 h-auto m-0 overflow-hidden p-0 absolute w-px whitespace-nowrap;
+@utility visually-hidden {
+    border: 0;
+    height: auto;
+    margin: 0;
+    overflow: hidden;
+    padding: 0;
+    position: absolute;
+    width: 1px;
+    white-space: nowrap;
     clip: rect(0 0 0 0);
-  }
-  
-  /* Hide scrollbars but maintain scrollability */
-  .no-scrollbar::-webkit-scrollbar {
-    display: none;
-  }
-  
-  .no-scrollbar {
-    -ms-overflow-style: none;  /* IE and Edge */
-    scrollbar-width: none;  /* Firefox */
-  }
+}
+
+@utility no-scrollbar {
+    /* Hide scrollbars but maintain scrollability */
+    &::-webkit-scrollbar {
+        display: none;
+    }
+    -ms-overflow-style: none; /* IE and Edge */
+    scrollbar-width: none; /* Firefox */
+}
+
+@utility card {
+    /* Base button styles that all buttons share */
+    @apply bg-[white] 
+      rounded-none 
+      shadow-none 
+      dark:bg-(--slate-700) 
+      dark:border-(--slate-300)
+      dark:text-(--lime-500);
+}
+
+@utility list-container {
+    /* List Item Styles */
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+@utility list-item {
+    @apply w-full items-center p-3 transition-all duration-200 cursor-pointer border-b border-gray-200;
+}
+
+@utility list-item-selected {
+    @apply bg-gray-200! text-black! border-l-4! border-l-red-500!;
+}
+
+@utility list-item-alt {
+    @apply bg-[white] text-black hover:bg-gray-50;
+}
+
+@utility list-item-default {
+    @apply bg-gray-50 text-black hover:bg-gray-50;
+}
+
+@utility list-item-content {
+    @apply hover:text-black group-hover:text-black bg-transparent hover:bg-transparent w-full items-start space-y-1 text-left min-w-0 h-auto;
+}
+
+@utility list-item-action {
+    @apply flex-none;
 }
 
 @layer base {
-  :root {
-    --font-body: 'Geist', 'Space Grotesk', sans-serif;
-    --font-mono: 'Geist Mono', 'Space Mono', monospace;
-    --background: 0 0% 100%;
-    --foreground: 0 0% 3.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 0 0% 3.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 3.9%;
-    --primary: 0 0 0;  /* Updated to match Redis red */
-    --primary-foreground: 0 85.7% 97.3%;
-    --secondary: 0 0% 96.1%;
-    --secondary-foreground: 0 0% 9%;
-    --muted: 0 0% 96.1%;
-    --muted-foreground: 0 0% 45.1%;
-    --accent: 0 0% 96.1%;
-    --accent-foreground: 0 0% 9%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 89.8%;
-    --input: 0 0% 89.8%;
-    --ring: 0 0% 3.9%;
-    --chart-1: 12 76% 61%;
-    --chart-2: 173 58% 39%;
-    --chart-3: 197 37% 24%;
-    --chart-4: 43 74% 66%;
-    --chart-5: 27 87% 67%;
-    --radius: 0.5rem;
-    --sidebar-background: 0 0% 98%;
-    --sidebar-foreground: 240 5.3% 26.1%;
-    --sidebar-primary: 240 5.9% 10%;
-    --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 240 4.8% 95.9%;
-    --sidebar-accent-foreground: 240 5.9% 10%;
-    --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
-  }
+    @font-face {
+        font-family: "Geist";
+        src: url("/fonts/GeistVF.woff") format("woff");
+        font-weight: 100 900;
+        font-style: normal;
+        font-display: swap;
+    }
 
-  .dark {
-    --background: 240 10% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 240 10% 3.9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 240 10% 3.9%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 0 72% 51%;  /* Updated to match Redis red */
-    --primary-foreground: 0 85.7% 97.3%;
-    --secondary: 240 3.7% 15.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 240 3.7% 15.9%;
-    --muted-foreground: 240 5% 64.9%;
-    --accent: 240 3.7% 15.9%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 240 3.7% 15.9%;
-    --input: 240 3.7% 15.9%;
-    --ring: 240 4.9% 83.9%;
-    --chart-1: 220 70% 50%;
-    --chart-2: 160 60% 45%;
-    --chart-3: 30 80% 55%;
-    --chart-4: 280 65% 60%;
-    --chart-5: 340 75% 55%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
-  }
-
-  * {
-    @apply border-border outline-ring/50;
-  }
-
-  body {
-    @apply bg-background text-foreground;
-    font-family: var(--font-body);
-    min-height: 100vh;
-    margin: 0;
-  }
-
-  h1 { 
-    @apply text-left font-mono font-bold text-black redis-grotesk dark:text-white text-2xl md:text-[2.4rem];
-  }
-
-  h2 {
-    @apply text-black font-mono font-semibold redis-grotesk dark:text-white text-base md:text-lg;
-  }
-
-  p {
-    @apply font-normal leading-relaxed;
-  }
-
-  pre {
-    @apply text-base font-mono bg-white/45 rounded p-2 overflow-x-auto shadow-md;
-  }
+    @font-face {
+        font-family: "Geist Mono";
+        src: url("/fonts/GeistMonoVF.woff") format("woff");
+        font-weight: 100 900;
+        font-style: normal;
+        font-display: swap;
+    }
 }
 
-@layer components {
-  /* Base button styles that all buttons share */
-  .btn {
-    @apply font-mono
-      p-2
-      flex
-      items-center
-      justify-center
-      gap-2
-      rounded-md
-      border
-      transition-colors
-      duration-200
-      text-sm
-      font-medium;
-  }
+@layer base {
+    :root {
+        --font-body: "Geist", "Space Grotesk", sans-serif;
+        --font-mono: "Geist Mono", "Space Mono", monospace;
+        --background: 0 0% 100%;
+        --foreground: 0 0% 3.9%;
+        --card: 0 0% 100%;
+        --card-foreground: 0 0% 3.9%;
+        --popover: 0 0% 100%;
+        --popover-foreground: 0 0% 3.9%;
+        --primary: 0 0 0; /* Updated to match Redis red */
+        --primary-foreground: 0 85.7% 97.3%;
+        --secondary: 0 0% 96.1%;
+        --secondary-foreground: 0 0% 9%;
+        --muted: 0 0% 96.1%;
+        --muted-foreground: 0 0% 45.1%;
+        --accent: 0 0% 96.1%;
+        --accent-foreground: 0 0% 9%;
+        --destructive: 0 84.2% 60.2%;
+        --destructive-foreground: 0 0% 98%;
+        --border: 0 0% 89.8%;
+        --input: 0 0% 89.8%;
+        --ring: 0 0% 3.9%;
+        --chart-1: 12 76% 61%;
+        --chart-2: 173 58% 39%;
+        --chart-3: 197 37% 24%;
+        --chart-4: 43 74% 66%;
+        --chart-5: 27 87% 67%;
+        --radius: 0.5rem;
+        --sidebar-background: 0 0% 98%;
+        --sidebar-foreground: 240 5.3% 26.1%;
+        --sidebar-primary: 240 5.9% 10%;
+        --sidebar-primary-foreground: 0 0% 98%;
+        --sidebar-accent: 240 4.8% 95.9%;
+        --sidebar-accent-foreground: 240 5.9% 10%;
+        --sidebar-border: 220 13% 91%;
+        --sidebar-ring: 217.2 91.2% 59.8%;
+    }
 
-  /* Action buttons (primary actions) */
-  .btn-primary {
-    @apply btn
-      bg-lime-300 
-      text-black  
-      border-black 
-      hover:bg-lime-500
-      hover:text-black
-      dark:bg-lime-500
-      dark:text-black
-      dark:hover:bg-lime-600;
-  }
+    .dark {
+        --background: 240 10% 3.9%;
+        --foreground: 0 0% 98%;
+        --card: 240 10% 3.9%;
+        --card-foreground: 0 0% 98%;
+        --popover: 240 10% 3.9%;
+        --popover-foreground: 0 0% 98%;
+        --primary: 0 72% 51%; /* Updated to match Redis red */
+        --primary-foreground: 0 85.7% 97.3%;
+        --secondary: 240 3.7% 15.9%;
+        --secondary-foreground: 0 0% 98%;
+        --muted: 240 3.7% 15.9%;
+        --muted-foreground: 240 5% 64.9%;
+        --accent: 240 3.7% 15.9%;
+        --accent-foreground: 0 0% 98%;
+        --destructive: 0 62.8% 30.6%;
+        --destructive-foreground: 0 0% 98%;
+        --border: 240 3.7% 15.9%;
+        --input: 240 3.7% 15.9%;
+        --ring: 240 4.9% 83.9%;
+        --chart-1: 220 70% 50%;
+        --chart-2: 160 60% 45%;
+        --chart-3: 30 80% 55%;
+        --chart-4: 280 65% 60%;
+        --chart-5: 340 75% 55%;
+        --sidebar-background: 240 5.9% 10%;
+        --sidebar-foreground: 240 4.8% 95.9%;
+        --sidebar-primary: 224.3 76.3% 48%;
+        --sidebar-primary-foreground: 0 0% 100%;
+        --sidebar-accent: 240 3.7% 15.9%;
+        --sidebar-accent-foreground: 240 4.8% 95.9%;
+        --sidebar-border: 240 3.7% 15.9%;
+        --sidebar-ring: 217.2 91.2% 59.8%;
+    }
 
-  /* Navigation/secondary buttons */
-  .btn-nav {
-    @apply btn
-      px-1
-      text-customSlate-400
-      hover:text-customSlate-700
-      border-transparent
-      bg-transparent
-      dark:text-customSlate-300
-      dark:hover:text-customSlate-100;
-  }
+    * {
+        border-color: hsl(var(--border));
+        outline-color: hsl(var(--ring) / 0.5);
+    }
 
-  /* Utility buttons (search, add, etc.) */
-  .btn-utility {
-    @apply btn
-      bg-customSlate-500
-      text-white
-      border-black
-      hover:bg-customSlate-700
-      hover:text-white
-      dark:bg-customSlate-600
-      dark:hover:bg-customSlate-700;
-  }
+    body {
+        background-color: hsl(var(--background));
+        color: hsl(var(--foreground));
+        font-family: var(--font-body);
+        min-height: 100vh;
+        margin: 0;
+    }
 
-  /* Danger/destructive actions */
-  .btn-danger {
-    @apply btn
-      bg-customRed-500
-      text-white  
-      border-black 
-      hover:bg-customRed-600
-      dark:bg-customRed-700
-      dark:hover:bg-customRed-800;
-  }
+    h1 {
+        text-align: left;
+        font-family: "Geist", "Space Grotesk", sans-serif;
+        font-weight: bold;
+        color: black;
+        font-size: 1.5rem;
+    }
+    .dark h1 {
+        color: white;
+    }
+    @media (min-width: 768px) {
+        h1 {
+            font-size: 2.4rem;
+        }
+    }
 
-  /* Ghost buttons (minimal style) */
-  .btn-ghost {
-    @apply btn
-      bg-transparent
-      text-black
-      border-transparent
-      hover:bg-lime-500
-      hover:text-black
-      dark:text-white
-      dark:hover:text-black;
-  }
+    h2 {
+        color: black;
+        font-family: "Geist", "Space Grotesk", sans-serif;
+        font-weight: 600;
+        font-size: 1rem;
+    }
+    .dark h2 {
+        color: white;
+    }
+    @media (min-width: 768px) {
+        h2 {
+            font-size: 1.125rem;
+        }
+    }
 
-  /* Outline variants */
-  .btn-outline {
-    @apply btn
-      bg-transparent
-      text-black
-      border-black
-      hover:bg-lime-500
-      hover:text-black
-      dark:border-white
-      dark:text-white
-      dark:hover:text-black;
-  }
+    p {
+        font-weight: normal;
+        line-height: 1.625;
+    }
 
-  .btn-outline-primary {
-    @apply btn
-      bg-transparent
-      text-lime-500
-      border-lime-500
-      hover:bg-lime-500
-      hover:text-black;
-  }
-
-  /* Icon-only buttons */
-  .btn-icon {
-    @apply btn
-      p-1
-      text-customSlate-400
-      hover:text-customSlate-700
-      border-transparent
-      dark:text-customSlate-300
-      dark:hover:text-customSlate-100;
-  }
-
-  /* Size variants */
-  .btn-sm {
-    @apply px-2 py-1 text-xs;
-  }
-
-  .btn-lg {
-    @apply px-4 py-3 text-base;
-  }
-
-  /* Disabled state */
-  .btn:disabled {
-    @apply opacity-50 cursor-not-allowed hover:bg-inherit;
-  }
-
-  /* Loading state */
-  .btn-loading {
-    @apply opacity-75 cursor-wait;
-  }
-
-  .card {
-    @apply 
-      bg-white 
-      rounded-none 
-      shadow-none 
-      dark:bg-slate-700 
-      dark:border-slate-300 
-      dark:text-lime-500;
-  }
-
-  .lime-button { 
-    @apply bg-customLime-300 text-lg text-customSlate-800;
-  }
-  /* List Item Styles */
-  .list-container {
-    @apply list-none p-0 m-0;
-  }
-
-  .list-item {
-    @apply w-full items-center p-3 transition-all duration-200 cursor-pointer border-b border-gray-200;
-  }
-
-  .list-item-selected {
-    @apply bg-gray-200 text-black border-l-4 border-l-customRed-500 !important;
-  }
-
-  .list-item-alt {
-    @apply bg-white text-black hover:bg-gray-50;
-  }
-
-  .list-item-default {
-    @apply bg-gray-50 text-black hover:bg-gray-50;
-  }
-
-  .list-item-content {
-    @apply hover:text-black group-hover:text-black bg-transparent hover:bg-transparent w-full items-start space-y-1 text-left min-w-0 h-auto;
-  }
-
-  .list-item-action {
-    @apply flex-none;
-  }
+    pre {
+        font-size: 1rem;
+        font-family: "Geist Mono", "Space Mono", monospace;
+        background-color: rgb(255 255 255 / 0.45);
+        border-radius: 0.25rem;
+        padding: 0.5rem;
+        overflow-x: auto;
+        box-shadow:
+            0 4px 6px -1px rgb(0 0 0 / 0.1),
+            0 2px 4px -2px rgb(0 0 0 / 0.1);
+    }
 }
 .form-body {
-  @apply flex flex-col space-y-2 p-2 bg-gray-100 rounded-lg mb-2;
+    @apply flex flex-col space-y-2 p-2 bg-gray-100 rounded-lg mb-2;
 }
 .form-section {
-  @apply flex flex-col space-y-2 bg-white p-2 rounded-lg;
+    @apply flex flex-col space-y-2 bg-[white] p-2 rounded-lg;
 }
 
 .form-item {
-  @apply flex space-x-2 items-center w-full border-b pb-2;
+    @apply flex space-x-2 items-center w-full border-b pb-2;
 }
 .form-label {
-  @apply pt-1;
+    @apply pt-1;
 }
-.form-control { 
-  @apply flex-1;
+.form-control {
+    @apply flex-1;
+}
+
+/* Custom styling for the sidebar resize handle */
+.sidebar-with-visible-handle > div[class*="cursor-col-resize"] {
+    width: 3px !important;
+    background-color: rgba(200, 200, 200, 0.3);
+    transition: background-color 0.2s ease;
+}
+
+.sidebar-with-visible-handle > div[class*="cursor-col-resize"]:hover {
+    background-color: rgba(100, 100, 200, 0.5);
+}
+
+.sidebar-with-visible-handle > div[class*="cursor-col-resize"]::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    height: 50px;
+    width: 2px;
+    background-color: rgba(100, 100, 200, 0.8);
+    border-radius: 1px;
 }

@@ -7,7 +7,7 @@ export const EMBEDDING_CACHE_LOG_KEY = "embeddingCache:log"
 export class EmbeddingCache {
     async get(input: string, config: EmbeddingConfig): Promise<number[] | null> {
         try {
-            const redisUrl = getRedisUrl()
+            const redisUrl = await getRedisUrl()
             if (!redisUrl) {
                 return null
             }
@@ -41,7 +41,7 @@ export class EmbeddingCache {
 
     async set(input: string, embedding: number[], config: EmbeddingConfig): Promise<void> {
         try {
-            const redisUrl = getRedisUrl()
+            const redisUrl = await getRedisUrl()
             if (!redisUrl) {
                 return
             }

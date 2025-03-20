@@ -32,20 +32,8 @@ import {
     CarouselNext,
     CarouselPrevious,
 } from "@/components/ui/carousel"
-
-interface SampleDataset {
-    name: string
-    description: string
-    icon: React.ReactNode
-    fileUrl: string
-    columns: string[]
-    recordCount: number
-    elementTemplate: string
-    vectorTemplate: string
-    attributeColumns: string[]
-    dataType: "text" | "image"
-    recommendedEmbedding: EmbeddingConfig
-}
+import { getDefaultEmbeddingConfig } from "@/app/utils/embeddingUtils"
+import { SampleDataset, sampleDatasets as configuredDatasets } from "./SampleDataSelect"
 
 interface ImportSampleDataProps {
     onClose: () => void
@@ -91,117 +79,33 @@ export default function ImportSampleData({
         currentEmbedding: VectorSetMetadata | null
     }>({ open: false, dataset: null, currentEmbedding: null })
     const [availableImageCount, setAvailableImageCount] = useState<number>(100)
+    const [embeddingConfigs, setEmbeddingConfigs] = useState<Record<string, EmbeddingConfig>>({})
 
     // Mode tracking - separating selection from import view
     const [viewMode, setViewMode] = useState<"select" | "import">(
         selectionMode ? "select" : "import"
     )
 
-    // Default recommended embedding configurations for each data type
-    const sampleDatasets: SampleDataset[] = [
-        {
-            name: "Goodreads Books",
-            description:
-                "A collection of popular books with titles, authors, descriptions, and ratings from Goodreads",
-            icon: <BookOpen className="h-5 w-5 text-blue-500" />,
-            fileUrl: "/sample-data/top2k_book_descriptions.csv",
-            columns: [
-                "title",
-                "authors",
-                "description",
-                "average_rating",
-                "isbn",
-                "original_publication_year",
-                "ratings_count",
-                "language_code",
-            ],
-            recordCount: 2000,
-            elementTemplate: "${title} (ISBN: ${isbn})",
-            vectorTemplate:
-                'The book titled "${title}", authored by ${authors}, was initially published in ${original_publication_year}. It has an average rating of ${average_rating} across ${ratings_count} ratings, and is available under ISBN ${isbn}. The description is as follows: ${description}.',
-            attributeColumns: [
-                "average_rating",
-                "original_publication_year",
-                "authors",
-                "isbn",
-                "ratings_count",
-                "language_code",
-            ],
-            dataType: "text",
-            recommendedEmbedding: {
-                provider: "openai",
-                openai: {
-                    apiKey: "",
-                    model: "text-embedding-3-small",
-                },
-            } as EmbeddingConfig,
-        },
-        {
-            name: "IMDB Movies",
-            description:
-                "A dataset of the top 1000 movies with titles, plot synopses, directors, and ratings from IMDB",
-            icon: <Film className="h-5 w-5 text-amber-500" />,
-            fileUrl: "/sample-data/imdb_top_1000.csv",
-            columns: [
-                "Poster_Link",
-                "Series_Title",
-                "Released_Year",
-                "Certificate",
-                "Runtime",
-                "Genre",
-                "IMDB_Rating",
-                "Overview",
-                "Meta_score",
-                "Director",
-                "Star1",
-                "Star2",
-                "Star3",
-                "Star4",
-                "No_of_Votes",
-                "Gross",
-            ],
-            recordCount: 1000,
-            elementTemplate: "${Series_Title} (${Released_Year})",
-            vectorTemplate:
-                "Movie '${Series_Title}' was released in ${Released_Year} with a runtime of ${Runtime} minutes. Directed by ${Director}, this ${Genre} film has a rating of ${IMDB_Rating} on IMDB. Overview: ${Overview}. It stars ${Star1}, ${Star2}, ${Star3}, and ${Star4}.",
-            attributeColumns: [
-                "IMDB_Rating",
-                "Released_Year",
-                "Director",
-                "Genre",
-                "Runtime",
-                "Meta_score",
-            ],
-            dataType: "text",
-            recommendedEmbedding: {
-                provider: "tensorflow",
-                tensorflow: {
-                    model: "universal-sentence-encoder",
-                },
-            } as EmbeddingConfig,
-        },
-        {
-            name: "UTK Faces",
-            description:
-                "UTKFace dataset with over 20,000 face images annotated with age, gender, and ethnicity. The images cover large variation in pose, facial expression, illumination, occlusion, and resolution.",
-            icon: <User className="h-5 w-5 text-violet-500" />,
-            fileUrl: "/sample-data/UTKFace/images",
-            columns: ["image", "age", "gender", "ethnicity"],
-            recordCount: 20000,
-            elementTemplate: "Face ${index}",
-            vectorTemplate: "",
-            attributeColumns: ["age", "gender", "ethnicity"],
-            dataType: "image",
-            recommendedEmbedding: {
-                provider: "image",
-                image: {
-                    model: "mobilenet",
-                },
-            } as EmbeddingConfig,
-        },
-    ]
+    // Load embedding configs when component mounts
+    useEffect(() => {
+        async function loadEmbeddingConfigs() {
+            const configs: Record<string, EmbeddingConfig> = {};
+            
+            for (const dataset of configuredDatasets) {
+                const config = await getDefaultEmbeddingConfig(dataset.embeddingType);
+                configs[dataset.name] = config;
+            }
+            
+            setEmbeddingConfigs(configs);
+        }
+        
+        loadEmbeddingConfigs();
+    }, []);
 
-    // Initialize the selected dataset from props if provided
+    // Use configured datasets from SampleDataSelect
+    const sampleDatasets = configuredDatasets;
+
+    // Track the selected dataset
     const [selectedDataset, setSelectedDataset] = useState<string | null>(
         initialSelectedDataset
     )
@@ -236,97 +140,39 @@ export default function ImportSampleData({
         dataset: SampleDataset,
         currentMetadata: VectorSetMetadata | null
     ): boolean => {
-        if (!currentMetadata) return false
-
-        if (dataset.dataType === "text") {
-            return isTextEmbedding(currentMetadata.embedding)
-        } else if (dataset.dataType === "image") {
-            return isImageEmbedding(currentMetadata.embedding)
-        }
-
-        return false
+        if (!currentMetadata || !currentMetadata.embedding) return true;
+        
+        // Get the embedding config for this dataset
+        const embeddingConfig = embeddingConfigs[dataset.name];
+        if (!embeddingConfig) return true; // If not loaded yet, assume compatible
+        
+        // Check if the embedding types match
+        const isCurrentText = isTextEmbedding(currentMetadata.embedding);
+        const isCurrentImage = isImageEmbedding(currentMetadata.embedding);
+        
+        if (dataset.embeddingType === "text" && isCurrentText) return true;
+        if (dataset.embeddingType === "image" && isCurrentImage) return true;
+        
+        return false;
     }
 
     const handleImportSampleDataset = async (dataset: SampleDataset) => {
-        // If in selection mode, just select the dataset and notify parent
-        if (selectionMode) {
-            setSelectedDataset(dataset.name)
-            setSelectedDatasetObject(dataset)
-            if (onSelectDataset) {
-                onSelectDataset(dataset.name)
-            }
+        // First check if this dataset is compatible with the current embedding settings
+        if (metadata && !isEmbeddingCompatible(dataset, metadata)) {
+            // If not compatible, show the mismatch dialog
+            setEmbeddingMismatch({
+                open: true,
+                dataset: dataset,
+                currentEmbedding: metadata,
+            })
             return
         }
 
-        // Check if there's metadata and if it's compatible with the dataset
-        if (metadata) {
-            const isCompatible = isEmbeddingCompatible(dataset, metadata)
-
-            if (!isCompatible) {
-                // Show mismatch dialog
-                setEmbeddingMismatch({
-                    open: true,
-                    dataset,
-                    currentEmbedding: metadata,
-                })
-                return
-            }
-        } else {
-            // If no metadata exists, create one with the recommended embedding
-            if (onUpdateMetadata) {
-                const newMetadata = createVectorSetMetadata(
-                    dataset.recommendedEmbedding as EmbeddingConfig,
-                    `Automatically configured for ${dataset.name}`
-                )
-                onUpdateMetadata(newMetadata)
-            }
-        }
-
-        // For image datasets, show confirmation dialog first
-        if (dataset.name === "UTK Faces") {
-            // Get the count of available images first
-            try {
-                const classesResponse = await fetch(
-                    "/sample-data/UTKFace/images/_classes.csv"
-                )
-                if (!classesResponse.ok) {
-                    throw new Error(
-                        `Failed to fetch image classes: ${classesResponse.statusText}`
-                    )
-                }
-
-                const classesText = await classesResponse.text()
-                const lines = classesText
-                    .split("\n")
-                    .filter((line) => line.trim().length > 0)
-
-                // Skip header row if it exists
-                const startIdx = lines[0].startsWith("filename") ? 1 : 0
-                const count = lines.length - startIdx
-
-                // Set the available count and make sure import count doesn't exceed it
-                setAvailableImageCount(count)
-                setImportCount(Math.min(importCount, count))
-
-                // Show the confirmation dialog
-                setConfirmDialog({
-                    open: true,
-                    dataset,
-                })
-            } catch (error) {
-                console.error("Error fetching image count:", error)
-                setError(
-                    `Failed to determine available image count: ${
-                        error instanceof Error ? error.message : String(error)
-                    }`
-                )
-            }
-            return
-        }
-
-        setSelectedDatasetObject(dataset)
-        setViewMode("import")
-        await importDataset(dataset)
+        // If there's no metadata or we're starting fresh, confirm with the user
+        setConfirmDialog({
+            open: true,
+            dataset: dataset,
+        })
     }
 
     // New function to handle starting the import from the UI
@@ -341,174 +187,82 @@ export default function ImportSampleData({
     }
 
     const importDataset = async (dataset: SampleDataset) => {
-        console.log(
-            `[ImportSampleData] importDataset called for: ${dataset.name}`
-        )
-        setError(null)
-        setIsImporting(true)
-        setImportProgress(null)
-        setImportStarted(true) // Mark as started immediately to prevent duplicate calls
-
         try {
-            // For regular CSV datasets
-            if (dataset.dataType === "text") {
-                // Step 1: Fetch the CSV file
-                const response = await fetch(dataset.fileUrl)
-                if (!response.ok) {
-                    throw new Error(
-                        `Failed to fetch sample dataset: ${response.statusText}`
-                    )
-                }
+            setError(null)
+            setIsImporting(true)
+            setImportStarted(true)
+            
+            // Get the embedding config for this dataset
+            const embeddingConfig = embeddingConfigs[dataset.name] || 
+                await getDefaultEmbeddingConfig(dataset.embeddingType);
 
-                // Convert the response to a Blob with CSV content type
-                const csvBlob = await response.blob()
-
-                // Create a File object from the Blob
-                const file = new File(
-                    [csvBlob],
-                    `${dataset.name.toLowerCase().replace(/\s+/g, "-")}.csv`,
-                    {
-                        type: "text/csv",
-                    }
-                )
-
-                // Step 2: Create the import job config
-                const config: ImportJobConfig = {
-                    delimiter: ",",
-                    hasHeader: true,
-                    skipRows: 0,
-                    elementColumn: dataset.columns[0],
-                    textColumn: dataset.columns[0],
-                    elementTemplate: dataset.elementTemplate,
-                    textTemplate: dataset.vectorTemplate,
-                    attributeColumns: dataset.attributeColumns,
-                    metadata: metadata || undefined,
-                    fileType: "csv",
-                }
-
-                // Step 3: Create the import job
-                await jobs.createImportJob(vectorSetName, file, config)
-            }
-            // For image dataset
-            else {
-                // Step 1: Get the list of images from the _classes.csv file
-                const classesResponse = await fetch(
-                    "/sample-data/UTKFace/images/_classes.csv"
-                )
-                if (!classesResponse.ok) {
-                    throw new Error(
-                        `Failed to fetch image classes: ${classesResponse.statusText}`
-                    )
-                }
-
-                const classesText = await classesResponse.text()
-                const lines = classesText
-                    .split("\n")
-                    .filter((line) => line.trim().length > 0)
-
-                // Skip header row if it exists
-                const startIdx = lines[0].startsWith("filename") ? 1 : 0
-
-                // Prepare files to import (limit by importCount)
-                const filesToImport = lines.slice(
-                    startIdx,
-                    startIdx + importCount
-                )
-                setImportProgress({ current: 0, total: filesToImport.length })
-
-                const embeddings: number[][] = []
-
-                // Process each image file
-                for (let i = 0; i < filesToImport.length; i++) {
-                    const line = filesToImport[i]
-                    const [filename] = line.split(",")
-
-                    // Fetch the image
-                    const imageUrl = `/sample-data/UTKFace/images/${filename}`
-                    const imageResponse = await fetch(imageUrl)
-                    if (!imageResponse.ok) {
-                        console.warn(`Could not fetch ${imageUrl}, skipping`)
-                        continue
-                    }
-
-                    const imageBlob = await imageResponse.blob()
-
-                    // Convert image to base64
-                    const reader = new FileReader()
-                    const imageDataPromise = new Promise<string>((resolve) => {
-                        reader.onloadend = () => {
-                            resolve(reader.result as string)
-                        }
-                    })
-                    reader.readAsDataURL(imageBlob)
-                    const imageData = await imageDataPromise
-
-                    // Generate embedding
-                    const imageConfig = { model: "mobilenet" }
-                    const embedding = await getImageEmbedding(
-                        imageData,
-                        imageConfig
-                    )
-                    embeddings.push(embedding)
-
-                    // Update progress
-                    setImportProgress({
-                        current: i + 1,
-                        total: filesToImport.length,
-                    })
-                }
-
-                // Create a sample image file for the import job
-                // We'll use the first image as the representative file
-                const sampleImageResponse = await fetch(
-                    `/sample-data/UTKFace/images/${
-                        filesToImport[0].split(",")[0]
-                    }`
-                )
-                const sampleImageBlob = await sampleImageResponse.blob()
-                const imageFile = new File(
-                    [sampleImageBlob],
-                    `UTK_Faces_${importCount}_images.jpg`,
-                    {
-                        type: "image/jpeg",
-                    }
-                )
-
-                // Create job config with all the computed vectors
-                const config: ImportJobConfig = {
-                    delimiter: ",",
-                    hasHeader: false,
-                    skipRows: 0,
-                    elementColumn: "image",
-                    textColumn: "image",
-                    elementTemplate: dataset.elementTemplate,
-                    attributeColumns: dataset.attributeColumns,
-                    metadata: metadata || undefined,
-                    fileType: "images",
-                    rawVectors: embeddings, // Include all pre-computed embeddings
-                }
-
-                // Create the import job
-                await jobs.createImportJob(vectorSetName, imageFile, config)
+            // Create job configuration
+            const jobConfig: ImportJobConfig = {
+                vectorSetName,
+                datasetName: dataset.name,
+                sourceUrl: dataset.fileUrl,
+                fileColumns: dataset.columns,
+                elementTemplate: dataset.elementTemplate,
+                vectorTemplate: dataset.vectorTemplate,
+                attributeColumns: dataset.attributeColumns,
+                dataType: dataset.dataType,
+                importLimit: dataset.dataType === "image" ? importCount : undefined,
+                embedding: embeddingConfig,
             }
 
+            const jobId = await jobs.createImportJob(jobConfig)
+            const result = await jobs.startImportJob(jobId)
+
+            setImportProgress(null)
             setShowSuccessDialog(true)
-            setIsImporting(false)
-            setImportProgress(null)
-
-            // Close the dialog after successful import
-            onClose()
-        } catch (error) {
-            console.error("Error importing sample dataset:", error)
+        } catch (err) {
+            console.error("Error importing sample data:", err)
             setError(
-                `Error importing sample dataset: ${
-                    error instanceof Error ? error.message : String(error)
-                }`
+                err instanceof Error
+                    ? err.message
+                    : "Failed to import sample data"
             )
+        } finally {
             setIsImporting(false)
-            setImportProgress(null)
         }
     }
+
+    // Handle embedding mismatch resolution
+    const handleUpdateEmbedding = async () => {
+        if (!embeddingMismatch.dataset) return;
+        
+        try {
+            // Get the appropriate embedding config for the dataset
+            const datasetName = embeddingMismatch.dataset.name;
+            const embeddingConfig = embeddingConfigs[datasetName] || 
+                await getDefaultEmbeddingConfig(embeddingMismatch.dataset.embeddingType);
+            
+            // Update the vector set's metadata with the new embedding config
+            if (onUpdateMetadata && embeddingMismatch.dataset) {
+                const newMetadata = {
+                    ...metadata,
+                    embedding: embeddingConfig,
+                };
+                onUpdateMetadata(newMetadata);
+            }
+            
+            // Close the dialog and continue with import
+            setEmbeddingMismatch({ open: false, dataset: null, currentEmbedding: null });
+            
+            // Show the confirm dialog
+            setConfirmDialog({
+                open: true,
+                dataset: embeddingMismatch.dataset,
+            });
+        } catch (err) {
+            console.error("Error updating embedding configuration:", err);
+            setError(
+                err instanceof Error
+                    ? err.message
+                    : "Failed to update embedding configuration"
+            );
+        }
+    };
 
     return (
         <div className="flex flex-col h-full">
@@ -528,7 +282,7 @@ export default function ImportSampleData({
                         </p>
 
                         {selectedDatasetObject && !importStarted && (
-                            <div className="bg-white rounded-lg border p-4 mb-4">
+                            <div className="bg-[white] rounded-lg border p-4 mb-4">
                                 <div className="flex items-center mb-4">
                                     <div className="mr-3 bg-gray-50 p-2 rounded-full">
                                         {selectedDatasetObject.icon}
@@ -676,7 +430,7 @@ export default function ImportSampleData({
                                         {sampleDatasets.map((dataset) => (
                                             <CarouselItem key={dataset.name} className="pl-4 basis-full sm:basis-1/2 md:basis-1/2">
                                                 <div
-                                                    className={`bg-white rounded-lg border shadow-sm overflow-hidden flex flex-col h-full max-w-full
+                                                    className={`bg-[white] rounded-lg border shadow-sm overflow-hidden flex flex-col h-full max-w-full
                                                       ${
                                                           selectionMode &&
                                                           selectedDataset ===
@@ -685,7 +439,7 @@ export default function ImportSampleData({
                                                               : ""
                                                       }`}
                                                 >
-                                                    <div className="p-4 flex-grow">
+                                                    <div className="p-4 grow">
                                                         <div className="flex items-center mb-4">
                                                             <div className="mr-3 bg-gray-50 p-2 rounded-full">
                                                                 {dataset.icon}
@@ -799,8 +553,8 @@ export default function ImportSampleData({
                                             </CarouselItem>
                                         ))}
                                     </CarouselContent>
-                                    <CarouselPrevious className="absolute left-0 top-1/2 -translate-y-1/2 h-8 w-8 md:h-9 md:w-9 bg-white border shadow-sm" />
-                                    <CarouselNext className="absolute right-0 top-1/2 -translate-y-1/2 h-8 w-8 md:h-9 md:w-9 bg-white border shadow-sm" />
+                                    <CarouselPrevious className="absolute left-0 top-1/2 -translate-y-1/2 h-8 w-8 md:h-9 md:w-9 bg-[white] border shadow-xs" />
+                                    <CarouselNext className="absolute right-0 top-1/2 -translate-y-1/2 h-8 w-8 md:h-9 md:w-9 bg-[white] border shadow-xs" />
                                 </Carousel>
                             </div>
                         ) : (
@@ -819,9 +573,9 @@ export default function ImportSampleData({
                                     <div
                                         key={dataset.name}
                                         className={`${carouselMode 
-                                            ? "flex-shrink-0 snap-center min-w-[330px] max-w-[330px]" 
+                                            ? "shrink-0 snap-center min-w-[330px] max-w-[330px]" 
                                             : ""} 
-                                          bg-white rounded-lg border shadow-sm overflow-hidden flex flex-col 
+                                          bg-[white] rounded-lg border shadow-sm overflow-hidden flex flex-col 
                                           ${
                                               selectionMode &&
                                               selectedDataset ===
@@ -830,7 +584,7 @@ export default function ImportSampleData({
                                                   : ""
                                           }`}
                                     >
-                                        <div className="p-6 flex-grow">
+                                        <div className="p-6 grow">
                                             <div className="flex items-center mb-4">
                                                 <div className="mr-3 bg-gray-50 p-2 rounded-full">
                                                     {dataset.icon}
@@ -1204,32 +958,7 @@ export default function ImportSampleData({
                         </Button>
                         <Button
                             variant="default"
-                            onClick={() => {
-                                if (
-                                    embeddingMismatch.dataset &&
-                                    onUpdateMetadata
-                                ) {
-                                    // Create new metadata with the recommended embedding
-                                    const newMetadata = createVectorSetMetadata(
-                                        embeddingMismatch.dataset
-                                            .recommendedEmbedding as EmbeddingConfig,
-                                        embeddingMismatch.currentEmbedding
-                                            ?.description ||
-                                            `Automatically configured for ${embeddingMismatch.dataset.name}`
-                                    )
-
-                                    // Update parent component's metadata
-                                    onUpdateMetadata(newMetadata)
-
-                                    // Close dialog and continue with import
-                                    setEmbeddingMismatch({
-                                        open: false,
-                                        dataset: null,
-                                        currentEmbedding: null,
-                                    })
-                                    importDataset(embeddingMismatch.dataset)
-                                }
-                            }}
+                            onClick={handleUpdateEmbedding}
                         >
                             Switch & Import
                         </Button>

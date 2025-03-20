@@ -40,9 +40,21 @@ export function registerCompletedJob(jobId: string, vectorSetName: string) {
 
 // API route to check for completed jobs
 export async function GET(req: NextRequest) {
-    const url = new URL(req.url)
-    const since = parseInt(url.searchParams.get("since") || "0", 10)
-    const vectorSetName = url.searchParams.get("vectorSetName")
+    let url;
+    let since = 0;
+    let vectorSetName = null;
+    
+    try {
+        url = new URL(req.url);
+        since = parseInt(url.searchParams.get("since") || "0", 10);
+        vectorSetName = url.searchParams.get("vectorSetName");
+    } catch (error) {
+        console.error("Error parsing URL:", error, "URL:", req.url);
+        return NextResponse.json({ 
+            success: false, 
+            error: `Invalid URL format: ${error instanceof Error ? error.message : String(error)}` 
+        }, { status: 400 });
+    }
     
     // Clean up old jobs first
     cleanupOldJobs()

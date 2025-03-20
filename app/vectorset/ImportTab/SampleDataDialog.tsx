@@ -11,7 +11,6 @@ import {
 import { SampleDataSelect, SampleDataset } from "./SampleDataSelect"
 import { SampleDataImporter } from "./SampleDataImporter"
 import { VectorSetMetadata } from "@/app/embeddings/types/config"
-import { Button } from "@/components/ui/button"
 
 interface SampleDataDialogProps {
     open: boolean
@@ -79,27 +78,26 @@ export function SampleDataDialog({
                 <DialogHeader>
                     <DialogTitle>{dialogTitle}</DialogTitle>
                 </DialogHeader>
-                <DialogFooter className="mt-4">
-                    <div className="flex-1 overflow-y-auto">
-                        {step === "select" && (
-                            <SampleDataSelect
-                                onSelect={handleSelectDataset}
-                                onCancel={handleClose}
-                                useCarousel={true}
-                            />
-                        )}
+                <div className="flex-1 overflow-y-auto mt-4 min-h-0">
+                    {step === "select" && (
+                        <SampleDataSelect
+                            onSelect={handleSelectDataset}
+                            onCancel={handleClose}
+                            useCarousel={true}
+                        />
+                    )}
 
-                        {step === "import" && selectedDataset && (
-                            <SampleDataImporter
-                                dataset={selectedDataset}
-                                vectorSetName={vectorSetName}
-                                metadata={metadata}
-                                onUpdateMetadata={onUpdateMetadata}
-                                onClose={handleClose}
-                            />
-                        )}
-                    </div>
-                </DialogFooter>
+                    {step === "import" && selectedDataset && (
+                        <SampleDataImporter
+                            dataset={selectedDataset}
+                            vectorSetName={vectorSetName}
+                            metadata={metadata}
+                            onUpdateMetadata={onUpdateMetadata}
+                            onClose={handleClose}
+                        />
+                    )}
+                </div>
+                
             </DialogContent>
         </Dialog>
     )

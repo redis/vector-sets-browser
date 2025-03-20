@@ -158,7 +158,7 @@ function AttributeColumnsDialog({
                                 >
                                     <Label
                                         htmlFor={`column-${col.name}`}
-                                        className="flex-grow"
+                                        className="grow"
                                     >
                                         {col.name.charAt(0).toUpperCase() +
                                             col.name.slice(1)}
@@ -1115,7 +1115,7 @@ export default function VectorResults({
                                             <div className="flex flex-col gap-1">
                                                 <div className="flex items-center gap-2">
                                                     {filter && (
-                                                        <div className="w-2 h-2 bg-red-500 rounded-full flex-shrink-0" />
+                                                        <div className="w-2 h-2 bg-red-500 rounded-full shrink-0" />
                                                     )}
                                                     <span className="font-medium">
                                                         {col.name
@@ -1308,7 +1308,7 @@ export default function VectorResults({
                     {filteredAndSortedResults.map((row, index) => (
                         <div
                             key={index}
-                            className={`bg-white rounded-lg border p-4 hover:shadow-md group ${
+                            className={`bg-[white] rounded-lg border p-4 hover:shadow-md group ${
                                 selectedElements.has(row[0]) ? 'border-blue-400 bg-blue-50' : ''
                             }`}
                             onClick={selectMode ? () => handleSelectToggle(row[0]) : undefined}
