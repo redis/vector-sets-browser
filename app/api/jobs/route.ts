@@ -145,6 +145,19 @@ export async function POST(req: NextRequest) {
         const delimiter = formData.get("delimiter") as string || ",";
         const hasHeader = formData.get("hasHeader") === "true";
         const skipRows = parseInt(formData.get("skipRows") as string || "0", 10);
+        const fileType = formData.get("fileType") as string || "csv";
+        
+        // Get raw vectors if provided
+        let rawVectors: number[][] | undefined;
+        const rawVectorsString = formData.get("rawVectors") as string;
+        if (rawVectorsString) {
+            try {
+                rawVectors = JSON.parse(rawVectorsString);
+                console.log(`[Jobs API] Received ${rawVectors.length} raw vectors`);
+            } catch (error) {
+                console.error("[Jobs API] Error parsing raw vectors:", error);
+            }
+        }
         
         console.log(`[Jobs API] Element column: ${elementColumn || 'not specified'}`);
         console.log(`[Jobs API] Text column: ${textColumn || 'not specified'}`);
@@ -152,6 +165,7 @@ export async function POST(req: NextRequest) {
         console.log(`[Jobs API] Text template: ${textTemplate || 'not specified'}`);
         console.log(`[Jobs API] Attribute columns: ${attributeColumns.length ? attributeColumns.join(', ') : 'none'}`);
         console.log(`[Jobs API] Delimiter: ${delimiter}, Has header: ${hasHeader}, Skip rows: ${skipRows}`);
+        console.log(`[Jobs API] File type: ${fileType}`);
 
         // Get vector set metadata
         const result = await redis.getMetadata(redisUrl, vectorSetName)
@@ -182,7 +196,9 @@ export async function POST(req: NextRequest) {
                 attributeColumns: attributeColumns.length > 0 ? attributeColumns : undefined,
                 delimiter,
                 hasHeader,
-                skipRows
+                skipRows,
+                fileType,
+                rawVectors
             }
         )
 

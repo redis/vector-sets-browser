@@ -484,6 +484,94 @@ export function useVectorSearch({
         ]
     )
 
+    // Handle Image search type - using the vector embedding generated from the image
+    const handleImageSearch = useCallback(
+        async (count: number) => {
+            if (!vectorSetName) return
+
+            // Clear any previous errors when starting a new search
+            clearError()
+
+            try {
+                // The searchQuery for images should already contain a vector representation
+                // from the ImageUploader's onEmbeddingGenerated callback
+                const vectorData = internalSearchState.searchQuery
+                    .split(",")
+                    .map((n) => parseFloat(n.trim()))
+                
+                // Check if we have valid vector data
+                if (vectorData.some(isNaN)) {
+                    handleError("Invalid image embedding data")
+                    return
+                }
+                
+                // Check if the vector dimensions match the expected dimensions
+                const expectedDim = await vdim({ keyName: vectorSetName! })
+                
+                // Log dimensions for debugging
+                console.log(`Image embedding dimensions: ${vectorData.length}, Required: ${expectedDim}`)
+                
+                if (vectorData.length !== expectedDim) {
+                    // Log detailed error
+                    console.error(`Vector dimension mismatch: image embedding has ${vectorData.length} dimensions but vector set ${vectorSetName} requires ${expectedDim} dimensions`)
+                    handleError(`Vector dimension mismatch: got ${vectorData.length}, need ${expectedDim}`)
+                    return
+                }
+
+                // Set status message to show searching
+                onStatusChange("Searching with image embedding...")
+                updateSearchState({ resultsTitle: "Searching with image..." })
+
+                // Perform vector-based search using the image embedding
+                const vsimResponse = await vsim({
+                    keyName: vectorSetName!,
+                    searchVector: vectorData,
+                    count,
+                    withEmbeddings: fetchEmbeddings,
+                    filter: internalSearchState.searchFilter,
+                    expansionFactor: internalSearchState.expansionFactor
+                })
+
+                // Use the execution time from the server response
+                if (vsimResponse.executionTimeMs) {
+                    const durationInSeconds = (
+                        vsimResponse.executionTimeMs / 1000
+                    ).toFixed(4)
+                    updateSearchState({ searchTime: durationInSeconds })
+                }
+
+                // Update results title
+                updateSearchState({ 
+                    resultsTitle: "Results for uploaded image" 
+                })
+
+                // Process results
+                onSearchResults(vsimResponse.result)
+                onStatusChange("Image search complete")
+
+                if (vsimResponse.executedCommand) {
+                    updateSearchState({ executedCommand: vsimResponse.executedCommand })
+                }
+            } catch (error) {
+                console.error("Image search error:", error)
+                handleError(error instanceof Error ? error.message : String(error))
+                onSearchResults([])
+            }
+        },
+        [
+            vectorSetName,
+            internalSearchState.searchQuery,
+            onSearchResults,
+            onStatusChange,
+            fetchEmbeddings,
+            internalSearchState.searchFilter,
+            internalSearchState.expansionFactor,
+            clearError,
+            handleError,
+            updateSearchState,
+        ]
+    )
+
     // Main search function
     const performSearch = useCallback(async () => {
         // Skip if no vector set or if nothing has changed since last search
@@ -522,6 +610,8 @@ export function useVectorSearch({
                 await performZeroVectorSearch(count)
             } else if (internalSearchState.searchType === "Vector") {
                 await handleVectorSearch(count)
+            } else if (internalSearchState.searchType === "Image") {
+                await handleImageSearch(count)
             } else {
                 await handleElementSearch(count)
             }
@@ -537,6 +627,7 @@ export function useVectorSearch({
         handleSearchError,
         handleVectorSearch,
         handleElementSearch,
+        handleImageSearch,
         performZeroVectorSearch,
         clearError,
     ])

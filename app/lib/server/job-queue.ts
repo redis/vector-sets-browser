@@ -53,6 +53,8 @@ export class JobQueueService {
             delimiter?: string
             hasHeader?: boolean
             skipRows?: number
+            fileType?: string
+            rawVectors?: number[][]
         }
     ): Promise<string> {
         const jobId = uuidv4()
@@ -66,20 +68,68 @@ export class JobQueueService {
         const hasHeader =
             options?.hasHeader !== undefined ? options.hasHeader : true
         const skipRows = options?.skipRows || 0
+        const fileType = options?.fileType || "csv"
 
-        console.log(`[JobQueue] Reading CSV file ${file.name}`)
-        const text = await file.text()
-        const records = parse(text, {
-            columns: hasHeader,
-            skip_empty_lines: true,
-            delimiter,
-            from_line: Math.max(1, skipRows + (hasHeader ? 1 : 0)),
-        }) as CSVRow[]
-        console.log(`[JobQueue] Parsed ${records.length} records from CSV`)
-
-        // Determine column names from the first record
-        const availableColumns =
-            records.length > 0 ? Object.keys(records[0]) : []
+        let records: CSVRow[] = [];
+        let availableColumns: string[] = [];
+        
+        // Handle different file types
+        if (fileType === "csv") {
+            console.log(`[JobQueue] Reading CSV file ${file.name}`)
+            const text = await file.text()
+            records = parse(text, {
+                columns: hasHeader,
+                skip_empty_lines: true,
+                delimiter,
+                from_line: Math.max(1, skipRows + (hasHeader ? 1 : 0)),
+            }) as CSVRow[]
+            console.log(`[JobQueue] Parsed ${records.length} records from CSV`)
+            
+            // Determine column names from the first record
+            availableColumns = records.length > 0 ? Object.keys(records[0]) : []
+        } 
+        else if (fileType === "image" || fileType === "images") {
+            console.log(`[JobQueue] Processing image file: ${file.name}`)
+            
+            // For image types, we create a single record with the image information
+            if (options?.rawVectors && options.rawVectors.length > 0) {
+                console.log(`[JobQueue] Using ${options.rawVectors.length} pre-computed vectors for images`)
+                
+                // Create a record for each image with pre-computed vector
+                records = options.rawVectors.map((vector, index) => {
+                    // Create a basic record for the image
+                    const record: CSVRow = {
+                        image: file.name,
+                        index: String(index),
+                        // Add any attribute columns with empty values
+                        ...(options.attributeColumns?.reduce((acc, col) => {
+                            acc[col] = "";
+                            return acc;
+                        }, {} as Record<string, string>) || {})
+                    };
+                    
+                    // Store the vector directly in the record for later use
+                    (record as any)._vector = vector;
+                    
+                    return record;
+                });
+                
+                availableColumns = ["image", "index", ...(options.attributeColumns || [])];
+            } else {
+                // Just a single record for the image without pre-computed vector
+                records = [{
+                    image: file.name,
+                    index: "0",
+                    // Add any attribute columns with empty values
+                    ...(options.attributeColumns?.reduce((acc, col) => {
+                        acc[col] = "";
+                        return acc;
+                    }, {} as Record<string, string>) || {})
+                }];
+                availableColumns = ["image", "index", ...(options.attributeColumns || [])];
+            }
+        }
+        
         console.log(`[JobQueue] Available columns:`, availableColumns)
 
         // Select appropriate columns based on options or defaults
@@ -123,6 +173,7 @@ export class JobQueueService {
                 delimiter,
                 hasHeader,
                 skipRows,
+                fileType,
             }
             console.log(
                 `[JobQueue] Setting metadata for job ${jobId}:`,

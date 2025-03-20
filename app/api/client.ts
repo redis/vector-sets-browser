@@ -106,5 +106,17 @@ export const apiClient = {
             method: 'DELETE',
             headers,
         });
+    },
+
+    async patch<TResponse, TRequest>(
+        url: string,
+        data: TRequest,
+        headers?: Record<string, string>
+    ) {
+        return this.request<TResponse, TRequest>(url, {
+            method: 'PATCH',
+            data,
+            headers,
+        });
     }
 }; 

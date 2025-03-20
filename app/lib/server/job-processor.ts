@@ -345,6 +345,20 @@ export class JobProcessor {
 
                     let elementId: string
                     let textToEmbed: string
+                    let embedding: number[]
+
+                    // Handle image file type with pre-computed vector
+                    if (this.metadata.fileType === 'image' || this.metadata.fileType === 'images') {
+                        console.log(`[JobProcessor] Processing image file type`)
+                        
+                        // Check if we have a pre-computed vector
+                        if ((item.rowData as any)._vector) {
+                            console.log(`[JobProcessor] Using pre-computed vector for image`)
+                            embedding = (item.rowData as any)._vector
+                        } else {
+                            console.log(`[JobProcessor] No pre-computed vector found for image, will try to compute one`)
+                        }
+                    }
 
                     // Get the element identifier - either from template or column
                     if (this.metadata.elementTemplate) {
@@ -382,44 +396,55 @@ export class JobProcessor {
                         continue
                     }
 
-                    // Get the text to embed - either from template or column
-                    if (this.metadata.textTemplate) {
-                        textToEmbed = this.processTemplate(
-                            this.metadata.textTemplate,
-                            item.rowData
-                        )
-                        console.log(
-                            `[JobProcessor] Text to embed from template (first 100 chars):`,
-                            textToEmbed
-                                ? textToEmbed.substring(0, 100) + "..."
-                                : "undefined"
-                        )
-                    } else {
-                        // Get the text to embed from the configured column
-                        const textColumn =
-                            this.metadata.textColumn || "plot_synopsis"
-                        textToEmbed = item.rowData[textColumn]
-                        console.log(
-                            `[JobProcessor] Text to embed from column '${textColumn}' (first 100 chars):`,
-                            textToEmbed
-                                ? textToEmbed.substring(0, 100) + "..."
-                                : "undefined"
-                        )
-                    }
+                    // For non-image files or image files without pre-computed vectors
+                    if (!embedding) {
+                        // Get the text to embed - either from template or column
+                        if (this.metadata.textTemplate) {
+                            textToEmbed = this.processTemplate(
+                                this.metadata.textTemplate,
+                                item.rowData
+                            )
+                            console.log(
+                                `[JobProcessor] Text to embed from template (first 100 chars):`,
+                                textToEmbed
+                                    ? textToEmbed.substring(0, 100) + "..."
+                                    : "undefined"
+                            )
+                        } else {
+                            // Get the text to embed from the configured column
+                            const textColumn =
+                                this.metadata.textColumn || "plot_synopsis"
+                            textToEmbed = item.rowData[textColumn]
+                            console.log(
+                                `[JobProcessor] Text to embed from column '${textColumn}' (first 100 chars):`,
+                                textToEmbed
+                                    ? textToEmbed.substring(0, 100) + "..."
+                                    : "undefined"
+                            )
+                        }
 
-                    if (!textToEmbed) {
-                        console.warn(
-                            `[JobProcessor] Skipping item ${
-                                item.index + 1
-                            }: Text to embed not found`
+                        if (!textToEmbed) {
+                            console.warn(
+                                `[JobProcessor] Skipping item ${
+                                    item.index + 1
+                                }: Text to embed not found`
+                            )
+                            await this.updateProgress({
+                                current: item.index + 1,
+                                message: `Skipped item ${
+                                    item.index + 1
+                                }: Missing text to embed`,
+                            })
+                            continue
+                        }
+
+                        console.log(
+                            `[JobProcessor] About to get embedding for text of length ${textToEmbed.length}`
                         )
-                        await this.updateProgress({
-                            current: item.index + 1,
-                            message: `Skipped item ${
-                                item.index + 1
-                            }: Missing text to embed`,
-                        })
-                        continue
+                        embedding = await this.getEmbedding(textToEmbed)
+                        console.log(
+                            `[JobProcessor] Successfully got embedding of length ${embedding.length}`
+                        )
                     }
 
                     // Extract attributes if attribute columns are configured
@@ -438,14 +463,6 @@ export class JobProcessor {
                             attributes
                         )
                     }
-
-                    console.log(
-                        `[JobProcessor] About to get embedding for text of length ${textToEmbed.length}`
-                    )
-                    const embedding = await this.getEmbedding(textToEmbed)
-                    console.log(
-                        `[JobProcessor] Successfully got embedding of length ${embedding.length}`
-                    )
 
                     await this.addToRedis(
                         elementId,

@@ -30,6 +30,7 @@ export interface CSVJobMetadata {
     delimiter?: string
     hasHeader?: boolean
     skipRows?: number
+    fileType?: string
 }
 
 export interface CSVRow {

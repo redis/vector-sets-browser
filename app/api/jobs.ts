@@ -41,6 +41,8 @@ export interface ImportJobConfig {
     textTemplate?: string
     attributeColumns?: string[]
     metadata?: VectorSetMetadata
+    rawVectors?: number[][]
+    fileType?: 'csv' | 'image' | 'images'
 }
 
 export const jobs = {
@@ -117,6 +119,17 @@ export const jobs = {
                 formData.append("attributeColumns", column)
             })
         }
+
+        // Add file type if specified
+        if (config.fileType) {
+            formData.append("fileType", config.fileType)
+        }
+
+        // Add raw vectors if provided
+        if (config.rawVectors && config.rawVectors.length > 0) {
+            formData.append("rawVectors", JSON.stringify(config.rawVectors))
+        }
+        
         return apiClient.post(`/api/jobs`, formData)
     },
 }

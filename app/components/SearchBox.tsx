@@ -31,6 +31,7 @@ import {
 import SmartFilterInput from "./SmartFilterInput"
 import { VectorTuple } from "@/app/redis-server/api"
 import RedisCommandBox from "./RedisCommandBox"
+import ImageUploader from "./ImageUploader"
 
 const searchTypes = [
     {
@@ -113,6 +114,12 @@ export default function SearchBox({
             "200"
         )
     })
+
+    // Add state for the last generated image embedding
+    const [lastImageEmbedding, setLastImageEmbedding] = useState<number[] | null>(null)
+
+    // Add a ref to track if we've initialized the search type
+    const initialSearchTypeSetRef = useRef(false);
 
     // Update local filter when searchFilter prop changes, but only on initial mount
     // or when the vector set changes, not on every searchFilter change
@@ -206,16 +213,24 @@ export default function SearchBox({
     // set default searchType only when metadata changes
     useEffect(() => {
         if (!metadata) return // Don't set defaults if no metadata
-
-        if (supportsEmbeddings) {
-            const newSearchType = isTextEmbedding ? "Vector" : "Element"
-
-            // Only update if the current searchType doesn't match what it should be
-            if (searchType !== newSearchType) {
-                setSearchType(newSearchType)
+        
+        // Only set default on first metadata load
+        if (supportsEmbeddings && !initialSearchTypeSetRef.current) {
+            // Choose appropriate default search type based on embedding format
+            let newSearchType: "Vector" | "Element" | "Image";
+            
+            if (isImageEmbedding) {
+                newSearchType = "Image";
+            } else if (isTextEmbedding) {
+                newSearchType = "Vector";
+            } else {
+                newSearchType = "Element";
             }
+
+            setSearchType(newSearchType);
+            initialSearchTypeSetRef.current = true;
         }
-    }, [metadata]) // Only run when metadata changes
+    }, [metadata, isImageEmbedding, isTextEmbedding, setSearchType, supportsEmbeddings])
 
     // Debug logging for results
     useEffect(() => {
@@ -239,6 +254,19 @@ export default function SearchBox({
         //console.log("Executed command updated:", executedCommand);
     }, [executedCommand])
 
+    // Handle image embedding generation
+    const handleImageSelect = (base64Data: string) => {
+        setSearchQuery(base64Data)
+    }
+
+    const handleImageEmbeddingGenerated = (embedding: number[]) => {
+        // Store the embedding
+        setLastImageEmbedding(embedding)
+        
+        // Set search query to a vector representation (needed for the search)
+        setSearchQuery(embedding.join(", "))
+    }
+
     return (
         <section className="mb-2">
             <div className="bg-white p-4 rounded shadow-md flex flex-col gap-2 items-start">
@@ -250,7 +278,13 @@ export default function SearchBox({
                         <Select
                             defaultValue={searchType}
                             value={searchType}
-                            onValueChange={setSearchType}
+                            onValueChange={(value) => {
+                                // Clear search query when switching between search types
+                                if (value !== searchType) {
+                                    setSearchQuery('');
+                                }
+                                setSearchType(value as "Vector" | "Element" | "Image");
+                            }}
                         >
                             <SelectTrigger className="w-[120px]">
                                 <SelectValue placeholder="Select type..." />
@@ -330,49 +364,61 @@ export default function SearchBox({
                     </DropdownMenu>
                 </div>
                 <div className="flex flex-col gap-2 grow w-full">
-                    <div className="relative flex gap-2">
-                        <div className="flex-1 relative">
-                            <Input
-                                type="text"
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                placeholder={searchBoxPlaceholder}
-                                className="border rounded p-3 w-full pr-12"
-                            />
-                            {searchType === "Vector" && (
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="absolute right-0 top-0 h-full"
-                                    onClick={() => {
-                                        if (dim) {
-                                            const randomVector = Array.from(
-                                                { length: dim },
-                                                () => Math.random()
-                                            ).map((n) => n.toFixed(4))
-                                            setSearchQuery(
-                                                randomVector.join(", ")
-                                            )
-                                        }
-                                    }}
-                                >
-                                    <Shuffle className="h-4 w-4" />
-                                </Button>
-                            )}
+                    {searchType === "Image" ? (
+                        // Show ImageUploader for Image search type
+                        <ImageUploader 
+                            onImageSelect={handleImageSelect}
+                            onEmbeddingGenerated={handleImageEmbeddingGenerated}
+                            config={metadata?.embedding?.image || { model: "mobilenet" }}
+                            className="w-full"
+                            allowMultiple={false}
+                        />
+                    ) : (
+                        // Show regular search input for other types
+                        <div className="relative flex gap-2">
+                            <div className="flex-1 relative">
+                                <Input
+                                    type="text"
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    placeholder={searchBoxPlaceholder}
+                                    className="border rounded p-3 w-full pr-12"
+                                />
+                                {searchType === "Vector" && (
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="absolute right-0 top-0 h-full"
+                                        onClick={() => {
+                                            if (dim) {
+                                                const randomVector = Array.from(
+                                                    { length: dim },
+                                                    () => Math.random()
+                                                ).map((n) => n.toFixed(4))
+                                                setSearchQuery(
+                                                    randomVector.join(", ")
+                                                )
+                                            }
+                                        }}
+                                    >
+                                        <Shuffle className="h-4 w-4" />
+                                    </Button>
+                                )}
+                            </div>
+                            <Button
+                                variant="outline"
+                                size="icon"
+                                className={`h-9 ${
+                                    showFilters
+                                        ? "bg-gray-500 hover:bg-gray-600 text-white"
+                                        : "bg-white hover:bg-gray-100"
+                                }`}
+                                onClick={() => setShowFilters(!showFilters)}
+                            >
+                                <Filter className="h-4 w-4" />
+                            </Button>
                         </div>
-                        <Button
-                            variant="outline"
-                            size="icon"
-                            className={`h-9 ${
-                                showFilters
-                                    ? "bg-gray-500 hover:bg-gray-600 text-white"
-                                    : "bg-white hover:bg-gray-100"
-                            }`}
-                            onClick={() => setShowFilters(!showFilters)}
-                        >
-                            <Filter className="h-4 w-4" />
-                        </Button>
-                    </div>
+                    )}
 
                     {showFilters && (
                         <div className="flex gap-2 items-center w-full mt-2">

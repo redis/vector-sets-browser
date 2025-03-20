@@ -22,6 +22,8 @@ import {
 import { useCallback, useEffect, useState } from "react"
 import ImportFromCSV from "./ImportFromCSV"
 import ImportSampleData from "./ImportSampleData"
+import { apiClient } from "@/app/api/client"
+import { SampleDataDialog } from "./SampleDataDialog"
 
 // Helper function to format dates nicely
 const formatDate = (dateString: string): string => {
@@ -79,10 +81,14 @@ export default function ImportTab({ vectorSetName, metadata }: ImportTabProps) {
                 const previousJobs = jobList || []
                 for (const job of filteredJobs) {
                     // Find if this job was previously in progress but now is completed
-                    const prevJob = previousJobs.find(j => j.jobId === job.jobId)
-                    if (prevJob && 
-                        prevJob.status.status !== "completed" && 
-                        job.status.status === "completed") {
+                    const prevJob = previousJobs.find(
+                        (j) => j.jobId === job.jobId
+                    )
+                    if (
+                        prevJob &&
+                        prevJob.status.status !== "completed" &&
+                        job.status.status === "completed"
+                    ) {
                         // This job just completed, show success dialog
                         setSuccessJob(job)
                         setShowSuccessDialog(true)
@@ -197,7 +203,7 @@ export default function ImportTab({ vectorSetName, metadata }: ImportTabProps) {
         fetchJobs()
         fetchImportLogs()
     }, [vectorSetName])
-    
+
     useEffect(() => {
         //fetchJobs()
         //fetchImportLogs()
@@ -273,18 +279,54 @@ export default function ImportTab({ vectorSetName, metadata }: ImportTabProps) {
                                                 Back
                                             </Button>
                                         </div>
-                                        <ImportSampleData
+                                        <SampleDataDialog
+                                            open={showImportSample}
+                                            onOpenChange={(open) => {setShowImportSample(open)}}
+                                            vectorSetName={vectorSetName}
+                                            metadata={metadata}
+                                            onImportComplete={() => {setShowImportSample(false)}}
+                                            onUpdateMetadata={async (
+                                                newMetadata
+                                            ) => {
+                                                console.log("Updating metadata:", newMetadata)
+                                            }}
+                                        />
+                                        {/* <ImportSampleData
                                             onClose={() =>
                                                 setShowImportSample(false)
                                             }
                                             metadata={metadata}
                                             vectorSetName={vectorSetName}
-                                        />
+                                            onUpdateMetadata={async (
+                                                newMetadata
+                                            ) => {
+                                                try {
+                                                    // Update the metadata on the server
+                                                    await apiClient.patch(
+                                                        `/api/vector-sets/${encodeURIComponent(
+                                                            vectorSetName
+                                                        )}/metadata`,
+                                                        {
+                                                            metadata:
+                                                                newMetadata,
+                                                        }
+                                                    )
+
+                                                    // Refresh the page to load updated metadata
+                                                    window.location.reload()
+                                                } catch (error) {
+                                                    console.error(
+                                                        "Failed to update metadata:",
+                                                        error
+                                                    )
+                                                    // Could show an error message here
+                                                }
+                                            }}
+                                        /> */}
                                     </div>
                                 ) : (
                                     <div>
                                         <p className="py-4">
-                             
                                             Import your data into this Vector
                                             Set to get started.
                                         </p>
@@ -335,7 +377,8 @@ export default function ImportTab({ vectorSetName, metadata }: ImportTabProps) {
                                                         Sample Data
                                                     </h3>
                                                     <p className="text-sm text-gray-500 text-center">
-                                                        Import pre-configured datasets with one click
+                                                        Import pre-configured
+                                                        datasets with one click
                                                     </p>
                                                 </div>
                                             </Card>
@@ -565,17 +608,17 @@ export default function ImportTab({ vectorSetName, metadata }: ImportTabProps) {
                                         </p>
                                     </div>
                                     <p>
-                                        Your data has been successfully imported. 
-                                        {successJob.status.total} records have been processed.
+                                        Your data has been successfully
+                                        imported.
+                                        {successJob.status.total} records have
+                                        been processed.
                                     </p>
                                 </div>
                             )}
                         </DialogDescription>
                     </DialogHeader>
                     <div className="mt-4 flex justify-end">
-                        <Button
-                            onClick={() => setShowSuccessDialog(false)}
-                        >
+                        <Button onClick={() => setShowSuccessDialog(false)}>
                             Close
                         </Button>
                     </div>

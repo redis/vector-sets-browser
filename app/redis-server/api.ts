@@ -96,6 +96,16 @@ export interface VaddRequestBody {
     useCAS?: boolean;
 }
 
+// VADD_MULTI command
+export interface VaddMultiRequestBody {
+    keyName: string;
+    elements: string[];
+    vectors: number[][];
+    attributes?: Record<string, string>[];
+    reduceDimensions?: number;
+    useCAS?: boolean;
+}
+
 export async function vadd(request: VaddRequestBody) {
     try {
         return await apiClient.post<boolean, VaddRequestBody>(
@@ -104,6 +114,19 @@ export async function vadd(request: VaddRequestBody) {
         );
     } catch (error) {
         console.error("[vadd] API error:", error);
+        // Re-throw the error to be caught by the caller
+        throw error;
+    }
+}
+
+export async function vadd_multi(request: VaddMultiRequestBody) {
+    try {
+        return await apiClient.post<boolean[], VaddMultiRequestBody>(
+            "/api/redis/command/vadd_multi",
+            request
+        );
+    } catch (error) {
+        console.error("[vadd_multi] API error:", error);
         // Re-throw the error to be caught by the caller
         throw error;
     }

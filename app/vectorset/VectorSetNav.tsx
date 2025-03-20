@@ -237,19 +237,78 @@ export default function VectorSetNav({
             loadVectorSets();
         };
 
+        // New handler to update job status
+        const checkForActiveJobs = async () => {
+            if (!isConnected || vectorSetList.length === 0) return;
+            
+            try {
+                // Fetch all jobs
+                const response = await fetch('/api/jobs');
+                if (!response.ok) return;
+                
+                const data = await response.json();
+                if (!data.success) return;
+                
+                // Group active jobs by vector set
+                const activeJobsByVectorSet: Record<string, number> = {};
+                
+                for (const job of data.result) {
+                    // Count only jobs that are processing, paused, or pending
+                    if (
+                        job.status.status === "processing" ||
+                        job.status.status === "paused" ||
+                        job.status.status === "pending"
+                    ) {
+                        const vectorSetName = job.metadata.vectorSetName;
+                        activeJobsByVectorSet[vectorSetName] = (activeJobsByVectorSet[vectorSetName] || 0) + 1;
+                    }
+                }
+                
+                // Update the active jobs count for each vector set
+                let hasUpdates = false;
+                const updatedInfo = { ...vectorSetInfo };
+                
+                for (const setName of vectorSetList) {
+                    const activeJobs = activeJobsByVectorSet[setName] || 0;
+                    
+                    // Only update if the count changed
+                    if (updatedInfo[setName] && updatedInfo[setName].activeJobs !== activeJobs) {
+                        updatedInfo[setName] = {
+                            ...updatedInfo[setName],
+                            activeJobs
+                        };
+                        hasUpdates = true;
+                    }
+                }
+                
+                // Only update state if there were changes
+                if (hasUpdates) {
+                    setVectorSetInfo(updatedInfo);
+                }
+            } catch (error) {
+                console.error("Error checking for active jobs:", error);
+            }
+        };
+        
         // Subscribe to events
         const unsubscribeAdded = eventBus.on(AppEvents.VECTOR_ADDED, handleVectorAdded);
         const unsubscribeDeleted = eventBus.on(AppEvents.VECTOR_DELETED, handleVectorDeleted);
         const unsubscribeImported = eventBus.on(AppEvents.VECTORS_IMPORTED, handleVectorsImported);
-
+        
+        // Poll for active jobs every 3 seconds
+        const intervalId = setInterval(checkForActiveJobs, 3000);
+        
+        // Initial check for active jobs
+        checkForActiveJobs();
+        
         // Cleanup subscriptions when component unmounts
         return () => {
             unsubscribeAdded();
             unsubscribeDeleted();
             unsubscribeImported();
+            clearInterval(intervalId);
         };
-    }, [vectorSetInfo]);
-
+    }, [vectorSetInfo, vectorSetList, isConnected, loadVectorSets]);
 
     useEffect(() => {
         if (isConnected && redisUrl) {

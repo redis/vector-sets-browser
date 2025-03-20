@@ -155,52 +155,66 @@ export async function preprocessImage(
 
         // Client-side processing using browser APIs
         // Create an HTMLImageElement from the base64 data
-        const image = new Image()
+        const image = new window.Image()
         const imagePromise = new Promise<HTMLImageElement>(
             (resolve, reject) => {
                 image.onload = () => resolve(image)
-                image.onerror = (err) => reject(err)
+                image.onerror = (err) => {
+                    console.error("[TensorFlow.js] Error loading image:", err);
+                    reject(err);
+                }
             }
         )
 
         // Set crossOrigin to anonymous to avoid CORS issues with data URLs
         image.crossOrigin = "anonymous"
         image.src = base64Data
-        await imagePromise
-
-        console.log(
-            "[TensorFlow.js] Image loaded successfully:",
-            image.width,
-            "x",
-            image.height
-        )
-
-        // Create a tensor from the image
-        const tensor = tf.browser.fromPixels(image)
-        console.log(
-            "[TensorFlow.js] Image tensor created with shape:",
-            tensor.shape
-        )
-
-        // Resize to the expected input size
-        const resized = tf.image.resizeBilinear(tensor, [inputSize, inputSize])
-        console.log("[TensorFlow.js] Image resized to:", resized.shape)
-
-        // Convert to float and normalize to [-1, 1]
-        const normalized = resized
-            .toFloat()
-            .div(tf.scalar(127.5))
-            .sub(tf.scalar(1))
-        console.log(
-            "[TensorFlow.js] Image normalized with shape:",
-            normalized.shape
-        )
-
-        // Clean up intermediate tensors
-        tensor.dispose()
-        resized.dispose()
-
-        return normalized
+        
+        try {
+            await imagePromise
+            
+            console.log(
+                "[TensorFlow.js] Image loaded successfully:",
+                image.width,
+                "x",
+                image.height
+            )
+            
+            // Create a tensor from the image
+            const tensor = tf.browser.fromPixels(image)
+            console.log(
+                "[TensorFlow.js] Image tensor created with shape:",
+                tensor.shape
+            )
+            
+            // Resize to the expected input size
+            const resized = tf.image.resizeBilinear(tensor, [inputSize, inputSize])
+            console.log("[TensorFlow.js] Image resized to:", resized.shape)
+            
+            // Convert to float and normalize to [-1, 1]
+            const normalized = resized
+                .toFloat()
+                .div(tf.scalar(127.5))
+                .sub(tf.scalar(1))
+            console.log(
+                "[TensorFlow.js] Image normalized with shape:",
+                normalized.shape
+            )
+            
+            // Clean up intermediate tensors
+            tensor.dispose()
+            resized.dispose()
+            
+            return normalized
+        } catch (error) {
+            console.error("[TensorFlow.js] Error processing image:", error);
+            
+            // Fallback: create an empty tensor with the right dimensions
+            // This ensures we don't crash the app even if image processing fails
+            console.log("[TensorFlow.js] Creating fallback tensor");
+            const fallbackTensor = tf.zeros([inputSize, inputSize, 3]);
+            return fallbackTensor;
+        }
     } catch (error) {
         console.error("[TensorFlow.js] Error preprocessing image:", error)
         throw error
@@ -232,12 +246,35 @@ export async function getImageEmbedding(
         // @ts-ignore - accessing internal property
         const internalModel = model.model
 
+        // Add batch dimension [1, height, width, channels]
+        const batchedTensor = tensor.expandDims(0);
+        console.log("[TensorFlow.js] Added batch dimension, new shape:", batchedTensor.shape);
+
         // Execute the model up to the penultimate layer
         // This gives us the feature vector (embedding) before classification
-        const activationLayer = internalModel.execute(
-            tensor,
-            ["global_average_pooling2d_1"] // This is the name of the penultimate layer in MobileNet v1
-        )
+        let activationLayer;
+        
+        try {
+            console.log("[TensorFlow.js] Attempting to execute model with layer name 'global_average_pooling2d_1'");
+            // Try first with the expected layer name
+            activationLayer = internalModel.execute(
+                batchedTensor,
+                ["global_average_pooling2d_1"] // This is the name of the penultimate layer in MobileNet v1
+            );
+        } catch (e) {
+            console.log("[TensorFlow.js] First layer name failed, trying alternate layer name 'global_average_pooling2d'");
+            try {
+                // Try alternate layer name
+                activationLayer = internalModel.execute(
+                    batchedTensor,
+                    ["global_average_pooling2d"] 
+                );
+            } catch (e2) {
+                console.log("[TensorFlow.js] Both layer names failed, using model.infer() method");
+                // If both specific layers fail, use model's infer method
+                activationLayer = model.infer(batchedTensor, true);
+            }
+        }
 
         // Debug the tensor shape and values
         console.log(
@@ -261,6 +298,7 @@ export async function getImageEmbedding(
 
         // Clean up the tensors
         tensor.dispose()
+        batchedTensor.dispose()
         activationLayer.dispose()
 
         return embedding

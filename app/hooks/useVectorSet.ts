@@ -171,24 +171,28 @@ export function useVectorSet(): UseVectorSetReturn {
                 }
 
                 setStatusMessage(`Generating embedding for "${element}"...`)
-                const embeddingResult = await embeddings.generateEmbedding({
-                    input: elementData,
-                    config: metadata.embedding,
-                })
+                const embeddingResult = await embeddings.getEmbedding(
+                    metadata.embedding,
+                    elementData
+                )
 
-                if (!embeddingResult.embedding) {
+                if (!embeddingResult.success || !embeddingResult.result) {
                     throw new Error("Failed to generate embedding")
                 }
 
-                newVector = embeddingResult.embedding
+                newVector = embeddingResult.result
             }
 
             // Validate and normalize the vector
-            let normalizedVector = validateAndNormalizeVector(newVector)
+            let normalizedVector = validateAndNormalizeVector(
+                newVector,
+                metadata?.embedding?.provider || "none",
+                dim
+            )
 
             // If the vector is not valid, throw an error
-            if (!normalizedVector) {
-                throw new Error("Invalid vector: contains NaN or Infinity values")
+            if (!normalizedVector.isValid) {
+                throw new Error(`Invalid vector: ${normalizedVector.error || "contains NaN or Infinity values"}`)
             }
 
             // Add the vector to Redis
@@ -196,11 +200,11 @@ export function useVectorSet(): UseVectorSetReturn {
             const result = await vadd({
                 keyName: vectorSetName,
                 element,
-                vector: normalizedVector,
+                vector: normalizedVector.vector,
                 ...options,
             })
 
-            if (result === 0 && useCAS) {
+            if (result === 0 && useCAS === true) {
                 throw new Error(
                     `Element "${element}" already exists in vector set "${vectorSetName}"`
                 )

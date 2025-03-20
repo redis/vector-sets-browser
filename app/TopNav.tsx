@@ -12,7 +12,7 @@ export default function TopNav({}: TopNavProps) {
 
         { 
             href: "/config", 
-            label: "Config", 
+            label: "Settings", 
             visible: pathname?.includes("/vectorset") || pathname?.includes("/console") || pathname?.includes("/config")
         },
         { href: "/vectorset", label: "Console", visible: true },

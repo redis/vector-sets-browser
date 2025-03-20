@@ -59,6 +59,7 @@ interface VectorResultsProps {
     onAddVector?: () => void
     isSearching?: boolean
     isLoading?: boolean
+    searchType?: "Vector" | "Element" | "Image"
 }
 
 type SortColumn = "element" | "score" | "none"
@@ -205,6 +206,7 @@ export default function VectorResults({
     isSearching,
     searchTime,
     isLoading,
+    searchType,
 }: VectorResultsProps) {
     const [isCompact, setIsCompact] = useState(true)
     const {
@@ -700,29 +702,37 @@ export default function VectorResults({
         if (!keyName) {
             return null // Don't show anything if no vector set is selected
         }
-        return (
-            <div className="flex flex-col items-center justify-center py-12 space-y-4 text-gray-500">
-                <svg
-                    className="w-8 h-8 text-gray-400"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                >
-                    <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={1.5}
-                        d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                    />
-                </svg>
-                <p className="text-sm">No results to display.</p>
-                {searchFilter && (
-                    <p className="text-xs">
-                        Try adjusting your search filter or query.
-                    </p>
-                )}
-            </div>
-        )
+        if (searchQuery === "") {
+            return (
+                <div className="flex flex-col items-center justify-center py-12 space-y-4 text-gray-500">
+                    <p className="text-sm">Enter en element or vector to search on</p>
+                </div>
+            )
+        } else {
+            return (
+                <div className="flex flex-col items-center justify-center py-12 space-y-4 text-gray-500">
+                    <svg
+                        className="w-8 h-8 text-gray-400"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                    >
+                        <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={1.5}
+                            d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                        />
+                    </svg>
+                    <p className="text-sm">No results to display.</p>
+                    {searchFilter && (
+                        <p className="text-xs">
+                            Try adjusting your search filter or query.
+                        </p>
+                    )}
+                </div>
+            )
+        }
     }
 
     // Sort indicator icons
@@ -768,7 +778,7 @@ export default function VectorResults({
 
             <div className="flex flex-col sm:flex-row gap-4 items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
-                    {results.length > 0 && (
+                    {results.length > 0 ? (
                         <>
                             <span className="flex text-gray-500 text-sm items-center space-x-2 whitespace-nowrap">
                                 {searchQuery ? (
@@ -839,6 +849,15 @@ export default function VectorResults({
                                     )}
                                 </div>
                             </span>
+                        </>
+                    ) : (
+                        <>
+                            {/* Message for empty search in Element search mode */}
+                            {searchType === "Element" && (searchQuery === undefined || searchQuery === "") && !isSearching && !isLoading && (
+                                <div className="ml-2 text-gray-500 text-sm flex items-center">
+                                    Enter an element ID to search
+                                </div>
+                            )}
                         </>
                     )}
                 </div>

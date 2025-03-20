@@ -19,12 +19,123 @@ import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { ArrowLeft, ChevronRight, Database } from "lucide-react"
+import { ArrowLeft, ChevronRight, Database, BookOpen, Film, User, ChevronLeft } from "lucide-react"
 import { useState } from "react"
 import { FormProvider, useForm } from "react-hook-form"
 import { z } from "zod"
 import EditEmbeddingConfigModal from "../components/EmbeddingConfig/EditEmbeddingConfigDialog"
 import ImportSampleData from "./ImportTab/ImportSampleData"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import ImportSampleDataDialog from "./ImportTab/ImportSampleDataDialog"
+
+
+// Define the Sample Dataset interface for type safety
+interface SampleDataset {
+    name: string;
+    description: string;
+    icon: React.ReactNode;
+    fileUrl: string;
+    columns: string[];
+    recordCount: number;
+    elementTemplate: string;
+    vectorTemplate: string;
+    attributeColumns: string[];
+    dataType: "text" | "image";
+    recommendedEmbedding: EmbeddingConfig;
+}
+
+// Define sample datasets for use in the component
+const sampleDatasets: SampleDataset[] = [
+    {
+        name: "Goodreads Books",
+        description:
+            "A collection of popular books with titles, authors, descriptions, and ratings from Goodreads",
+        icon: <BookOpen className="h-5 w-5 text-blue-500" />,
+        fileUrl: "/sample-data/top2k_book_descriptions.csv",
+        columns: [
+            "title",
+            "authors",
+            "description",
+            "average_rating",
+            "isbn",
+            "original_publication_year",
+            "ratings_count",
+            "language_code",
+        ],
+        recordCount: 2000,
+        elementTemplate: "${title} (ISBN: ${isbn})",
+        vectorTemplate: "The book titled \"${title}\", authored by ${authors}, was initially published in ${original_publication_year}. It has an average rating of ${average_rating} across ${ratings_count} ratings, and is available under ISBN ${isbn}. The description is as follows: ${description}.",
+        attributeColumns: ["average_rating", "original_publication_year", "authors", "isbn", "ratings_count", "language_code"],
+        dataType: "text",
+        recommendedEmbedding: {
+            provider: "openai",
+            openai: {
+                apiKey: "",
+                model: "text-embedding-3-small"
+            }
+        } as EmbeddingConfig
+    },
+    {
+        name: "IMDB Movies",
+        description:
+            "A dataset of the top 1000 movies with titles, plot synopses, directors, and ratings from IMDB",
+        icon: <Film className="h-5 w-5 text-amber-500" />,
+        fileUrl: "/sample-data/imdb_top_1000.csv",
+        columns: [
+            "Poster_Link",
+            "Series_Title",
+            "Released_Year",
+            "Certificate",
+            "Runtime",
+            "Genre",
+            "IMDB_Rating",
+            "Overview",
+            "Meta_score",
+            "Director",
+            "Star1",
+            "Star2",
+            "Star3",
+            "Star4",
+            "No_of_Votes",
+            "Gross"
+        ],
+        recordCount: 1000,
+        elementTemplate: "${Series_Title} (${Released_Year})",
+        vectorTemplate: "Movie '${Series_Title}' was released in ${Released_Year} with a runtime of ${Runtime} minutes. Directed by ${Director}, this ${Genre} film has a rating of ${IMDB_Rating} on IMDB. Overview: ${Overview}. It stars ${Star1}, ${Star2}, ${Star3}, and ${Star4}.",
+        attributeColumns: ["IMDB_Rating", "Released_Year", "Director", "Genre", "Runtime", "Meta_score"],
+        dataType: "text",
+        recommendedEmbedding: {
+            provider: "tensorflow",
+            tensorflow: {
+                model: "universal-sentence-encoder"
+            }
+        } as EmbeddingConfig
+    },
+    {
+        name: "UTK Faces",
+        description:
+            "UTKFace dataset with over 20,000 face images annotated with age, gender, and ethnicity. The images cover large variation in pose, facial expression, illumination, occlusion, and resolution.",
+        icon: <User className="h-5 w-5 text-violet-500" />,
+        fileUrl: "/sample-data/UTKFace/images",
+        columns: [
+            "image",
+            "age",
+            "gender",
+            "ethnicity"
+        ],
+        recordCount: 20000,
+        elementTemplate: "Face ${index}",
+        vectorTemplate: "",
+        attributeColumns: ["age", "gender", "ethnicity"],
+        dataType: "image",
+        recommendedEmbedding: {
+            provider: "image",
+            image: {
+                model: "mobilenet"
+            }
+        } as EmbeddingConfig
+    },
+];
 
 interface CreateVectorSetModalProps {
     isOpen: boolean
@@ -66,22 +177,34 @@ export default function CreateVectorSetModal({
     const [error, setError] = useState<string | null>(null)
     const [isCreating, setIsCreating] = useState(false)
     const [embeddingConfig, setEmbeddingConfig] = useState<EmbeddingConfig>({
-        provider: "ollama",
-        ollama: {
-            apiUrl: "http://localhost:11434/api/embeddings",
-            modelName: "mxbai-embed-large",
-            promptTemplate: "{text}",
+        provider: "tensorflow",
+        tensorflow: {
+            model: "universal-sentence-encoder",
         },
     })
 
     const [activeTab, setActiveTab] = useState("automatic")
     const [isEditConfigModalOpen, setIsEditConfigModalOpen] = useState(false)
 
+    // Add state for vector data choice
+    const [vectorDataChoice, setVectorDataChoice] = useState<
+        "manual" | "embedding" | "sample"
+    >("embedding")
+    const [selectedSampleDataset, setSelectedSampleDataset] = useState<
+        string | null
+    >(null)
+
     // Add state for sliding panels
     const [activePanel, setActivePanel] = useState<string | null>(null)
 
-    const [isSampleDataImportStarted, setIsSampleDataImportStarted] = useState(false)
-    const [selectedSampleDataset, setSelectedSampleDataset] = useState<string | null>(null)
+    const [isSampleDataImportStarted, setIsSampleDataImportStarted] =
+        useState(false)
+
+    // Create an initial metadata object for use with the ImportSampleData component
+    const [currentMetadata, setCurrentMetadata] =
+        useState<VectorSetMetadata | null>(null)
+
+    const [isSampleDataDialogOpen, setIsSampleDataDialogOpen] = useState(false)
 
     const form = useForm<FormValues>({
         resolver: zodResolver(vectorSetSchema),
@@ -118,46 +241,16 @@ export default function CreateVectorSetModal({
             setError(null)
             setIsCreating(true)
 
-            // Additional validation specific to tab
-            if (activeTab === "manual") {
+            // Additional validation based on vector data choice
+            if (vectorDataChoice === "manual") {
                 const dim = values.dimensions
-                if (!values.customElement?.trim()) {
-                    setError("Please enter an element ID")
+                if (!dim || dim < 2) {
+                    setError("Please enter valid dimensions (minimum 2)")
                     setIsCreating(false)
                     return
                 }
-
-                if (!values.customVector?.trim()) {
-                    setError("Please enter a vector")
-                    setIsCreating(false)
-                    return
-                }
-
-                // Validate vector dimensions
-                const vectorValues = values.customVector
-                    .split(",")
-                    .map((v) => parseFloat(v.trim()))
-
-                if (vectorValues.some(isNaN)) {
-                    setError("Vector must contain valid numbers")
-                    setIsCreating(false)
-                    return
-                }
-
-                if (vectorValues.length !== dim) {
-                    setError(`Vector must have exactly ${dim} dimensions`)
-                    setIsCreating(false)
-                    return
-                }
-
-                // validate the vector dimensions matches the vector values
-                if (vectorValues.length !== dim) {
-                    setError(`Vector must have exactly ${dim} dimensions`)
-                    setIsCreating(false)
-                    return
-                }
-            } else {
-                // Only validate embedding config in automatic mode
+            } else if (vectorDataChoice === "embedding") {
+                // Validate embedding config
                 if (
                     embeddingConfig.provider === "openai" &&
                     (!embeddingConfig.openai || !embeddingConfig.openai.apiKey)
@@ -172,6 +265,12 @@ export default function CreateVectorSetModal({
                     (!embeddingConfig.ollama || !embeddingConfig.ollama.apiUrl)
                 ) {
                     setError("Please configure Ollama embedding settings")
+                    setIsCreating(false)
+                    return
+                }
+            } else if (vectorDataChoice === "sample") {
+                if (!selectedSampleDataset) {
+                    setError("Please select a sample dataset")
                     setIsCreating(false)
                     return
                 }
@@ -203,44 +302,71 @@ export default function CreateVectorSetModal({
                 )
             }
 
-            const metadata =
-                activeTab === "automatic"
-                    ? {
-                          ...createVectorSetMetadata(embeddingConfig),
-                          redisConfig:
-                              Object.keys(redisConfig).length > 0
-                                  ? redisConfig
-                                  : undefined,
-                      }
-                    : {
-                          embedding: {
-                              provider: "none" as EmbeddingProvider,
-                          },
-                          created: new Date().toISOString(),
-                          redisConfig:
-                              Object.keys(redisConfig).length > 0
-                                  ? redisConfig
-                                  : undefined,
-                      }
+            let metadata;
+            
+            if (vectorDataChoice === "embedding") {
+                metadata = {
+                    ...createVectorSetMetadata(embeddingConfig),
+                    redisConfig:
+                        Object.keys(redisConfig).length > 0
+                            ? redisConfig
+                            : undefined,
+                }
+            } else if (vectorDataChoice === "sample" && selectedSampleDataset) {
+                // Find the selected sample dataset to get its recommended embedding config
+                const selectedDataset = sampleDatasets.find(ds => ds.name === selectedSampleDataset);
+                if (selectedDataset) {
+                    metadata = {
+                        ...createVectorSetMetadata(selectedDataset.recommendedEmbedding as EmbeddingConfig),
+                        redisConfig:
+                            Object.keys(redisConfig).length > 0
+                                ? redisConfig
+                                : undefined,
+                    }
+                } else {
+                    // Fallback if dataset not found
+                    metadata = {
+                        embedding: {
+                            provider: "none" as EmbeddingProvider,
+                        },
+                        created: new Date().toISOString(),
+                        redisConfig:
+                            Object.keys(redisConfig).length > 0
+                                ? redisConfig
+                                : undefined,
+                    }
+                }
+            } else {
+                // For manual mode
+                metadata = {
+                    embedding: {
+                        provider: "none" as EmbeddingProvider,
+                    },
+                    created: new Date().toISOString(),
+                    redisConfig:
+                        Object.keys(redisConfig).length > 0
+                            ? redisConfig
+                            : undefined,
+                }
+            }
 
-            // Use manual dimensions in custom mode, or get dimensions from metadata for automatic mode
+            // Update currentMetadata with the final metadata
+            setCurrentMetadata(metadata)
+
+            // Use manual dimensions or get dimensions from metadata
             const effectiveDimensions =
-                activeTab === "manual"
+                vectorDataChoice === "manual"
                     ? values.dimensions
-                    : metadata.dimensions || 3
+                    : metadata.dimensions || values.dimensions || 256
 
-            // Pass custom vector data if in custom mode
-            const customData =
-                activeTab === "manual" &&
-                values.customElement &&
-                values.customVector
-                    ? {
-                          element: values.customElement.trim(),
-                          vector: values.customVector
-                              .split(",")
-                              .map((v) => parseFloat(v.trim())),
-                      }
-                    : undefined
+            // For manual mode, create a zero vector of correct dimensions
+            let customData = undefined
+            if (vectorDataChoice === "manual") {
+                customData = {
+                    element: `initial_vector_${Date.now()}`,
+                    vector: Array(effectiveDimensions).fill(0),
+                }
+            }
 
             const result = await onCreate(
                 values.name.trim(),
@@ -248,12 +374,14 @@ export default function CreateVectorSetModal({
                 metadata,
                 customData
             )
-            
+
             // Don't close dialog if sample data import is selected
-            if (!values.loadSampleData) {
-                onClose()
-            } else {
+            if (vectorDataChoice === "sample") {
+                console.log(`[CreateVectorSetDialog] Setting up sample data import for: ${selectedSampleDataset}`);
+                // Set state to show the import panel
                 setIsSampleDataImportStarted(true)
+            } else {
+                onClose()
             }
         } catch (err) {
             console.error("Error in CreateVectorSetModal handleSubmit:", err)
@@ -271,12 +399,14 @@ export default function CreateVectorSetModal({
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg p-6 w-[800px] max-h-[90vh] overflow-hidden relative">
+            <div className="bg-white rounded-lg p-6 w-[900px] min-h-[600px] max-h-[90vh] overflow-hidden relative">
                 <FormProvider {...form}>
                     {/* Main Form Content */}
                     <div
                         className={`transition-transform duration-300 ${
-                            activePanel || isSampleDataImportStarted ? "transform -translate-x-full" : ""
+                            activePanel || isSampleDataImportStarted
+                                ? "transform -translate-x-full"
+                                : ""
                         } w-full`}
                     >
                         <div className="mb-4">
@@ -295,7 +425,7 @@ export default function CreateVectorSetModal({
                                 have to do is provide the name of your vector
                                 set, but you can customize the settings below.
                             </p>
-                            <form onSubmit={form.handleSubmit(onSubmit)}>
+                            <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-2 h-full">
                                 <div className="form-body">
                                     <div className="form-section">
                                         <FormField
@@ -303,16 +433,14 @@ export default function CreateVectorSetModal({
                                             name="name"
                                             render={({ field }) => (
                                                 <FormItem className="form-item border-none">
-                                                    <FormLabel className="form-label text-lg">
-                                                        <div>
-                                                            Vector Set Name
-                                                        </div>
+                                                    <FormLabel className="form-label">
+                                                        Vector Set Name
                                                         <FormMessage />
                                                     </FormLabel>
                                                     <FormControl className="form-control">
                                                         <Input
                                                             className="text-right border-none"
-                                                            placeholder="my_vector_set"
+                                                            placeholder="Enter a name for your vector set"
                                                             {...field}
                                                         />
                                                     </FormControl>
@@ -322,29 +450,32 @@ export default function CreateVectorSetModal({
                                     </div>
 
                                     <div className="form-section">
-                                        {/* Vector Embeddings Button */}
+                                        {/* Vector Data Button */}
                                         <div
                                             className="w-full cursor-pointer"
                                             onClick={() =>
-                                                setActivePanel(
-                                                    "vectorEmbeddings"
-                                                )
+                                                setActivePanel("vectorData")
                                             }
                                         >
                                             <div className="flex w-full space-x-2 items-center">
-                                                <div className="text-lg font-medium">
-                                                    Vector Embeddings
-                                                </div>
+                                                <FormLabel className="form-label">
+                                                    Vector Data
+                                                </FormLabel>
                                                 <div className="grow"></div>
                                                 <div className="text-right text-gray-500 flex flex-col">
                                                     <div className="font-bold">
-                                                        {activeTab ==
-                                                        "automatic"
-                                                            ? "Automatic"
-                                                            : "Manual"}
+                                                        {vectorDataChoice ===
+                                                            "manual" &&
+                                                            "Manual"}
+                                                        {vectorDataChoice ===
+                                                            "embedding" &&
+                                                            "Automatic"}
+                                                        {vectorDataChoice ===
+                                                            "sample" &&
+                                                            "Sample Data"}
                                                     </div>
-                                                    {activeTab ===
-                                                        "automatic" && (
+                                                    {vectorDataChoice ===
+                                                        "embedding" && (
                                                         <div>
                                                             Using{" "}
                                                             {
@@ -352,6 +483,15 @@ export default function CreateVectorSetModal({
                                                             }
                                                         </div>
                                                     )}
+                                                    {vectorDataChoice ===
+                                                        "sample" &&
+                                                        selectedSampleDataset && (
+                                                            <div>
+                                                                {
+                                                                    selectedSampleDataset
+                                                                }
+                                                            </div>
+                                                        )}
                                                 </div>
                                                 <div>
                                                     <ChevronRight className="h-5 w-5" />
@@ -359,36 +499,7 @@ export default function CreateVectorSetModal({
                                             </div>
                                         </div>
                                     </div>
-                                    
-                                    <div className="form-section">
-                                        {/* Sample Data Button */}
-                                        <div
-                                            className="w-full cursor-pointer"
-                                            onClick={() =>
-                                                setActivePanel(
-                                                    "sampleData"
-                                                )
-                                            }
-                                        >
-                                            <div className="flex w-full space-x-2 items-center">
-                                                <div className="text-lg font-medium">
-                                                    Load Sample Data
-                                                </div>
-                                                <div className="grow"></div>
-                                                <div className="text-right text-gray-500 flex flex-col">
-                                                    <div>
-                                                        {form.watch("loadSampleData") 
-                                                            ? "Yes" 
-                                                            : "No"}
-                                                    </div>
-                                                </div>
-                                                <div>
-                                                    <ChevronRight className="h-5 w-5" />
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    
+
                                     <div className="form-section">
                                         {/* Advanced Configuration Button */}
                                         <div
@@ -399,9 +510,9 @@ export default function CreateVectorSetModal({
                                                 )
                                             }
                                         >
-                                            <div className="text-lg font-medium">
+                                            <FormLabel className="form-label">
                                                 Advanced Configuration
-                                            </div>
+                                            </FormLabel>
                                             <div className="grow"></div>
                                             <div>
                                                 <ChevronRight className="h-5 w-5" />
@@ -414,6 +525,8 @@ export default function CreateVectorSetModal({
                                             {error}
                                         </div>
                                     )}
+                                </div>
+                                <div className="grow">
                                 </div>
                                 <div className="flex justify-end gap-2 mt-4">
                                     <Button
@@ -437,10 +550,10 @@ export default function CreateVectorSetModal({
                         </Form>
                     </div>
 
-                    {/* Vector Embeddings Panel */}
+                    {/* Vector Data Panel */}
                     <div
                         className={`absolute top-0 left-0 w-full h-full bg-white p-6 transition-transform duration-300 transform ${
-                            activePanel === "vectorEmbeddings"
+                            activePanel === "vectorData"
                                 ? "translate-x-0"
                                 : "translate-x-full"
                         } overflow-y-auto`}
@@ -455,364 +568,230 @@ export default function CreateVectorSetModal({
                                 <ArrowLeft className="h-5 w-5" />
                             </Button>
                             <h2 className="text-xl font-semibold">
-                                Vector Embeddings
+                                Vector Data
                             </h2>
                         </div>
 
-                        <div className="">
-                            <Tabs
-                                defaultValue="automatic"
-                                onValueChange={setActiveTab}
-                                value={activeTab}
-                            >
-                                <TabsList className="grid w-full grid-cols-2 p-1">
-                                    <TabsTrigger value="automatic">
-                                        Automatic
-                                    </TabsTrigger>
-                                    <TabsTrigger value="manual">
-                                        Manual
-                                    </TabsTrigger>
-                                </TabsList>
+                        <div className="mb-6">
+                            <h3 className="text-lg mb-2">
+                                Tell us about the vectors you'll store here
+                            </h3>
+                            <p className="text-gray-600 text-sm mb-4">
+                                Choose how you want to create and manage your
+                                vector data
+                            </p>
+                        </div>
 
-                                <TabsContent value="automatic">
-                                    <div>
-                                        <h3 className="text-sm font-medium text-gray-700 mb-3">
-                                            Choose your embedding provider, text
-                                            and images are supported
-                                        </h3>
-                                        <div className="border rounded p-4 mb-4">
-                                            <div className="flex justify-between items-center">
-                                                <div>
-                                                    <p className="font-medium">
-                                                        Provider:{" "}
-                                                        {
-                                                            embeddingConfig.provider
-                                                        }
-                                                    </p>
-                                                    {embeddingConfig.provider ===
-                                                        "openai" &&
-                                                        embeddingConfig.openai && (
-                                                            <p className="text-sm text-gray-600">
-                                                                Model:{" "}
-                                                                {
-                                                                    embeddingConfig
-                                                                        .openai
-                                                                        .model
-                                                                }
-                                                            </p>
-                                                        )}
-                                                    {embeddingConfig.provider ===
-                                                        "ollama" &&
-                                                        embeddingConfig.ollama && (
-                                                            <p className="text-sm text-gray-600">
-                                                                Model:{" "}
-                                                                {
-                                                                    embeddingConfig
-                                                                        .ollama
-                                                                        .modelName
-                                                                }
-                                                            </p>
-                                                        )}
-                                                    {embeddingConfig.provider ===
-                                                        "tensorflow" &&
-                                                        embeddingConfig.tensorflow && (
-                                                            <p className="text-sm text-gray-600">
-                                                                Model:{" "}
-                                                                {
-                                                                    embeddingConfig
-                                                                        .tensorflow
-                                                                        .model
-                                                                }
-                                                            </p>
-                                                        )}
-                                                </div>
-                                                <Button
-                                                    type="button"
-                                                    variant="outline"
-                                                    onClick={() =>
-                                                        setIsEditConfigModalOpen(
-                                                            true
-                                                        )
-                                                    }
-                                                >
-                                                    Change
-                                                </Button>
-                                            </div>
+                        <div className="flex space-x-4 w-full min-h-[350px]">
+                            {/* Manual Option Panel */}
+                            <div
+                                className={`border w-full rounded-lg p-6 cursor-pointer transition-all duration-200 ${
+                                    vectorDataChoice === "manual"
+                                        ? "border-primary ring-2 ring-primary/20 shadow-md"
+                                        : "hover:border-gray-400"
+                                }`}
+                                onClick={() => setVectorDataChoice("manual")}
+                            >
+                                <div className="flex justify-between items-start">
+                                    <div className="flex items-start">
+                                        <div
+                                            className={`w-5 h-5 shrink-0 rounded-full border flex items-center justify-center mr-3 mt-1 ${
+                                                vectorDataChoice === "manual"
+                                                    ? "border-primary"
+                                                    : "border-gray-300"
+                                            }`}
+                                        >
+                                            {vectorDataChoice === "manual" && (
+                                                <div className="w-3 h-3 rounded-full bg-customRed-500"></div>
+                                            )}
+                                        </div>
+                                        <div>
+                                            <h4 className="text-lg font-medium">
+                                                Manual
+                                            </h4>
+                                            <p className="text-sm text-gray-600 mt-1">
+                                                I'll add my own vectors directly
+                                            </p>
                                         </div>
                                     </div>
-                                </TabsContent>
+                                </div>
 
-                                <TabsContent value="manual">
-                                    <div className="space-y-4 form-body">
-                                        <div className="form-section">
-                                            <FormField
-                                                control={form.control}
-                                                name="dimensions"
-                                                render={({ field }) => (
-                                                    <FormItem className="form-item border-none">
+                                {vectorDataChoice === "manual" && (
+                                    <div className="mt-6 border-t pt-4">
+                                        <FormField
+                                            control={form.control}
+                                            name="dimensions"
+                                            render={({ field }) => (
+                                                <FormItem className="flex-col">
+                                                    <div className="flex items-center gap-2">
                                                         <FormLabel className="form-label">
-                                                            <FormLabel className="form-label">
-                                                                Dimensions
-                                                            </FormLabel>
-                                                            <FormMessage />
+                                                            Vector Dimensions
                                                         </FormLabel>
+
                                                         <FormControl className="form-control">
                                                             <Input
                                                                 type="number"
-                                                                className="text-right border-none"
+                                                                className="border-gray-300"
                                                                 placeholder="1536"
                                                                 min="2"
                                                                 {...field}
                                                             />
                                                         </FormControl>
-                                                    </FormItem>
-                                                )}
-                                            />
-
-                                            <FormField
-                                                control={form.control}
-                                                name="customElement"
-                                                render={({ field }) => (
-                                                    <FormItem className="form-item">
-                                                        <FormLabel>
-                                                            First Element ID
-                                                        </FormLabel>
-                                                        <FormControl className="form-control">
-                                                            <Input
-                                                                className="text-right border-none"
-                                                                placeholder="element_1"
-                                                                {...field}
-                                                            />
-                                                        </FormControl>
-                                                        <FormMessage />
-                                                    </FormItem>
-                                                )}
-                                            />
-
-                                            <FormField
-                                                control={form.control}
-                                                name="customVector"
-                                                render={({ field }) => (
-                                                    <div>
-                                                        <FormItem className="form-item border-none">
-                                                            <FormLabel>
-                                                                First Vector
-                                                            </FormLabel>
-                                                            <FormControl className="form-control">
-                                                                <Textarea
-                                                                    className="text-right border-none"
-                                                                    placeholder="0.1234, 0.5678, ..."
-                                                                    rows={3}
-                                                                    {...field}
-                                                                />
-                                                            </FormControl>
-
-                                                            <FormMessage />
-                                                        </FormItem>
-                                                        <div className="flex justify-end">
-                                                            <Button
-                                                                type="button"
-                                                                onClick={
-                                                                    generateRandomVector
-                                                                }
-                                                                variant="link"
-                                                                className="flex justify-end h-auto p-0 text-sm text-blue-500 hover:underline"
-                                                            >
-                                                                Create Random
-                                                                Vector
-                                                            </Button>
-                                                        </div>
                                                     </div>
-                                                )}
-                                            />
+
+                                                    <FormMessage />
+                                                    <FormDescription>
+                                                        Number of dimensions for
+                                                        each vector
+                                                    </FormDescription>
+                                                </FormItem>
+                                            )}
+                                        />
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Embedding Model Option Panel */}
+                            <div
+                                className={`w-full border rounded-lg p-6 cursor-pointer transition-all duration-200 ${
+                                    vectorDataChoice === "embedding"
+                                        ? "border-primary ring-2 ring-primary/20 shadow-md"
+                                        : "hover:border-gray-400"
+                                }`}
+                                onClick={() => setVectorDataChoice("embedding")}
+                            >
+                                <div className="flex justify-between items-start">
+                                    <div className="flex items-start">
+                                        <div
+                                            className={`w-5 h-5 shrink-0 rounded-full border flex items-center justify-center mr-3 mt-1 ${
+                                                vectorDataChoice === "embedding"
+                                                    ? "border-primary"
+                                                    : "border-gray-300"
+                                            }`}
+                                        >
+                                            {vectorDataChoice ===
+                                                "embedding" && (
+                                                <div className="w-3 h-3 rounded-full bg-customRed-500"></div>
+                                            )}
+                                        </div>
+                                        <div>
+                                            <h4 className="text-lg font-medium">
+                                                Embedding Model
+                                            </h4>
+                                            <p className="text-sm text-gray-600 mt-1">
+                                                Use an embedding engine for
+                                                automatic vector creation
+                                            </p>
+                                            <p className="text-sm text-primary-600 mt-1">
+                                                Click to change
+                                            </p>
                                         </div>
                                     </div>
-                                </TabsContent>
-                            </Tabs>
-                        </div>
-                    </div>
-
-                    {/* Sample Data Panel */}
-                    <div
-                        className={`absolute top-0 left-0 w-full h-full bg-white p-6 transition-transform duration-300 transform ${
-                            activePanel === "sampleData"
-                                ? "translate-x-0"
-                                : "translate-x-full"
-                        } overflow-y-auto`}
-                    >
-                        <div className="flex items-center mb-4 border-b pb-4">
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                className="mr-2"
-                                onClick={() => setActivePanel(null)}
-                            >
-                                <ArrowLeft className="h-5 w-5" />
-                            </Button>
-                            <h2 className="text-xl font-semibold">
-                                Load Sample Data
-                            </h2>
-                        </div>
-
-                        <div className="space-y-4">
-                            <p className="text-gray-600">
-                                Would you like to load sample data into your vector set?
-                                This will help you get started quickly with pre-populated data.
-                            </p>
-                        
-                            <FormField
-                                control={form.control}
-                                name="loadSampleData"
-                                render={({ field }) => (
-                                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                                        <div className="space-y-0.5">
-                                            <FormLabel className="text-base">
-                                                Import sample data after creation
-                                            </FormLabel>
-                                            <FormDescription>
-                                                Start with curated sample datasets
-                                            </FormDescription>
-                                        </div>
-                                        <FormControl>
-                                            <Switch
-                                                checked={field.value}
-                                                onCheckedChange={field.onChange}
-                                            />
-                                        </FormControl>
-                                    </FormItem>
-                                )}
-                            />
-                            
-                            {form.watch("loadSampleData") && (
-                                <div className="mt-4">
-                                    <p className="text-sm text-gray-600 mb-2">
-                                        You'll be able to choose your dataset after creating the vector set.
-                                    </p>
                                 </div>
-                            )}
-                        </div>
-                    </div>
 
-                    {/* Advanced Configuration Panel */}
-                    <div
-                        className={`absolute top-0 left-0 w-full h-full bg-white p-6 transition-transform duration-300 transform ${
-                            activePanel === "advancedConfiguration"
-                                ? "translate-x-0"
-                                : "translate-x-full"
-                        } overflow-y-auto`}
-                    >
-                        <div className="flex items-center mb-4 border-b pb-4">
+                                {vectorDataChoice === "embedding" && (
+                                    <div className="mt-6 border-t pt-4">
+                                        <div className="bg-gray-50 rounded p-4 flex flex-col gap-2">
+                                            <div className="text-sm text-black font-bold">
+                                                Text Embeddings (default)
+                                            </div>
+                                            <div className="flex flex-col gap-2">
+                                                {embeddingConfig.provider === "openai" && embeddingConfig.openai && (
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="px-2 py-1 rounded bg-green-100 text-green-800 text-xs font-medium">OpenAI</span>
+                                                        <p className="text-sm text-gray-600">
+                                                            {embeddingConfig.openai.model}
+                                                        </p>
+                                                    </div>
+                                                )}
+                                                {embeddingConfig.provider === "ollama" && embeddingConfig.ollama && (
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="px-2 py-1 rounded bg-blue-100 text-blue-800 text-xs font-medium">Ollama</span>
+                                                        <p className="text-sm text-gray-600">
+                                                            {embeddingConfig.ollama.modelName}
+                                                        </p>
+                                                    </div>
+                                                )}
+                                                {embeddingConfig.provider === "tensorflow" && embeddingConfig.tensorflow && (
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="px-2 py-1 rounded bg-yellow-100 text-yellow-800 text-xs font-medium">TensorFlow</span>
+                                                        <p className="text-sm text-gray-600">
+                                                            {embeddingConfig.tensorflow.model} (built-in)
+                                                        </p>
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                onClick={(e) => {
+                                                    e.stopPropagation()
+                                                    setIsEditConfigModalOpen(true)
+                                                }}
+                                            >
+                                                Change
+                                            </Button>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Sample Data Option Panel */}
+                            <div
+                                className={`w-full border rounded-lg p-6 cursor-pointer transition-all duration-200 ${
+                                    vectorDataChoice === "sample"
+                                        ? "border-primary ring-2 ring-primary/20 shadow-md"
+                                        : "hover:border-gray-400"
+                                }`}
+                                onClick={() => {
+                                    setVectorDataChoice("sample")
+                                    setIsSampleDataDialogOpen(true)
+                                }}
+                            >
+                                <div className="flex justify-between items-start">
+                                    <div className="flex flex-col gap-2 items-start">
+                                        <div className="flex items-center gap-2">
+                                            <div
+                                                className={`w-5 h-5 shrink-0 rounded-full border flex items-center justify-center ${
+                                                    vectorDataChoice ===
+                                                    "sample"
+                                                        ? "border-primary"
+                                                        : "border-gray-300"
+                                                }`}
+                                            >
+                                                {vectorDataChoice ===
+                                                    "sample" && (
+                                                    <div className="w-3 h-3 rounded-full bg-customRed-500"></div>
+                                                )}
+                                            </div>
+                                            <h4 className="text-lg font-medium">
+                                                Sample Data
+                                            </h4>
+                                        </div>
+                                        <p className="text-sm text-gray-600 mt-2">
+                                            Choose from one of 3 pre-built datasets, including text and images. Movies, Books, Faces, etc.
+                                        </p>
+                                        {selectedSampleDataset && (
+                                            <p className="text-sm text-primary-600 mt-2">
+                                                Selected:{" "}
+                                                {selectedSampleDataset}
+                                            </p>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="flex justify-end mt-6">
                             <Button
-                                variant="ghost"
-                                size="icon"
-                                className="mr-2"
+                                variant="default"
                                 onClick={() => setActivePanel(null)}
                             >
-                                <ArrowLeft className="h-5 w-5" />
+                                Done
                             </Button>
-                            <h2 className="text-xl font-semibold">
-                                Advanced Configuration
-                            </h2>
-                        </div>
-
-                        <div className="space-y-4">
-                            <FormField
-                                control={form.control}
-                                name="quantization"
-                                render={({ field }) => (
-                                    <FormItem className="form-item">
-                                        <div className="form-label">
-                                            <FormLabel>
-                                                Vector Quantization
-                                            </FormLabel>
-                                            <FormDescription>
-                                                Controls how vectors are stored
-                                                in memory. Cannot be changed
-                                                after creation.
-                                            </FormDescription>
-                                        </div>
-                                        <FormControl className="form-control">
-                                            <select
-                                                className="w-full p-2 "
-                                                {...field}
-                                            >
-                                                <option value="Q8">
-                                                    Q8 - Signed 8-bit
-                                                    quantization (default,
-                                                    smaller vectors)
-                                                </option>
-                                                <option value="BIN">
-                                                    BIN - Binary quantization
-                                                </option>
-                                                <option value="NOQUANT">
-                                                    NOQUANT - No quantization
-                                                    (larger vectors)
-                                                </option>
-                                            </select>
-                                        </FormControl>
-
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-
-                            <FormField
-                                control={form.control}
-                                name="reduceDimensions"
-                                render={({ field }) => (
-                                    <FormItem className="form-item">
-                                        <div className="form-label">
-                                            <FormLabel>
-                                                Dimension Reduction
-                                            </FormLabel>
-                                            <FormDescription>
-                                                Optionally reduce vector
-                                                dimensions using random
-                                                projection. Cannot be changed
-                                                after creation.
-                                            </FormDescription>
-                                        </div>
-                                        <FormControl>
-                                            <Input
-                                                type="number"
-                                                className="text-right border-none"
-                                                placeholder="Leave empty for no reduction"
-                                                min="2"
-                                                {...field}
-                                            />
-                                        </FormControl>
-
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-
-                            <FormField
-                                control={form.control}
-                                name="defaultCAS"
-                                render={({ field }) => (
-                                    <FormItem className="form-item">
-                                        <div className="form-label grow">
-                                            <FormLabel className="">
-                                                Multi-threading
-                                            </FormLabel>
-                                            <FormDescription>
-                                                Improves performance with CAS
-                                                option (Check and Set)
-                                            </FormDescription>
-                                        </div>
-                                        <FormControl>
-                                            <Switch
-                                                checked={field.value}
-                                                onCheckedChange={field.onChange}
-                                            />
-                                        </FormControl>
-                                    </FormItem>
-                                )}
-                            />
                         </div>
                     </div>
-                    
+
                     {/* Sample Data Import Panel - This is shown after vector set is created */}
                     <div
                         className={`absolute top-0 left-0 w-full h-full bg-white p-6 transition-transform duration-300 transform ${
@@ -826,33 +805,105 @@ export default function CreateVectorSetModal({
                                 Import Sample Data
                             </h2>
                         </div>
-                        
+
+                        <div className="bg-green-50 border border-green-100 rounded-md p-3 mb-4">
+                            <p className="text-green-700 text-sm">
+                                <span className="font-semibold">Vector set "{form.getValues("name").trim()}" created successfully!</span> Now you can import the sample data.
+                            </p>
+                        </div>
+
                         {isSampleDataImportStarted && (
-                            <ImportSampleData 
+                            <ImportSampleData
                                 onClose={onClose}
                                 metadata={
-                                    activeTab === "automatic"
+                                    vectorDataChoice === "embedding"
                                         ? {
-                                            ...createVectorSetMetadata(embeddingConfig),
-                                            redisConfig: form.getValues("quantization") 
-                                                ? { quantization: form.getValues("quantization") } 
-                                                : undefined,
+                                              ...createVectorSetMetadata(
+                                                  embeddingConfig
+                                              ),
+                                              redisConfig: form.getValues(
+                                                  "quantization"
+                                              )
+                                                  ? {
+                                                        quantization:
+                                                            form.getValues(
+                                                                "quantization"
+                                                            ),
+                                                    }
+                                                  : undefined,
                                           }
+                                        : vectorDataChoice === "sample" && selectedSampleDataset
+                                        ? (() => {
+                                              const selectedDataset = sampleDatasets.find(ds => ds.name === selectedSampleDataset);
+                                              return selectedDataset 
+                                                  ? {
+                                                        ...createVectorSetMetadata(
+                                                            selectedDataset.recommendedEmbedding as EmbeddingConfig
+                                                        ),
+                                                        redisConfig: form.getValues("quantization")
+                                                            ? {
+                                                                  quantization: form.getValues("quantization"),
+                                                              }
+                                                            : undefined,
+                                                    }
+                                                  : {
+                                                        embedding: {
+                                                            provider: "none" as EmbeddingProvider,
+                                                        },
+                                                        created: new Date().toISOString(),
+                                                        redisConfig: form.getValues("quantization")
+                                                            ? {
+                                                                  quantization: form.getValues("quantization"),
+                                                              }
+                                                            : undefined,
+                                                    };
+                                          })()
                                         : {
-                                            embedding: {
-                                                provider: "none" as EmbeddingProvider,
-                                            },
-                                            created: new Date().toISOString(),
-                                            redisConfig: form.getValues("quantization")
-                                                ? { quantization: form.getValues("quantization") }
-                                                : undefined,
-                                        }
+                                              embedding: {
+                                                  provider: "none" as EmbeddingProvider,
+                                              },
+                                              created: new Date().toISOString(),
+                                              redisConfig: form.getValues(
+                                                  "quantization"
+                                              )
+                                                  ? {
+                                                        quantization:
+                                                            form.getValues(
+                                                                "quantization"
+                                                            ),
+                                                    }
+                                                  : undefined,
+                                          }
                                 }
                                 vectorSetName={form.getValues("name").trim()}
+                                onUpdateMetadata={(newMetadata) => {
+                                    // Update embedding config based on the new metadata
+                                    setEmbeddingConfig(newMetadata.embedding)
+                                }}
+                                selectedDataset={selectedSampleDataset}
+                                // The user will control when to start the import, not automatically
+                                importMode={false}
                             />
                         )}
                     </div>
                 </FormProvider>
+
+                {/* Replace the inline dialog with the new component */}
+                <ImportSampleDataDialog
+                    isOpen={isSampleDataDialogOpen}
+                    onClose={() => setIsSampleDataDialogOpen(false)}
+                    metadata={currentMetadata}
+                    vectorSetName={form.getValues("name").trim()}
+                    onUpdateMetadata={(newMetadata) => {
+                        // Update embedding config based on the new metadata
+                        setEmbeddingConfig(newMetadata.embedding)
+                        setCurrentMetadata(newMetadata)
+                    }}
+                    onSelectDataset={(datasetName) => {
+                        setSelectedSampleDataset(datasetName)
+                        setIsSampleDataDialogOpen(false)
+                    }}
+                />
 
                 <EditEmbeddingConfigModal
                     isOpen={isEditConfigModalOpen}

@@ -1,6 +1,6 @@
 @font-face {
   font-family: 'Geist';
-  src: url('/app/fonts/GeistVF.woff') format('woff');
+  src: url('/fonts/GeistVF.woff') format('woff');
   font-weight: 100 900;
   font-style: normal;
   font-display: swap;
@@ -8,7 +8,7 @@
 
 @font-face {
   font-family: 'Geist Mono';
-  src: url('/app/fonts/GeistMonoVF.woff') format('woff');
+  src: url('/fonts/GeistMonoVF.woff') format('woff');
   font-weight: 100 900;
   font-style: normal;
   font-display: swap;
@@ -41,6 +41,16 @@
   .visually-hidden {
     @apply border-0 h-auto m-0 overflow-hidden p-0 absolute w-px whitespace-nowrap;
     clip: rect(0 0 0 0);
+  }
+  
+  /* Hide scrollbars but maintain scrollability */
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  
+  .no-scrollbar {
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;  /* Firefox */
   }
 }
 
