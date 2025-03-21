@@ -7,16 +7,17 @@ export default function TopNav({}: TopNavProps) {
     const pathname = usePathname()
 
     const navItems = [
-        { href: "/docs", label: "Docs", visible: true },
+        { href: "/vectorset", paths: ["/vectorset", "/console"], label: "Console", visible: true },
+        { href: "/docs", paths: ["/docs"], label: "Docs", visible: true },
         {
             href: "/config",
+            paths: ["/config"],
             label: "Settings",
             visible:
                 pathname?.includes("/vectorset") ||
                 pathname?.includes("/console") ||
                 pathname?.includes("/config"),
         },
-        { href: "/vectorset", label: "Console", visible: true },
     ]
 
     return (
@@ -37,11 +38,11 @@ export default function TopNav({}: TopNavProps) {
                 <nav className="flex items-center gap-4 pl-8">
                     {navItems
                         .filter(({ visible }) => visible)
-                        .map(({ href, label }) => (
+                        .map(({ href, paths, label }) => (
                             <Link key={href} href={href} legacyBehavior>
                                 <div
                                     className={`font-mono hover:text-red-500 py-2 cursor-pointer border-b-2 ${
-                                        pathname === href
+                                        paths.some((path) => pathname === path)
                                             ? "border-red-500 text-red-600"
                                             : "border-transparent text-black"
                                     }`}

@@ -10,8 +10,8 @@ import {
 } from "@/app/redis-server/api"
 import { vectorSets } from "@/app/api/vector-sets"
 import { embeddings } from "@/app/embeddings/client"
-import { VectorSetMetadata } from "@/app/embeddings/types/config"
-import { validateAndNormalizeVector } from "@/app/embeddings/utils/validation"
+import { getExpectedDimensions, VectorSetMetadata } from "@/app/embeddings/types/config"
+import { validateVector } from "@/app/embeddings/utils/validation"
 import eventBus, { AppEvents } from "@/app/utils/eventEmitter"
 import { useEffect, useRef, useState } from "react"
 
@@ -183,25 +183,26 @@ export function useVectorSet(): UseVectorSetReturn {
                 newVector = embeddingResult.result
             }
 
-            // Validate and normalize the vector
-            let normalizedVector = validateAndNormalizeVector(
+            // Validate the vector (no normalization)
+            let validationResult = validateVector(
                 newVector,
-                metadata?.embedding?.provider || "none",
-                dim
+                metadata?.embedding ? getExpectedDimensions(metadata?.embedding) : undefined,
             )
 
             // If the vector is not valid, throw an error
-            if (!normalizedVector.isValid) {
-                throw new Error(`Invalid vector: ${normalizedVector.error || "contains NaN or Infinity values"}`)
+            if (!validationResult.isValid) {
+                throw new Error(`Invalid vector: ${validationResult.error || "contains NaN or Infinity values"}`)
             }
 
-            // Add the vector to Redis
-            const options = useCAS ? { nx: true } : {}
+            // TODO: FIX ATTRIBUTES 
+            
+            // Use original vector
             const result = await vadd({
                 keyName: vectorSetName,
                 element,
-                vector: normalizedVector.vector,
-                ...options,
+                vector: newVector as number[],
+                attributes: JSON.stringify(attrs),
+                useCAS,
             })
 
             if (result === 0 && useCAS === true) {

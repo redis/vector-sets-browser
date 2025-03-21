@@ -29,10 +29,10 @@ export default function RedisCommandBox({
     // Helper function to get and format the Redis command
     const getRedisCommand = (includeFullEmbedding: boolean = false) => {
         // If copying the full command, return as a simple string
+        console.log("Executed command:", executedCommand)
         if (includeFullEmbedding && executedCommand) {
             return executedCommand;
         }
-        
         // For display purposes, we'll return a structured object
         if (executedCommand) {
             // For display purposes, truncate the vector values
@@ -108,7 +108,7 @@ export default function RedisCommandBox({
         // Default fallback for initial state
         return { 
             type: 'simple', 
-            text: `VSIM ${vectorSetName} VALUES ${dim} 0.0, 0.0, ...` 
+            text: `V? ${vectorSetName} VALUES ${dim} 0.0, 0.0, ...` 
         };
     }
 

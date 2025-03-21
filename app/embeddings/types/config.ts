@@ -446,3 +446,45 @@ export function validateAndCorrectMetadata(data: unknown): VectorSetMetadata {
 
     return correctedMetadata
 }
+
+// Helper function to get the expected dimensions for a given embedding config
+export function getExpectedDimensions(config: EmbeddingConfig): number {
+    // First try to get dimensions from model data
+
+    const modelData = getModelData(config);
+    if (modelData) {
+        console.log(`[getExpectedDimensions] Model data: ${JSON.stringify(modelData)}`)
+        return modelData.dimensions;
+    }
+    
+    // If no model data is available, try to get dimensions directly from the provider config
+    switch (config.provider) {
+        case "none":
+            return config.none?.dimensions || 0;
+        case "openai":
+            // For OpenAI, we need to look up the model dimensions from the model name
+            const modelName = config.openai?.model;
+            console.log(`[getExpectedDimensions] Model name: ${modelName}`)
+            return modelName && OPENAI_MODELS[modelName]?.dimensions || 0;
+        case "ollama":
+            // For Ollama, check if the model name is in our known models
+            const ollamaModelName = config.ollama?.modelName;
+            console.log(`[getExpectedDimensions] Ollama model name: ${ollamaModelName}`)
+            return ollamaModelName && 
+                OLLAMA_MODELS[ollamaModelName as keyof typeof OLLAMA_MODELS]?.dimensions || 0;
+        case "tensorflow":
+            // For TensorFlow, check if the model name is in our known models
+            const tfModelName = config.tensorflow?.model;
+            console.log(`[getExpectedDimensions] TensorFlow model name: ${tfModelName}`)
+            return tfModelName && 
+                TENSORFLOW_MODELS[tfModelName]?.dimensions || 0;
+        case "image":
+            // For Image models, check if the model name is in our known models
+            const imageModelName = config.image?.model;
+            console.log(`[getExpectedDimensions] Image model name: ${imageModelName}`)
+            return imageModelName && 
+                IMAGE_MODELS[imageModelName]?.dimensions || 0;
+        default:
+            return 0;
+    }
+}

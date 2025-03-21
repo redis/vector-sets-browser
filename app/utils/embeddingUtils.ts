@@ -33,7 +33,7 @@ export async function getDefaultTextEmbeddingConfig(): Promise<EmbeddingConfig> 
       provider: "ollama",
       ollama: {
         apiUrl: "http://localhost:11434",
-        modelName: "llama3",
+        modelName: "mxbai-embed-large",
       },
     };
   }

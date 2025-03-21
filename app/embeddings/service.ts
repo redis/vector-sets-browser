@@ -1,10 +1,10 @@
-import { EmbeddingConfig } from "./types/config"
+import { EmbeddingConfig, getExpectedDimensions } from "./types/config"
 import { OpenAIProvider } from "./providers/openai"
 import { OllamaProvider } from "./providers/ollama"
 import { TensorFlowProvider } from "./providers/tensorflow"
 import { ImageProvider } from "./providers/image"
 import { EmbeddingProvider } from "./providers/base"
-import { validateAndNormalizeVector } from "./utils/validation"
+import { validateVector } from "./utils/validation"
 import { EmbeddingCache } from "./cache/redis-cache"
 import { PROVIDERS } from "./constants"
 
@@ -49,11 +49,12 @@ export class EmbeddingService {
         }
 
         const embedding = await provider.getEmbedding(input, config)
+        const expectedDimensions = getExpectedDimensions(config)
 
-        // Validate and normalize the embedding
-        const validationResult = validateAndNormalizeVector(
-            embedding,
-            config.provider
+        // Validate the embedding 
+        const validationResult = validateVector(
+            embedding, 
+            expectedDimensions
         )
         if (!validationResult.isValid) {
             throw new Error(
@@ -62,9 +63,10 @@ export class EmbeddingService {
         }
 
         // Cache the result if caching is enabled
-        await this.cache.set(input, validationResult.vector, config)
+        await this.cache.set(input, embedding, config)
 
-        return validationResult.vector
+        // Return the original embedding, not normalized
+        return embedding
     }
 
     async getBatchEmbeddings(
@@ -127,19 +129,22 @@ export class EmbeddingService {
             }
         }
 
-        // Validate and normalize each embedding
+        // Validate each embedding (without normalization)
+        // get the expected dimensions from the provider 
+        const expectedDimensions = getExpectedDimensions(config)
+
         const validatedEmbeddings = uncachedEmbeddings.map(
             (embedding, index) => {
-                const validationResult = validateAndNormalizeVector(
+                const validationResult = validateVector(
                     embedding,
-                    config.provider
+                    expectedDimensions
                 )
                 if (!validationResult.isValid) {
                     throw new Error(
                         `Invalid embedding from ${config.provider} for input ${index}: ${validationResult.error}`
                     )
                 }
-                return validationResult.vector
+                return embedding; // Return original embedding, not the normalized version
             }
         )
 

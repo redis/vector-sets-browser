@@ -142,6 +142,7 @@ export default function AdvancedConfigurationPanel({
                                         placeholder="Enter dimensions"
                                         className="text-right border-none w-48"
                                         {...field}
+                                        value={field.value || ""}
                                     />
                                 </div>
                                 <FormMessage />

@@ -7,6 +7,7 @@ export interface ApiResponse<T = unknown> {
     result?: T;
     error?: string;
     executionTimeMs?: number;
+    executedCommand?: string;
 }
 
 // Common vector types
@@ -94,6 +95,8 @@ export interface VaddRequestBody {
     attributes?: string;
     reduceDimensions?: number;
     useCAS?: boolean;
+    ef?: number;
+    returnCommandOnly?: boolean;
 }
 
 // VADD_MULTI command
@@ -104,11 +107,19 @@ export interface VaddMultiRequestBody {
     attributes?: Record<string, string>[];
     reduceDimensions?: number;
     useCAS?: boolean;
+    ef?: number;
+}
+
+export interface VaddResponse {
+    success: boolean;
+    error?: string;
+    executionTimeMs?: number;
+    executedCommand?: string;
 }
 
 export async function vadd(request: VaddRequestBody) {
     try {
-        return await apiClient.post<boolean, VaddRequestBody>(
+        return await apiClient.post<VaddResponse, VaddRequestBody>(
             "/api/redis/command/vadd",
             request
         );

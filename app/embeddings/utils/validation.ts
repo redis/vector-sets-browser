@@ -1,4 +1,4 @@
-import { EmbeddingProvider, getModelData } from "../types/config"
+import { EmbeddingProvider } from "../types/config"
 
 export interface ValidationResult {
     isValid: boolean
@@ -13,9 +13,8 @@ export interface ValidationResult {
     }
 }
 
-export function validateAndNormalizeVector(
+export function validateVector(
     vector: unknown,
-    provider: EmbeddingProvider,
     expectedDimensions?: number
 ): ValidationResult {
     // Debug information
@@ -37,8 +36,7 @@ export function validateAndNormalizeVector(
         }
     }
 
-    // Handle different vector formats based on provider
-    let normalizedVector: number[] = [];
+    let processedVector: number[] = [];
     
     try {
         // Process vector based on provider
@@ -46,11 +44,11 @@ export function validateAndNormalizeVector(
             // If it's already an array, check if it's nested
             if (vector.length > 0 && Array.isArray(vector[0])) {
                 // It's a nested array, take the first element
-                normalizedVector = vector[0].map(Number)
+                processedVector = vector[0].map(Number)
                 debug.sampleValues = vector[0].slice(0, 5)
             } else {
                 // It's a flat array
-                normalizedVector = vector.map(Number)
+                processedVector = vector.map(Number)
                 debug.sampleValues = vector.slice(0, 5)
             }
         } else {
@@ -58,7 +56,7 @@ export function validateAndNormalizeVector(
         }
 
         // Check if vector has any values
-        if (normalizedVector.length === 0) {
+        if (processedVector.length === 0) {
             return {
                 isValid: false,
                 error: "Vector is empty",
@@ -68,7 +66,7 @@ export function validateAndNormalizeVector(
         }
 
         // Check for non-numeric values
-        debug.containsNonNumbers = normalizedVector.some(
+        debug.containsNonNumbers = processedVector.some(
             (v) => typeof v !== "number" || isNaN(v)
         )
 
@@ -81,36 +79,22 @@ export function validateAndNormalizeVector(
             }
         }
 
-        // Check if vector contains all zeros
-        if (normalizedVector.every((v) => v === 0)) {
-            return {
-                isValid: false,
-                error: "Vector contains all zeros",
-                vector: [],
-                debug
-            }
-        }
-
         // Validate dimensions if expected dimensions are provided
         if (
             expectedDimensions !== undefined &&
-            normalizedVector.length !== expectedDimensions
+            processedVector.length !== expectedDimensions
         ) {
             return {
-                vector: normalizedVector,
+                vector: processedVector,
                 isValid: false,
-                error: `Vector dimensions (${normalizedVector.length}) do not match expected dimensions (${expectedDimensions})`,
+                error: `Vector dimensions (${processedVector.length}) do not match expected dimensions (${expectedDimensions})`,
                 debug,
             }
         }
 
-        // Normalize the vector
-        const magnitude = Math.sqrt(normalizedVector.reduce((sum, v) => sum + v * v, 0))
-        const normalizedResult = normalizedVector.map((v) => v / magnitude)
-
         return {
             isValid: true,
-            vector: normalizedResult,
+            vector: processedVector,
             debug
         }
     } catch (error) {

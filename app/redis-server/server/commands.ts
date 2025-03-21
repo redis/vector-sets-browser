@@ -2,6 +2,7 @@ import {
     validateAndCorrectMetadata,
     VectorSetMetadata,
 } from "@/app/embeddings/types/config"
+import { VaddRequestBody } from "@/app/redis-server/api"
 import { cookies } from "next/headers"
 import { createClient, RedisClientType } from "redis"
 
@@ -242,56 +243,68 @@ export async function scanVectorSets(
     })
 }
 
-export async function vadd(
-    url: string,
-    keyName: string,
-    element: string,
-    vector: number[],
-    attributes?: string,
-    useCAS?: boolean,
-    reduceDimensions?: number
-): Promise<VectorOperationResult> {
-    return RedisClient.withConnection(url, async (client) => {
+export async function vadd(redisUrl: string, request: VaddRequestBody) : Promise<VectorOperationResult> {
+    
+    return RedisClient.withConnection(redisUrl, async (client) => {
+
+        console.log("VADD request:", request)
         // Ensure vector is an array of numbers
-        if (!Array.isArray(vector)) {
+        if (!Array.isArray(request.vector)) {
             return {
                 success: false,
                 error: `Invalid vector data: not an array`,
             }
         }
 
-        if (vector.some((v) => typeof v !== "number" || isNaN(v))) {
+        if (request.vector.some((v) => typeof v !== "number" || isNaN(v))) {
             return {
                 success: false,
                 error: `Invalid vector data: contains non-numeric values`,
             }
         }
 
-        const command = ["VADD", keyName]
+        const command = ["VADD", request.keyName]
 
-        if (reduceDimensions) {
-            command.push("REDUCE", reduceDimensions.toString())
+        if (request.reduceDimensions) {
+            command.push("REDUCE", request.reduceDimensions.toString())
         }
 
         command.push(
             "VALUES",
-            vector.length.toString(),
-            ...vector.map((v) => v.toString()),
-            element
+            request.vector.length.toString(),
+            ...request.vector.map((v) => v.toString()),
+            request.element
         )
 
-        if (attributes) {
-            command.push("SETATTR", attributes)
+        if (request.attributes) {
+            command.push("SETATTR", request.attributes)
         }
 
         // Add CAS flag if enabled
-        if (useCAS) {
+        if (request.useCAS) {
             command.push("CAS")
+        }
+
+        if (request.ef) {
+            command.push("EF", request.ef.toString())
+        }
+        const finalCommand = command.join(" ")
+
+        // If returnCommandOnly is set, just return the command string
+        if (request.returnCommandOnly) {
+            return {
+                success: true,
+                executedCommand: finalCommand,
+            }
         }
 
         try {
             const result = await client.sendCommand(command)
-            return result
+            return {
+                success: true,
+                result,
+                executedCommand: finalCommand,
+            }
         } catch (error) {
             console.error("Error executing VADD command:", error)
             return {

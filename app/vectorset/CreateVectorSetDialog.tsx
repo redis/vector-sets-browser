@@ -2,6 +2,7 @@ import {
     createVectorSetMetadata,
     EmbeddingConfig,
     EmbeddingProvider,
+    getExpectedDimensions,
     VectorSetMetadata,
 } from "@/app/embeddings/types/config"
 import { Button } from "@/components/ui/button"
@@ -19,20 +20,44 @@ import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { ArrowLeft, ChevronRight, Database, BookOpen, Film, User, ChevronLeft } from "lucide-react"
+import {
+    ArrowLeft,
+    ChevronRight,
+    Database,
+    BookOpen,
+    Film,
+    User,
+    ChevronLeft,
+} from "lucide-react"
 import { useState, useEffect } from "react"
 import { FormProvider, useForm, UseFormReturn } from "react-hook-form"
 import { z } from "zod"
 import EditEmbeddingConfigModal from "../components/EmbeddingConfig/EditEmbeddingConfigDialog"
 import ImportSampleData from "./ImportTab/ImportSampleData"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog"
 import ImportSampleDataDialog from "./ImportTab/ImportSampleDataDialog"
-import { getDefaultTextEmbeddingConfig, getDefaultEmbeddingConfig } from "@/app/utils/embeddingUtils"
-import { SampleDataset, sampleDatasets as configuredDatasets } from "./ImportTab/SampleDataSelect"
-import AdvancedConfigurationPanel, { vectorSetSchema, FormValues } from "./AdvancedConfigurationPanel"
+import {
+    getDefaultTextEmbeddingConfig,
+    getDefaultEmbeddingConfig,
+} from "@/app/utils/embeddingUtils"
+import {
+    SampleDataset,
+    sampleDatasets as configuredDatasets,
+} from "./ImportTab/SampleDataSelect"
+import AdvancedConfigurationPanel, {
+    vectorSetSchema,
+    FormValues,
+} from "./AdvancedConfigurationPanel"
+import { vadd } from "@/app/redis-server/api"
+import RedisCommandBox from "../components/RedisCommandBox"
 
 // Define sample datasets for use in the component
-const sampleDatasets = configuredDatasets;
+const sampleDatasets = configuredDatasets
 
 interface CreateVectorSetModalProps {
     isOpen: boolean
@@ -59,54 +84,13 @@ export default function CreateVectorSetModal({
         },
     })
     const [isOllamaAvailable, setIsOllamaAvailable] = useState(false)
-    const [embeddingConfigs, setEmbeddingConfigs] = useState<Record<string, EmbeddingConfig>>({})
+    const [embeddingConfigs, setEmbeddingConfigs] = useState<
+        Record<string, EmbeddingConfig>
+    >({})
+    const [previewCommand, setPreviewCommand] = useState<string | null>(null)
+    const [isConfigInitialized, setIsConfigInitialized] = useState(false)
 
-    // Use the utility function to get the default text embedding config
-    useEffect(() => {
-        async function initEmbeddingConfig() {
-            try {
-                const defaultConfig = await getDefaultTextEmbeddingConfig();
-                setEmbeddingConfig(defaultConfig);
-                setIsOllamaAvailable(defaultConfig.provider === "ollama");
-                
-                // Also load embedding configs for all sample datasets
-                const configs: Record<string, EmbeddingConfig> = {};
-                for (const dataset of sampleDatasets) {
-                    const config = await getDefaultEmbeddingConfig(dataset.embeddingType);
-                    configs[dataset.name] = config;
-                }
-                setEmbeddingConfigs(configs);
-            } catch (error) {
-                console.error("Error initializing embedding config:", error);
-            }
-        }
-        
-        initEmbeddingConfig();
-    }, []);
-
-    const [activeTab, setActiveTab] = useState("automatic")
-    const [isEditConfigModalOpen, setIsEditConfigModalOpen] = useState(false)
-
-    // Add state for vector data choice
-    const [vectorDataChoice, setVectorDataChoice] = useState<
-        "manual" | "embedding" | "sample"
-    >("embedding")
-    const [selectedSampleDataset, setSelectedSampleDataset] = useState<
-        string | null
-    >(null)
-
-    // Add state for sliding panels
-    const [activePanel, setActivePanel] = useState<string | null>(null)
-
-    const [isSampleDataImportStarted, setIsSampleDataImportStarted] =
-        useState(false)
-
-    // Create an initial metadata object for use with the ImportSampleData component
-    const [currentMetadata, setCurrentMetadata] =
-        useState<VectorSetMetadata | null>(null)
-
-    const [isSampleDataDialogOpen, setIsSampleDataDialogOpen] = useState(false)
-
+    // Form setup
     const form = useForm<FormValues>({
         resolver: zodResolver(vectorSetSchema),
         defaultValues: {
@@ -115,13 +99,238 @@ export default function CreateVectorSetModal({
             customElement: "",
             customVector: "",
             quantization: undefined,
-            reduceDimensions: undefined,
+            reduceDimensions: "",
             defaultCAS: undefined,
             buildExplorationFactor: undefined,
             loadSampleData: false,
             selectedDataset: undefined,
         },
     })
+
+    const [activeTab, setActiveTab] = useState("automatic")
+    const [isEditConfigModalOpen, setIsEditConfigModalOpen] = useState(false)
+    const [vectorDataChoice, setVectorDataChoice] = useState<
+        "manual" | "embedding" | "sample"
+    >("embedding")
+    const [selectedSampleDataset, setSelectedSampleDataset] = useState<
+        string | null
+    >(null)
+    const [activePanel, setActivePanel] = useState<string | null>(null)
+    const [isSampleDataImportStarted, setIsSampleDataImportStarted] =
+        useState(false)
+    const [currentMetadata, setCurrentMetadata] =
+        useState<VectorSetMetadata | null>(null)
+    const [isSampleDataDialogOpen, setIsSampleDataDialogOpen] = useState(false)
+
+    // Initialize embedding configurations only once
+    useEffect(() => {
+        async function initEmbeddingConfig() {
+            try {
+                console.log(
+                    "[CreateVectorSetDialog] Initializing embedding config..."
+                )
+                const defaultConfig = await getDefaultTextEmbeddingConfig()
+                console.log(
+                    `[CreateVectorSetDialog] Default config loaded: ${JSON.stringify(defaultConfig)}`
+                )
+
+                setEmbeddingConfig(defaultConfig)
+                setIsOllamaAvailable(defaultConfig.provider === "ollama")
+
+                // Also load embedding configs for all sample datasets
+                const configs: Record<string, EmbeddingConfig> = {}
+                for (const dataset of sampleDatasets) {
+                    const config = await getDefaultEmbeddingConfig(
+                        dataset.embeddingType
+                    )
+                    configs[dataset.name] = config
+                }
+                setEmbeddingConfigs(configs)
+                setIsConfigInitialized(true)
+
+                console.log(
+                    "[CreateVectorSetDialog] Config initialization complete"
+                )
+            } catch (error) {
+                console.error("Error initializing embedding config:", error)
+            }
+        }
+
+        initEmbeddingConfig()
+    }, [])
+
+    // Function to get the current effective embedding config based on user choices
+    const getCurrentEmbeddingConfig = (): EmbeddingConfig => {
+        if (vectorDataChoice === "manual") {
+            return {
+                provider: "none",
+                none: {
+                    model: "manual",
+                    dimensions: form.getValues("dimensions"),
+                },
+            }
+        } else if (vectorDataChoice === "sample" && selectedSampleDataset) {
+            const selectedDataset = sampleDatasets.find(
+                (ds) => ds.name === selectedSampleDataset
+            )
+            if (selectedDataset && embeddingConfigs[selectedDataset.name]) {
+                return embeddingConfigs[selectedDataset.name]
+            }
+        }
+        // Default to the current embedding config (for "embedding" choice or fallback)
+        return embeddingConfig
+    }
+
+    // Function to get the expected dimensions for the current configuration
+    const getEffectiveDimensions = (): number => {
+        const config = getCurrentEmbeddingConfig()
+        if (vectorDataChoice === "manual") {
+            return form.getValues("dimensions")
+        }
+        return getExpectedDimensions(config)
+    }
+
+    // Simplified function to update the preview command
+    const updatePreviewCommand = async (manualUpdate = false) => {
+        const values = form.getValues()
+        if (!values.name) return
+
+        const config = getCurrentEmbeddingConfig()
+        console.log(
+            `[CreateVectorSetDialog] Updating preview with provider: ${config.provider}`
+        )
+
+        try {
+            const effectiveDimensions = getEffectiveDimensions()
+            console.log(
+                `[CreateVectorSetDialog] Using dimensions: ${effectiveDimensions}`
+            )
+
+            // Create a sample vector for preview
+            const sampleVector = Array(effectiveDimensions).fill(0)
+
+            // Create the request to get the command
+            const request = {
+                keyName: values.name.trim(),
+                element: `initial_vector`,
+                vector: sampleVector,
+                attributes: JSON.stringify({ preview: true }),
+                useCAS: values.defaultCAS,
+                reduceDimensions: values.reduceDimensions
+                    ? parseInt(values.reduceDimensions, 10)
+                    : undefined,
+                returnCommandOnly: true,
+            }
+
+            // Only make the API call if this was manually triggered or name is valid
+            if (manualUpdate || values.name.length > 2) {
+                const result = await vadd(request)
+                if (result.executedCommand) {
+                    setPreviewCommand(result.executedCommand)
+                }
+            }
+        } catch (error) {
+            console.error("Error generating preview command:", error)
+        }
+    }
+
+    // Watch form value changes to update preview
+    useEffect(() => {
+        const subscription = form.watch((value, { name, type }) => {
+            if (
+                name === "name" ||
+                name === "dimensions" ||
+                name === "defaultCAS" ||
+                name === "reduceDimensions"
+            ) {
+                // If config is initialized and a name is entered, update preview
+                if (isConfigInitialized && value.name) {
+                    updatePreviewCommand(true)
+                }
+            }
+        })
+
+        return () => subscription.unsubscribe()
+    }, [form, isConfigInitialized, vectorDataChoice])
+
+    // Update preview when embedding config changes
+    useEffect(() => {
+        if (isConfigInitialized && form.getValues("name")) {
+            console.log(
+                "[CreateVectorSetDialog] Embedding config changed, updating preview"
+            )
+            updatePreviewCommand(true)
+        }
+    }, [embeddingConfig, isConfigInitialized])
+
+    // Update preview when vector data choice changes
+    useEffect(() => {
+        if (isConfigInitialized && form.getValues("name")) {
+            console.log(
+                "[CreateVectorSetDialog] Vector data choice changed, updating preview"
+            )
+            updatePreviewCommand(true)
+        }
+    }, [vectorDataChoice, isConfigInitialized])
+
+    // Update preview when sample dataset selection changes
+    useEffect(() => {
+        if (
+            isConfigInitialized &&
+            vectorDataChoice === "sample" &&
+            selectedSampleDataset &&
+            form.getValues("name")
+        ) {
+            console.log(
+                "[CreateVectorSetDialog] Sample dataset changed, updating preview"
+            )
+            updatePreviewCommand(true)
+        }
+    }, [selectedSampleDataset, isConfigInitialized])
+
+    // Handle edit config changes
+    const handleEditConfig = (config: EmbeddingConfig) => {
+        console.log(
+            `[CreateVectorSetDialog] Updating embedding config: ${JSON.stringify(config)}`
+        )
+        setEmbeddingConfig(config)
+    }
+
+    // Building metadata based on vector data choice for form submission
+    const getMetadataForSubmit = async (): Promise<VectorSetMetadata> => {
+        const values = form.getValues()
+        // Build redisConfig object only with defined values
+        const redisConfig: Record<string, string | number | boolean> = {}
+
+        // Only add properties that are explicitly set
+        if (values.quantization) {
+            redisConfig.quantization = values.quantization
+        }
+
+        if (values.reduceDimensions) {
+            redisConfig.reduceDimensions = parseInt(values.reduceDimensions, 10)
+        }
+
+        if (values.defaultCAS !== undefined) {
+            redisConfig.defaultCAS = values.defaultCAS
+        }
+
+        if (values.buildExplorationFactor) {
+            redisConfig.buildExplorationFactor = parseInt(
+                values.buildExplorationFactor,
+                10
+            )
+        }
+
+        // Get the current embedding config
+        const config = getCurrentEmbeddingConfig()
+
+        return {
+            ...createVectorSetMetadata(config),
+            redisConfig:
+                Object.keys(redisConfig).length > 0 ? redisConfig : undefined,
+        }
+    }
 
     const generateRandomVector = () => {
         const dimensions = form.getValues("dimensions")
@@ -132,63 +341,6 @@ export default function CreateVectorSetModal({
             form.setValue("customVector", vector)
         }
     }
-
-    const handleEditConfig = (config: EmbeddingConfig) => {
-        setEmbeddingConfig(config)
-    }
-
-    // Building metadata based on vector data choice
-    const getMetadataForSubmit = async (values: FormValues): Promise<VectorSetMetadata> => {
-        // Build redisConfig object only with defined values
-        const redisConfig: Record<string, string | number | boolean> = {};
-
-        // Only add properties that are explicitly set
-        if (values.quantization) {
-            redisConfig.quantization = values.quantization;
-        }
-
-        if (values.reduceDimensions) {
-            redisConfig.reduceDimensions = parseInt(values.reduceDimensions, 10);
-        }
-
-        if (values.defaultCAS !== undefined) {
-            redisConfig.defaultCAS = values.defaultCAS;
-        }
-
-        if (values.buildExplorationFactor) {
-            redisConfig.buildExplorationFactor = parseInt(values.buildExplorationFactor, 10);
-        }
-
-        // Create metadata based on vector data choice
-        if (vectorDataChoice === "embedding") {
-            return {
-                ...createVectorSetMetadata(embeddingConfig),
-                redisConfig: Object.keys(redisConfig).length > 0 ? redisConfig : undefined,
-            };
-        } else if (vectorDataChoice === "sample" && selectedSampleDataset) {
-            // Find the selected sample dataset
-            const selectedDataset = sampleDatasets.find(ds => ds.name === selectedSampleDataset);
-            if (selectedDataset) {
-                // Use the pre-loaded embedding config for this dataset
-                const datasetEmbeddingConfig = embeddingConfigs[selectedDataset.name] || 
-                    await getDefaultEmbeddingConfig(selectedDataset.embeddingType);
-                
-                return {
-                    ...createVectorSetMetadata(datasetEmbeddingConfig),
-                    redisConfig: Object.keys(redisConfig).length > 0 ? redisConfig : undefined,
-                };
-            }
-        }
-        
-        // Fallback for manual mode or if dataset not found
-        return {
-            embedding: {
-                provider: "none" as EmbeddingProvider,
-            },
-            created: new Date().toISOString(),
-            redisConfig: Object.keys(redisConfig).length > 0 ? redisConfig : undefined,
-        };
-    };
 
     const onSubmit = async (values: FormValues) => {
         try {
@@ -231,24 +383,21 @@ export default function CreateVectorSetModal({
             }
 
             // Get metadata based on selection
-            const metadata = await getMetadataForSubmit(values);
-            
-            // Update currentMetadata with the final metadata
-            setCurrentMetadata(metadata);
+            const metadata = await getMetadataForSubmit()
 
-            // Use manual dimensions or get dimensions from metadata
-            const effectiveDimensions =
-                vectorDataChoice === "manual"
-                    ? values.dimensions
-                    : metadata.dimensions || values.dimensions || 256;
+            // Update currentMetadata with the final metadata
+            setCurrentMetadata(metadata)
+
+            // Get effective dimensions
+            const effectiveDimensions = getEffectiveDimensions()
 
             // For manual mode, create a zero vector of correct dimensions
-            let customData = undefined;
+            let customData = undefined
             if (vectorDataChoice === "manual") {
                 customData = {
                     element: `initial_vector_${Date.now()}`,
                     vector: Array(effectiveDimensions).fill(0),
-                };
+                }
             }
 
             const result = await onCreate(
@@ -256,27 +405,29 @@ export default function CreateVectorSetModal({
                 effectiveDimensions,
                 metadata,
                 customData
-            );
+            )
 
             // Don't close dialog if sample data import is selected
             if (vectorDataChoice === "sample") {
-                console.log(`[CreateVectorSetDialog] Setting up sample data import for: ${selectedSampleDataset}`);
+                console.log(
+                    `[CreateVectorSetDialog] Setting up sample data import for: ${selectedSampleDataset}`
+                )
                 // Set state to show the import panel
-                setIsSampleDataImportStarted(true);
+                setIsSampleDataImportStarted(true)
             } else {
-                onClose();
+                onClose()
             }
         } catch (err) {
-            console.error("Error in CreateVectorSetModal handleSubmit:", err);
+            console.error("Error in CreateVectorSetModal handleSubmit:", err)
             setError(
                 err instanceof Error
                     ? err.message
                     : "Failed to create vector set"
-            );
+            )
         } finally {
-            setIsCreating(false);
+            setIsCreating(false)
         }
-    };
+    }
 
     if (!isOpen) return null
 
@@ -308,7 +459,10 @@ export default function CreateVectorSetModal({
                                 have to do is provide the name of your vector
                                 set, but you can customize the settings below.
                             </p>
-                            <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-2 h-full">
+                            <form
+                                onSubmit={form.handleSubmit(onSubmit)}
+                                className="flex flex-col gap-2 h-full"
+                            >
                                 <div className="form-body">
                                     <div className="form-section">
                                         <FormField
@@ -408,9 +562,31 @@ export default function CreateVectorSetModal({
                                             {error}
                                         </div>
                                     )}
+                                    {/* Command Preview */}
+                                    {form.getValues("name") && (
+                                        <div className="p-2">
+                                            <FormLabel className="form-label">
+                                                Redis Command:
+                                            </FormLabel>
+                                            <RedisCommandBox
+                                                vectorSetName={form
+                                                    .getValues("name")
+                                                    .trim()}
+                                                dim={form.getValues(
+                                                    "dimensions"
+                                                )}
+                                                executedCommand={
+                                                    previewCommand || ""
+                                                }
+                                                searchQuery={""}
+                                                searchFilter={""}
+                                                showRedisCommand={true}
+                                                setShowRedisCommand={() => {}}
+                                            />
+                                        </div>
+                                    )}
                                 </div>
-                                <div className="grow">
-                                </div>
+                                <div className="grow"></div>
                                 <div className="flex justify-end gap-2 mt-4">
                                     <Button
                                         type="button"
@@ -473,7 +649,10 @@ export default function CreateVectorSetModal({
                                         ? "border-primary ring-2 ring-primary/20 shadow-md"
                                         : "hover:border-gray-400"
                                 }`}
-                                onClick={() => setVectorDataChoice("manual")}
+                                onClick={() => {
+                                    setVectorDataChoice("manual")
+                                    updatePreviewCommand(true)
+                                }}
                             >
                                 <div className="flex justify-between items-start">
                                     <div className="flex items-start">
@@ -541,7 +720,10 @@ export default function CreateVectorSetModal({
                                         ? "border-primary ring-2 ring-primary/20 shadow-md"
                                         : "hover:border-gray-400"
                                 }`}
-                                onClick={() => setVectorDataChoice("embedding")}
+                                onClick={() => {
+                                    setVectorDataChoice("embedding")
+                                    updatePreviewCommand(true)
+                                }}
                             >
                                 <div className="flex justify-between items-start">
                                     <div className="flex items-start">
@@ -581,40 +763,68 @@ export default function CreateVectorSetModal({
                                             <div className="flex flex-col gap-2">
                                                 {isOllamaAvailable && (
                                                     <div className="text-xs text-green-600 font-medium mb-2">
-                                                        ✓ Using locally installed Ollama
+                                                        ✓ Using locally
+                                                        installed Ollama
                                                     </div>
                                                 )}
-                                                {embeddingConfig.provider === "openai" && embeddingConfig.openai && (
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="px-2 py-1 rounded bg-green-100 text-green-800 text-xs font-medium">OpenAI</span>
-                                                        <p className="text-sm text-gray-600">
-                                                            {embeddingConfig.openai.model}
-                                                        </p>
-                                                    </div>
-                                                )}
-                                                {embeddingConfig.provider === "ollama" && embeddingConfig.ollama && (
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="px-2 py-1 rounded bg-blue-100 text-blue-800 text-xs font-medium">Ollama</span>
-                                                        <p className="text-sm text-gray-600">
-                                                            {embeddingConfig.ollama.modelName}
-                                                        </p>
-                                                    </div>
-                                                )}
-                                                {embeddingConfig.provider === "tensorflow" && embeddingConfig.tensorflow && (
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="px-2 py-1 rounded bg-yellow-100 text-yellow-800 text-xs font-medium">TensorFlow</span>
-                                                        <p className="text-sm text-gray-600">
-                                                            {embeddingConfig.tensorflow.model} (built-in)
-                                                        </p>
-                                                    </div>
-                                                )}
+                                                {embeddingConfig.provider ===
+                                                    "openai" &&
+                                                    embeddingConfig.openai && (
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="px-2 py-1 rounded bg-green-100 text-green-800 text-xs font-medium">
+                                                                OpenAI
+                                                            </span>
+                                                            <p className="text-sm text-gray-600">
+                                                                {
+                                                                    embeddingConfig
+                                                                        .openai
+                                                                        .model
+                                                                }
+                                                            </p>
+                                                        </div>
+                                                    )}
+                                                {embeddingConfig.provider ===
+                                                    "ollama" &&
+                                                    embeddingConfig.ollama && (
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="px-2 py-1 rounded bg-blue-100 text-blue-800 text-xs font-medium">
+                                                                Ollama
+                                                            </span>
+                                                            <p className="text-sm text-gray-600">
+                                                                {
+                                                                    embeddingConfig
+                                                                        .ollama
+                                                                        .modelName
+                                                                }
+                                                            </p>
+                                                        </div>
+                                                    )}
+                                                {embeddingConfig.provider ===
+                                                    "tensorflow" &&
+                                                    embeddingConfig.tensorflow && (
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="px-2 py-1 rounded bg-yellow-100 text-yellow-800 text-xs font-medium">
+                                                                TensorFlow
+                                                            </span>
+                                                            <p className="text-sm text-gray-600">
+                                                                {
+                                                                    embeddingConfig
+                                                                        .tensorflow
+                                                                        .model
+                                                                }{" "}
+                                                                (built-in)
+                                                            </p>
+                                                        </div>
+                                                    )}
                                             </div>
                                             <Button
                                                 type="button"
                                                 variant="outline"
                                                 onClick={(e) => {
                                                     e.stopPropagation()
-                                                    setIsEditConfigModalOpen(true)
+                                                    setIsEditConfigModalOpen(
+                                                        true
+                                                    )
                                                 }}
                                             >
                                                 Change
@@ -634,6 +844,7 @@ export default function CreateVectorSetModal({
                                 onClick={() => {
                                     setVectorDataChoice("sample")
                                     setIsSampleDataDialogOpen(true)
+                                    updatePreviewCommand(true)
                                 }}
                             >
                                 <div className="flex justify-between items-start">
@@ -657,7 +868,9 @@ export default function CreateVectorSetModal({
                                             </h4>
                                         </div>
                                         <p className="text-sm text-gray-600 mt-2">
-                                            Choose from one of 3 pre-built datasets, including text and images. Movies, Books, Faces, etc.
+                                            Choose from one of 3 pre-built
+                                            datasets, including text and images.
+                                            Movies, Books, Faces, etc.
                                         </p>
                                         {selectedSampleDataset && (
                                             <p className="text-sm text-primary-600 mt-2">
@@ -710,7 +923,11 @@ export default function CreateVectorSetModal({
 
                         <div className="bg-green-50 border border-green-100 rounded-md p-3 mb-4">
                             <p className="text-green-700 text-sm">
-                                <span className="font-semibold">Vector set "{form.getValues("name").trim()}" created successfully!</span> Now you can import the sample data.
+                                <span className="font-semibold">
+                                    Vector set "{form.getValues("name").trim()}"
+                                    created successfully!
+                                </span>{" "}
+                                Now you can import the sample data.
                             </p>
                         </div>
 
@@ -734,53 +951,79 @@ export default function CreateVectorSetModal({
                                                     }
                                                   : undefined,
                                           }
-                                        : vectorDataChoice === "sample" && selectedSampleDataset
-                                        ? (() => {
-                                              const selectedDataset = sampleDatasets.find(ds => ds.name === selectedSampleDataset);
-                                              return selectedDataset 
-                                                  ? {
-                                                        ...createVectorSetMetadata(
-                                                            embeddingConfigs[selectedDataset.name] || {
-                                                                provider: "tensorflow",
-                                                                tensorflow: {
-                                                                    model: "universal-sentence-encoder",
-                                                                }
-                                                            }
-                                                        ),
-                                                        redisConfig: form.getValues("quantization")
-                                                            ? {
-                                                                  quantization: form.getValues("quantization"),
+                                        : vectorDataChoice === "sample" &&
+                                            selectedSampleDataset
+                                          ? (() => {
+                                                const selectedDataset =
+                                                    sampleDatasets.find(
+                                                        (ds) =>
+                                                            ds.name ===
+                                                            selectedSampleDataset
+                                                    )
+                                                return selectedDataset
+                                                    ? {
+                                                          ...createVectorSetMetadata(
+                                                              embeddingConfigs[
+                                                                  selectedDataset
+                                                                      .name
+                                                              ] || {
+                                                                  provider:
+                                                                      "tensorflow",
+                                                                  tensorflow: {
+                                                                      model: "universal-sentence-encoder",
+                                                                  },
                                                               }
-                                                            : undefined,
-                                                    }
-                                                  : {
-                                                        embedding: {
-                                                            provider: "none" as EmbeddingProvider,
-                                                        },
-                                                        created: new Date().toISOString(),
-                                                        redisConfig: form.getValues("quantization")
-                                                            ? {
-                                                                  quantization: form.getValues("quantization"),
-                                                              }
-                                                            : undefined,
-                                                    };
-                                          })()
-                                        : {
-                                              embedding: {
-                                                  provider: "none" as EmbeddingProvider,
-                                              },
-                                              created: new Date().toISOString(),
-                                              redisConfig: form.getValues(
-                                                  "quantization"
-                                              )
-                                                  ? {
-                                                        quantization:
-                                                            form.getValues(
-                                                                "quantization"
-                                                            ),
-                                                    }
-                                                  : undefined,
-                                          }
+                                                          ),
+                                                          redisConfig:
+                                                              form.getValues(
+                                                                  "quantization"
+                                                              )
+                                                                  ? {
+                                                                        quantization:
+                                                                            form.getValues(
+                                                                                "quantization"
+                                                                            ),
+                                                                    }
+                                                                  : undefined,
+                                                      }
+                                                    : {
+                                                          embedding: {
+                                                              provider:
+                                                                  "none" as EmbeddingProvider,
+                                                          },
+                                                          created:
+                                                              new Date().toISOString(),
+                                                          redisConfig:
+                                                              form.getValues(
+                                                                  "quantization"
+                                                              )
+                                                                  ? {
+                                                                        quantization:
+                                                                            form.getValues(
+                                                                                "quantization"
+                                                                            ),
+                                                                    }
+                                                                  : undefined,
+                                                      }
+                                            })()
+                                          : {
+                                                embedding: {
+                                                    provider:
+                                                        "none" as EmbeddingProvider,
+                                                },
+                                                created:
+                                                    new Date().toISOString(),
+                                                redisConfig: form.getValues(
+                                                    "quantization"
+                                                )
+                                                    ? {
+                                                          quantization:
+                                                              form.getValues(
+                                                                  "quantization"
+                                                              ),
+                                                      }
+                                                    : undefined,
+                                            }
                                 }
                                 vectorSetName={form.getValues("name").trim()}
                                 onUpdateMetadata={(newMetadata) => {

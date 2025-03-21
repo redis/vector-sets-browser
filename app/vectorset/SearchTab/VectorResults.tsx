@@ -1,12 +1,9 @@
-import {
-    VectorTuple, vgetattr,
-    vgetattr_multi
-} from "@/app/redis-server/api"
 import SearchTimeIndicator from "@/app/components/SearchTimeIndicator"
 import {
     ColumnConfig,
     useVectorResultsSettings,
 } from "@/app/hooks/useVectorResultsSettings"
+import { VectorTuple, vgetattr, vgetattr_multi } from "@/app/redis-server/api"
 import { parseFieldFilters } from "@/app/utils/filterParser"
 import { Button } from "@/components/ui/button"
 import {
@@ -40,6 +37,7 @@ import {
     ArrowDownUp,
     ArrowDownWideNarrow,
     ArrowUpNarrowWide,
+    CheckSquare,
     Settings,
 } from "lucide-react"
 import { useEffect, useMemo, useRef, useState } from "react"
@@ -186,10 +184,10 @@ function AttributeColumnsDialog({
 
 // Add a new interface to pass updated attributes back from the dialog
 interface EditAttributesDialogProps {
-    isOpen: boolean;
-    onClose: (updatedAttributes?: string) => void;
-    keyName: string;
-    element: string;
+    isOpen: boolean
+    onClose: (updatedAttributes?: string) => void
+    keyName: string
+    element: string
 }
 
 export default function VectorResults({
@@ -251,17 +249,19 @@ export default function VectorResults({
 
     // Add new state variables for selection mode
     const [selectMode, setSelectMode] = useState(false)
-    const [selectedElements, setSelectedElements] = useState<Set<string>>(new Set())
-    
+    const [selectedElements, setSelectedElements] = useState<Set<string>>(
+        new Set()
+    )
+
     // Clear selections when the keyName (vector set) changes
     useEffect(() => {
         setSelectMode(false)
         setSelectedElements(new Set())
     }, [keyName])
-    
+
     // Handle individual selection toggle
     const handleSelectToggle = (element: string) => {
-        setSelectedElements(prev => {
+        setSelectedElements((prev) => {
             const newSet = new Set(prev)
             if (newSet.has(element)) {
                 newSet.delete(element)
@@ -271,24 +271,24 @@ export default function VectorResults({
             return newSet
         })
     }
-    
+
     // Handle "Select All" action
     const handleSelectAll = () => {
-        const allElements = filteredAndSortedResults.map(row => row[0])
+        const allElements = filteredAndSortedResults.map((row) => row[0])
         setSelectedElements(new Set(allElements))
     }
-    
+
     // Handle "Deselect All" action
     const handleDeselectAll = () => {
         setSelectedElements(new Set())
     }
-    
+
     // Handle exiting select mode
     const handleExitSelectMode = () => {
         setSelectMode(false)
         setSelectedElements(new Set())
     }
-    
+
     // Handle bulk delete action
     const handleBulkDelete = () => {
         if (onBulkDeleteClick && selectedElements.size > 0) {
@@ -549,42 +549,42 @@ export default function VectorResults({
             setAttributeCache((prev) => ({
                 ...prev,
                 [editingAttributes]: updatedAttributes,
-            }));
-            
+            }))
+
             try {
                 // Also update the parsed cache
-                const parsed = JSON.parse(updatedAttributes);
+                const parsed = JSON.parse(updatedAttributes)
                 setParsedAttributeCache((prev) => ({
                     ...prev,
                     [editingAttributes]: parsed,
-                }));
-                
+                }))
+
                 // Update available columns with any new attributes
-                const newColumns = new Set(Object.keys(parsed));
+                const newColumns = new Set(Object.keys(parsed))
                 setAvailableColumns((prev) => {
-                    const existingColumns = new Set(prev.map((c) => c.name));
-                    const updatedColumns = [...prev];
-                    
+                    const existingColumns = new Set(prev.map((c) => c.name))
+                    const updatedColumns = [...prev]
+
                     newColumns.forEach((colName) => {
                         if (!existingColumns.has(colName)) {
                             updatedColumns.push({
                                 name: colName,
                                 visible: true,
                                 type: "attribute",
-                            });
+                            })
                         }
-                    });
-                    
-                    return updatedColumns;
-                });
+                    })
+
+                    return updatedColumns
+                })
             } catch (e) {
-                console.error(`Error parsing updated attributes:`, e);
+                console.error(`Error parsing updated attributes:`, e)
             }
         }
-        
+
         // Clear the editing state
-        setEditingAttributes(null);
-    };
+        setEditingAttributes(null)
+    }
 
     // Add this helper function
     const formatAttributeValue = (value: AttributeValue): string => {
@@ -689,8 +689,8 @@ export default function VectorResults({
                     {!isLoaded
                         ? "Loading settings..."
                         : isLoading
-                        ? "Loading vector set..."
-                        : "Searching for vectors..."}
+                          ? "Loading vector set..."
+                          : "Searching for vectors..."}
                 </p>
             </div>
         )
@@ -705,7 +705,9 @@ export default function VectorResults({
         if (searchQuery === "") {
             return (
                 <div className="flex flex-col items-center justify-center py-12 space-y-4 text-gray-500">
-                    <p className="text-sm">Enter en element or vector to search on</p>
+                    <p className="text-sm">
+                        Enter en element or vector to search on
+                    </p>
                 </div>
             )
         } else {
@@ -853,11 +855,15 @@ export default function VectorResults({
                     ) : (
                         <>
                             {/* Message for empty search in Element search mode */}
-                            {searchType === "Element" && (searchQuery === undefined || searchQuery === "") && !isSearching && !isLoading && (
-                                <div className="ml-2 text-gray-500 text-sm flex items-center">
-                                    Enter an element ID to search
-                                </div>
-                            )}
+                            {searchType === "Element" &&
+                                (searchQuery === undefined ||
+                                    searchQuery === "") &&
+                                !isSearching &&
+                                !isLoading && (
+                                    <div className="ml-2 text-gray-500 text-sm flex items-center">
+                                        Enter an element ID to search
+                                    </div>
+                                )}
                         </>
                     )}
                 </div>
@@ -868,17 +874,17 @@ export default function VectorResults({
                             <span className="text-sm font-medium">
                                 {selectedElements.size} selected
                             </span>
-                            <Button 
-                                variant="outline" 
-                                size="sm" 
+                            <Button
+                                variant="outline"
+                                size="sm"
                                 onClick={handleSelectAll}
                                 className="text-xs"
                             >
                                 Select All
                             </Button>
-                            <Button 
-                                variant="outline" 
-                                size="sm" 
+                            <Button
+                                variant="outline"
+                                size="sm"
                                 onClick={handleDeselectAll}
                                 className="text-xs"
                                 disabled={selectedElements.size === 0}
@@ -894,9 +900,9 @@ export default function VectorResults({
                             >
                                 Delete Selected
                             </Button>
-                            <Button 
-                                variant="ghost" 
-                                size="sm" 
+                            <Button
+                                variant="ghost"
+                                size="sm"
                                 onClick={handleExitSelectMode}
                                 className="text-xs"
                             >
@@ -905,54 +911,56 @@ export default function VectorResults({
                         </div>
                     ) : (
                         <div className="flex items-center space-x-2">
-                            {/* Add a "Select" button to enable selection mode */}
-                            <Button 
-                                variant="outline" 
-                                onClick={() => setSelectMode(true)}
-                                disabled={results.length === 0}
-                            >
-                                <svg
-                                    className="w-5 h-5 mr-1"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    viewBox="0 0 24 24"
-                                >
-                                    <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        strokeWidth={2}
-                                        d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
-                                    />
-                                </svg>
-                                Select
-                            </Button>
-                            
                             {onAddVector && (
-                                <Button variant="outline" onClick={handleAddVector}>
-                                    <svg
-                                        className="w-5 h-5"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        viewBox="0 0 24 24"
-                                    >
-                                        <path
-                                            strokeLinecap="round"
-                                            strokeLinejoin="round"
-                                            strokeWidth={2}
-                                            d="M12 4v16m8-8H4"
-                                        />
-                                    </svg>
-                                    Add Vector
+                                <Button
+                                    variant="outline"
+                                    onClick={handleAddVector}
+                                >
+                                    <div className="flex items-center space-x-2">
+                                        <svg
+                                            className="w-5 h-5"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            viewBox="0 0 24 24"
+                                        >
+                                            <path
+                                                strokeLinecap="round"
+                                                strokeLinejoin="round"
+                                                strokeWidth={2}
+                                                d="M12 4v16m8-8H4"
+                                            />
+                                        </svg>
+                                        <div className="text-xs">
+                                            Add Vector
+                                        </div>
+                                    </div>
                                 </Button>
                             )}
+                            {/* Add a "Select" button to enable selection mode */}
+                            <Button
+                                variant="outline"
+                                onClick={() => setSelectMode(true)}
+                                disabled={results.length === 0}
+                                className="text-xs"
+                            >
+                                <CheckSquare className="w-5 h-5 mr-1" />
+                                Select
+                            </Button>
+
                             <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
-                                    <Button variant="outline">
+                                    <Button
+                                        variant="outline"
+                                        className="text-xs"
+                                    >
                                         <Settings className="h-4 w-4" />
                                         Options
                                     </Button>
                                 </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end" className="w-56">
+                                <DropdownMenuContent
+                                    align="end"
+                                    className="w-56"
+                                >
                                     <DropdownMenuCheckboxItem
                                         checked={isCompact}
                                         onCheckedChange={setIsCompact}
@@ -979,7 +987,9 @@ export default function VectorResults({
                                                     "Setting showOnlyFilteredAttributes to:",
                                                     checked
                                                 )
-                                                setShowOnlyFilteredAttributes(checked)
+                                                setShowOnlyFilteredAttributes(
+                                                    checked
+                                                )
                                             }}
                                             disabled={!showAttributes}
                                         >
@@ -987,7 +997,9 @@ export default function VectorResults({
                                         </DropdownMenuCheckboxItem>
                                     )}
                                     <DropdownMenuSeparator />
-                                    <DropdownMenuLabel>Columns</DropdownMenuLabel>
+                                    <DropdownMenuLabel>
+                                        Columns
+                                    </DropdownMenuLabel>
                                     {/* System Columns */}
                                     <DropdownMenuLabel className="text-xs text-gray-500 pl-2">
                                         System
@@ -1000,15 +1012,18 @@ export default function VectorResults({
                                                 checked={col.visible}
                                                 onCheckedChange={(checked) => {
                                                     // Update local state
-                                                    setAvailableColumns((prev) =>
-                                                        prev.map((c) =>
-                                                            c.name === col.name
-                                                                ? {
-                                                                      ...c,
-                                                                      visible: checked,
-                                                                  }
-                                                                : c
-                                                        )
+                                                    setAvailableColumns(
+                                                        (prev) =>
+                                                            prev.map((c) =>
+                                                                c.name ===
+                                                                col.name
+                                                                    ? {
+                                                                          ...c,
+                                                                          visible:
+                                                                              checked,
+                                                                      }
+                                                                    : c
+                                                            )
                                                     )
 
                                                     // Persist the change
@@ -1018,7 +1033,9 @@ export default function VectorResults({
                                                     )
                                                 }}
                                             >
-                                                {col.name.charAt(0).toUpperCase() +
+                                                {col.name
+                                                    .charAt(0)
+                                                    .toUpperCase() +
                                                     col.name.slice(1)}
                                             </DropdownMenuCheckboxItem>
                                         ))}
@@ -1038,7 +1055,9 @@ export default function VectorResults({
                                                 className="cursor-pointer"
                                             >
                                                 <div className="flex items-center justify-between w-full">
-                                                    <span>Attribute Columns</span>
+                                                    <span>
+                                                        Attribute Columns
+                                                    </span>
                                                     <span className="text-xs text-gray-500">
                                                         {
                                                             availableColumns.filter(
@@ -1078,14 +1097,23 @@ export default function VectorResults({
                                     <div className="flex items-center justify-center">
                                         <input
                                             type="checkbox"
-                                            checked={selectedElements.size === filteredAndSortedResults.length && filteredAndSortedResults.length > 0}
-                                            onChange={(e) => e.target.checked ? handleSelectAll() : handleDeselectAll()}
+                                            checked={
+                                                selectedElements.size ===
+                                                    filteredAndSortedResults.length &&
+                                                filteredAndSortedResults.length >
+                                                    0
+                                            }
+                                            onChange={(e) =>
+                                                e.target.checked
+                                                    ? handleSelectAll()
+                                                    : handleDeselectAll()
+                                            }
                                             className="h-4 w-4 rounded border-gray-300"
                                         />
                                     </div>
                                 </TableHead>
                             )}
-                            
+
                             {availableColumns
                                 .filter((col) => col.visible)
                                 .map((col) => {
@@ -1152,9 +1180,9 @@ export default function VectorResults({
                     </TableHeader>
                     <TableBody>
                         {filteredAndSortedResults.map((row, index) => (
-                            <TableRow 
-                                key={index} 
-                                className={`group ${selectedElements.has(row[0]) ? 'bg-blue-50' : ''}`}
+                            <TableRow
+                                key={index}
+                                className={`group ${selectedElements.has(row[0]) ? "bg-blue-50" : ""}`}
                             >
                                 {/* Add a checkbox cell when in select mode */}
                                 {selectMode && (
@@ -1162,22 +1190,39 @@ export default function VectorResults({
                                         <div className="flex items-center justify-center">
                                             <input
                                                 type="checkbox"
-                                                checked={selectedElements.has(row[0])}
-                                                onChange={() => handleSelectToggle(row[0])}
+                                                checked={selectedElements.has(
+                                                    row[0]
+                                                )}
+                                                onChange={() =>
+                                                    handleSelectToggle(row[0])
+                                                }
                                                 className="h-4 w-4 rounded border-gray-300"
-                                                onClick={(e) => e.stopPropagation()} // Prevent row click when clicking checkbox
+                                                onClick={(e) =>
+                                                    e.stopPropagation()
+                                                } // Prevent row click when clicking checkbox
                                             />
                                         </div>
                                     </TableCell>
                                 )}
-                                
+
                                 {availableColumns
                                     .filter((col) => col.visible)
                                     .map((col) => (
-                                        <TableCell 
-                                            key={col.name} 
-                                            onClick={selectMode ? () => handleSelectToggle(row[0]) : undefined}
-                                            className={selectMode ? 'cursor-pointer' : ''}
+                                        <TableCell
+                                            key={col.name}
+                                            onClick={
+                                                selectMode
+                                                    ? () =>
+                                                          handleSelectToggle(
+                                                              row[0]
+                                                          )
+                                                    : undefined
+                                            }
+                                            className={
+                                                selectMode
+                                                    ? "cursor-pointer"
+                                                    : ""
+                                            }
                                         >
                                             {col.type === "system" ? (
                                                 col.name === "element" ? (
@@ -1207,7 +1252,9 @@ export default function VectorResults({
                                                     variant="ghost"
                                                     size="icon"
                                                     onClick={() =>
-                                                        handleSearchSimilar(row[0])
+                                                        handleSearchSimilar(
+                                                            row[0]
+                                                        )
                                                     }
                                                     className="h-8 w-8"
                                                     title="Search similar vectors"
@@ -1230,7 +1277,10 @@ export default function VectorResults({
                                                     variant="ghost"
                                                     size="icon"
                                                     onClick={(e) =>
-                                                        onShowVectorClick(e, row[0])
+                                                        onShowVectorClick(
+                                                            e,
+                                                            row[0]
+                                                        )
                                                     }
                                                     className="h-8 w-8"
                                                     title="Copy vector"
@@ -1253,7 +1303,9 @@ export default function VectorResults({
                                                     variant="ghost"
                                                     size="icon"
                                                     onClick={() =>
-                                                        setEditingAttributes(row[0])
+                                                        setEditingAttributes(
+                                                            row[0]
+                                                        )
                                                     }
                                                     className="h-8 w-8"
                                                     title="Edit attributes"
@@ -1309,9 +1361,15 @@ export default function VectorResults({
                         <div
                             key={index}
                             className={`bg-[white] rounded-lg border p-4 hover:shadow-md group ${
-                                selectedElements.has(row[0]) ? 'border-blue-400 bg-blue-50' : ''
+                                selectedElements.has(row[0])
+                                    ? "border-blue-400 bg-blue-50"
+                                    : ""
                             }`}
-                            onClick={selectMode ? () => handleSelectToggle(row[0]) : undefined}
+                            onClick={
+                                selectMode
+                                    ? () => handleSelectToggle(row[0])
+                                    : undefined
+                            }
                         >
                             <div className="flex items-start justify-between w-full">
                                 {/* Add checkbox in non-compact view */}
@@ -1319,8 +1377,12 @@ export default function VectorResults({
                                     <div className="mr-2 mt-1">
                                         <input
                                             type="checkbox"
-                                            checked={selectedElements.has(row[0])}
-                                            onChange={() => handleSelectToggle(row[0])}
+                                            checked={selectedElements.has(
+                                                row[0]
+                                            )}
+                                            onChange={() =>
+                                                handleSelectToggle(row[0])
+                                            }
                                             className="h-4 w-4 rounded border-gray-300"
                                             onClick={(e) => e.stopPropagation()}
                                         />
