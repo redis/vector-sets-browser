@@ -63,7 +63,7 @@ export default function AdvancedConfigurationPanel({
             <div className="mb-6">
                 <h3 className="text-lg mb-2">Vector Index Options</h3>
                 <p className="text-gray-600 text-sm mb-4">
-                    Customize how vectors are indexed and retrieved
+                    Customize how vectors are indexed and retrieved. Achieve the best balance of performance, precision and storage size.
                 </p>
             </div>
 
@@ -132,7 +132,7 @@ export default function AdvancedConfigurationPanel({
                                             Dimension Reduction
                                         </label>
                                         <p className="text-xs text-gray-500">
-                                            Reduce dimensions for faster search
+                                            Reduce dimensions for faster search, lower precision
                                         </p>
                                     </div>
                                     <div className="grow"></div>
@@ -164,10 +164,10 @@ export default function AdvancedConfigurationPanel({
                                     >
                                         <div>
                                             <span className="text-sm font-medium block">
-                                                Default CAS
+                                                High performance multi-threading
                                             </span>
                                             <p className="text-xs text-gray-500">
-                                                Use Content Addressable Storage
+                                                Speeds up adds to the vector set using multi-threading Check and Set approach (CAS option)
                                             </p>
                                         </div>
                                     </label>
@@ -200,7 +200,7 @@ export default function AdvancedConfigurationPanel({
                                             Build Exploration Factor
                                         </label>
                                         <p className="text-xs text-gray-500">
-                                            Higher values improve recall, but increase search time
+                                            Higher values improve recall, but increase search time (EF option, default is 200, values between 100 and 1000)
                                         </p>
                                     </div>
                                     <div className="grow"></div>

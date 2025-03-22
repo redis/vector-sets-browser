@@ -6,6 +6,7 @@ import {
     getModelName,
     VectorSetMetadata,
 } from "@/app/embeddings/types/config"
+import { vinfo } from "@/app/redis-server/api"
 
 interface InfoPanelProps {
     vectorSetName: string
@@ -13,15 +14,29 @@ interface InfoPanelProps {
     dim: number | null
     metadata: VectorSetMetadata | null
     onEditConfig: () => void
+    onEditRedisConfig?: () => void
 }
 
+/* 
+    attributes-count
+    hnsw-m
+    hnsw-max-node-uid
+    max-level
+    quant-type
+    size
+    vector-dim
+    vset-uid
+*/
+
 interface VInfo {
-    quantType: string
-    vectorDim: number
-    size: number
-    maxLevel: number
-    vsetUid: number
+    attributesCount: number
+    hnswM: number
     hnswMaxNodeUid: number
+    maxLevel: number
+    quantType: string
+    size: number
+    vectorDim: number
+    vsetUid: number
 }
 
 export default function InfoPanel({
@@ -30,36 +45,39 @@ export default function InfoPanel({
     dim,
     metadata,
     onEditConfig,
+    onEditRedisConfig,
 }: InfoPanelProps) {
     const [vInfo, setVInfo] = useState<VInfo | null>(null)
 
     useEffect(() => {
         async function fetchVInfo() {
             try {
-                const response = await fetch("/api/redis/command/vinfo", {
-                    method: "POST",
-                    body: JSON.stringify({
-                        keyName: vectorSetName,
-                    }),
-                })
-                const data = await response.json()
-                if (data.success) {
-                    console.log(data)
-                    setVInfo({
-                        quantType: data.result["quant-type"],
-                        vectorDim: data.result["vector-dim"],
-                        size: data.result["size"],
-                        maxLevel: data.result["max-level"],
-                        vsetUid: data.result["vset-uid"],
-                        hnswMaxNodeUid: data.result["hnsw-max-node-uid"],
-                    })
+                console.log("Fetching vinfo for:", vectorSetName)
+                console.log("Metadata:", metadata)
+                const vInfoData = await vinfo({ keyName: vectorSetName })
+
+                if (!vInfoData) {
+                    console.error("Failed to fetch vinfo:", vInfoData)
+                    return
                 }
+                console.log("VINFO data:", vInfoData)
+
+                setVInfo({
+                    attributesCount: Number(vInfoData["attributes-count"]),
+                    hnswM: Number(vInfoData["hnsw-m"]),
+                    hnswMaxNodeUid: Number(vInfoData["hnsw-max-node-uid"]),
+                    maxLevel: Number(vInfoData["max-level"]),
+                    quantType: String(vInfoData["quant-type"]),
+                    size: Number(vInfoData["size"]),
+                    vectorDim: Number(vInfoData["vector-dim"]),
+                    vsetUid: Number(vInfoData["vset-uid"]),
+                })
             } catch (error) {
                 console.error("Failed to fetch vinfo:", error)
             }
         }
         fetchVInfo()
-    }, [])
+    }, [vectorSetName])
 
     return (
         <div className="flex flex-col gap-4">
@@ -81,16 +99,10 @@ export default function InfoPanel({
                         This section contains information about the vector set
                         returned from the <strong>VINFO</strong> command
                     </p>
-                    <div className="grid grid-cols-4 gap-2 p-4">
-                        <div className="text-gray-600">Vectors:</div>
-                        <div>
-                            {recordCount !== null
-                                ? recordCount.toLocaleString()
-                                : "Loading..."}
-                        </div>
-                    </div>
                     {vInfo && (
                         <div className="grid grid-cols-4 gap-2 p-4">
+                            <div className="text-gray-600">Size:</div>
+                            <div>{vInfo.size}</div>
                             <div className="text-gray-600">
                                 Vector Dimensions:
                             </div>
@@ -99,8 +111,6 @@ export default function InfoPanel({
                                 Quantization Type:
                             </div>
                             <div>{vInfo.quantType}</div>
-                            <div className="text-gray-600">Size:</div>
-                            <div>{vInfo.size}</div>
                             <div className="text-gray-600">Max Level:</div>
                             <div>{vInfo.maxLevel}</div>
                             <div className="text-gray-600">VSet UID:</div>
@@ -109,6 +119,86 @@ export default function InfoPanel({
                                 HNSW Max Node UID:
                             </div>
                             <div>{vInfo.hnswMaxNodeUid}</div>
+                            <div className="text-gray-600">HNSW M:</div>
+                            <div>{vInfo.hnswM}</div>
+                            <div className="text-gray-600">
+                                Attributes Count:
+                            </div>
+                            <div>{vInfo.attributesCount}</div>
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
+
+            <Card>
+                <CardHeader>
+                    <div className="flex items-center w-full space-x-2">
+                        <CardTitle>Vector Set Advanced Configuration</CardTitle>
+                        <div className="grow"></div>
+                    </div>
+                </CardHeader>
+                <CardContent>
+                    <p className="text-sm text-gray-600">
+                        These advanced settings control how Redis manages and
+                        stores your vector set. Modifying these settings may
+                        require recreating the vector set.
+                    </p>
+                    {metadata?.redisConfig && (
+                        <div className="flex items-center gap-4 p-4">
+                            <div className="grow">
+                                <div className="grid grid-cols-2 gap-2 text-sm">
+                                    <div className="text-gray-600">
+                                        Quantization:
+                                    </div>
+                                    <div>
+                                        {metadata.redisConfig.quantization}
+                                    </div>
+
+                                    {metadata.redisConfig.reduceDimensions && (
+                                        <>
+                                            <div className="text-gray-600">
+                                                Reduced Dimensions:
+                                            </div>
+                                            <div>
+                                                {
+                                                    metadata.redisConfig
+                                                        .reduceDimensions
+                                                }
+                                            </div>
+                                        </>
+                                    )}
+
+                                    <div className="text-gray-600">
+                                        Default CAS:
+                                    </div>
+                                    <div>
+                                        {metadata.redisConfig.defaultCAS
+                                            ? "Enabled"
+                                            : "Disabled"}
+                                    </div>
+
+                                    {metadata.redisConfig
+                                        .buildExplorationFactor && (
+                                        <>
+                                            <div className="text-gray-600">
+                                                Build EF:
+                                            </div>
+                                            <div>
+                                                {
+                                                    metadata.redisConfig
+                                                        .buildExplorationFactor
+                                                }
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
+                            </div>
+                            <Button
+                                variant="default"
+                                onClick={onEditRedisConfig}
+                            >
+                                Edit
+                            </Button>
                         </div>
                     )}
                 </CardContent>
@@ -167,52 +257,6 @@ export default function InfoPanel({
                     )}
                 </CardContent>
             </Card>
-
-            {metadata?.redisConfig && (
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Redis Configuration</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="grid grid-cols-2 gap-2 text-sm">
-                            <div className="text-gray-600">Quantization:</div>
-                            <div>{metadata.redisConfig.quantization}</div>
-
-                            {metadata.redisConfig.reduceDimensions && (
-                                <>
-                                    <div className="text-gray-600">
-                                        Reduced Dimensions:
-                                    </div>
-                                    <div>
-                                        {metadata.redisConfig.reduceDimensions}
-                                    </div>
-                                </>
-                            )}
-
-                            <div className="text-gray-600">Default CAS:</div>
-                            <div>
-                                {metadata.redisConfig.defaultCAS
-                                    ? "Enabled"
-                                    : "Disabled"}
-                            </div>
-
-                            {metadata.redisConfig.buildExplorationFactor && (
-                                <>
-                                    <div className="text-gray-600">
-                                        Build EF:
-                                    </div>
-                                    <div>
-                                        {
-                                            metadata.redisConfig
-                                                .buildExplorationFactor
-                                        }
-                                    </div>
-                                </>
-                            )}
-                        </div>
-                    </CardContent>
-                </Card>
-            )}
         </div>
     )
 }

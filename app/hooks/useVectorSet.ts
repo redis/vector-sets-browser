@@ -194,18 +194,22 @@ export function useVectorSet(): UseVectorSetReturn {
                 throw new Error(`Invalid vector: ${validationResult.error || "contains NaN or Infinity values"}`)
             }
 
-            // TODO: FIX ATTRIBUTES 
-            
+            // Create an empty attributes object
+            const attrs = {}
+
             // Use original vector
             const result = await vadd({
                 keyName: vectorSetName,
                 element,
                 vector: newVector as number[],
                 attributes: JSON.stringify(attrs),
-                useCAS,
+                useCAS: useCAS || metadata?.redisConfig?.defaultCAS,
+                reduceDimensions: metadata?.redisConfig?.reduceDimensions,
+                ef: metadata?.redisConfig?.buildExplorationFactor,
+                quantization: metadata?.redisConfig?.quantization,
             })
 
-            if (result === 0 && useCAS === true) {
+            if (!result.success) {
                 throw new Error(
                     `Element "${element}" already exists in vector set "${vectorSetName}"`
                 )

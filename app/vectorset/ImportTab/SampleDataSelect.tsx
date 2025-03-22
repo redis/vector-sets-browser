@@ -29,6 +29,7 @@ export interface SampleDataset {
     attributeColumns: string[]
     dataType: "text" | "image"
     embeddingType: "text" | "image"
+    recommendedEmbedding: EmbeddingConfig
 }
 
 // Pre-defined sample datasets
@@ -63,6 +64,13 @@ export const sampleDatasets: SampleDataset[] = [
         ],
         dataType: "text",
         embeddingType: "text",
+        recommendedEmbedding: {
+            provider: "ollama",
+            ollama: {
+                modelName: "mxbai-embed-large",
+                apiUrl: "http://localhost:11434/api/embeddings"
+            }
+        }
     },
     {
         name: "UTK Faces",
@@ -76,6 +84,12 @@ export const sampleDatasets: SampleDataset[] = [
         attributeColumns: ["age", "gender", "ethnicity"],
         dataType: "image",
         embeddingType: "image",
+        recommendedEmbedding: {
+            provider: "image",
+            image: {
+                model: "mobilenet"
+            }
+        }
     },
 
     {
@@ -116,11 +130,17 @@ export const sampleDatasets: SampleDataset[] = [
         ],
         dataType: "text",
         embeddingType: "text",
+        recommendedEmbedding: {
+            provider: "tensorflow",
+            tensorflow: {
+                model: "universal-sentence-encoder"
+            }
+        }
     },
 ]
 
 interface SampleDataSelectProps {
-    onSelect: (dataset: SampleDataset, embeddingConfig: EmbeddingConfig) => void
+    onSelect: (dataset: SampleDataset) => void
     onCancel: () => void
     selectedDataset?: string | null
     useCarousel?: boolean
@@ -144,7 +164,9 @@ export function SampleDataSelect({
             const configs: Record<string, EmbeddingConfig> = {}
             
             for (const dataset of sampleDatasets) {
-                const config = await getDefaultEmbeddingConfig(dataset.embeddingType)
+                // Use recommended embedding as default if available, otherwise get default
+                const config = dataset.recommendedEmbedding || 
+                    await getDefaultEmbeddingConfig(dataset.embeddingType)
                 configs[dataset.name] = config
             }
             
@@ -171,8 +193,7 @@ export function SampleDataSelect({
             return
         }
         
-        const embeddingConfig = embeddingConfigs[selected.name] || await getDefaultEmbeddingConfig(selected.embeddingType)
-        onSelect(selected, embeddingConfig)
+        onSelect(selected)
     }
 
     return (

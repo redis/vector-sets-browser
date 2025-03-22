@@ -96,6 +96,7 @@ export interface VaddRequestBody {
     reduceDimensions?: number;
     useCAS?: boolean;
     ef?: number;
+    quantization?: string;
     returnCommandOnly?: boolean;
 }
 

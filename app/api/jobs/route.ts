@@ -12,7 +12,6 @@ export async function GET(req: NextRequest) {
     let url;
     let jobId;
     let vectorSetName;
-    
     try {
         url = new URL(req.url);
         jobId = url.searchParams.get("jobId");
@@ -38,17 +37,22 @@ export async function GET(req: NextRequest) {
                 JobQueueService.getJobProgress(redisUrl, jobId),
                 JobQueueService.getJobMetadata(redisUrl, jobId),
             ])
-
+            
             if (!status) {
                 return NextResponse.json(
                     { success: false, error: "Job not found" },
                     { status: 404 }
                 )
             }
-
+            
+            // Return the job details directly without unnecessary wrapping
             return NextResponse.json({ 
                 success: true,
-                result: { jobId, status, metadata }
+                result: { 
+                    jobId, 
+                    status, 
+                    metadata 
+                }
             })
         }
 
@@ -58,13 +62,20 @@ export async function GET(req: NextRequest) {
             async (client) => {
                 const keys = await client.keys("job:*:status")
                 const jobs = []
-
+                console.log("[Jobs API] Found", keys.length, "jobs")
+                console.log("[Jobs API] Keys:", keys)
+                
                 for (const key of keys) {
                     const jobId = key.split(":")[1]
+                    
+                    // Skip if the key format is invalid
+                    if (!jobId) continue;
+                    
                     const [status, metadata] = await Promise.all([
                         JobQueueService.getJobProgress(redisUrl, jobId),
                         JobQueueService.getJobMetadata(redisUrl, jobId),
                     ])
+                    
                     if (status && metadata) {
                         // If vectorSetName is provided, only include jobs for that vector set
                         if (
@@ -73,10 +84,17 @@ export async function GET(req: NextRequest) {
                         ) {
                             continue
                         }
-                        jobs.push({ jobId, status, metadata })
+                        
+                        // Add the job with proper structure
+                        jobs.push({ 
+                            jobId, 
+                            status, 
+                            metadata 
+                        })
                     }
                 }
-
+                
+                console.log("[Jobs API] Found", jobs.length, "jobs")
                 return jobs
             }
         )

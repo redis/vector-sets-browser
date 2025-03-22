@@ -28,6 +28,7 @@ export class EmbeddingService {
         config: EmbeddingConfig,
         isImage: boolean = false
     ): Promise<number[]> {
+        console.log("[EmbeddingService] Getting embedding for input:", input.substring(0, 10), "...")
         // For image data, ensure we're using the image provider
         if (isImage && config.provider !== PROVIDERS.IMAGE) {
             throw new Error(`Provider ${config.provider} does not support image data`)
@@ -40,6 +41,7 @@ export class EmbeddingService {
         // Check cache first if caching is enabled
         const cachedEmbedding = await this.cache.get(input, config)
         if (cachedEmbedding) {
+            console.log("[EmbeddingService] Returning cached embedding")
             return cachedEmbedding
         }
 
@@ -49,8 +51,14 @@ export class EmbeddingService {
         }
 
         const embedding = await provider.getEmbedding(input, config)
+        // TODO: Validate the embedding
+        // THIS DOES NOT WORK WITH REDUCE... WE lose track of the original embedding size
+        // and the VDIM returns the REDUCE size...
+        // ideally we should remember the original embedding size and use that,
+        // but the question is with REDUCE can you throw any size embedding at it, and it will
+        // normalize it to the expected dimensions? 
+        // TODO: We should test this... 
         const expectedDimensions = getExpectedDimensions(config)
-
         // Validate the embedding 
         const validationResult = validateVector(
             embedding, 

@@ -53,6 +53,18 @@ export default function VectorSetPage() {
     const [activeTab, setActiveTab] = useState("search")
     // Keep track of search state per vector set
     const [isVectorSetChanging, setIsVectorSetChanging] = useState(false)
+    // Add state to track if we should auto-open sample data dialog
+    const [openSampleData, setOpenSampleData] = useState(false)
+
+    // Function to change active tab - can be passed to child components
+    const changeTab = (tabName: string, options?: { openSampleData?: boolean }) => {
+        setActiveTab(tabName);
+        if (options?.openSampleData) {
+            setOpenSampleData(true);
+        } else {
+            setOpenSampleData(false);
+        }
+    }
 
     const {
         redisUrl,
@@ -261,6 +273,8 @@ export default function VectorSetPage() {
                         value={activeTab}
                         onValueChange={(value) => {
                             setActiveTab(value)
+                            // Reset the sample data flag when manually changing tabs
+                            setOpenSampleData(false);
                         }}
                     >
                         <TabsList className="bg-gray-200 w-full">
@@ -291,6 +305,7 @@ export default function VectorSetPage() {
                             <ImportTab
                                 vectorSetName={vectorSetName}
                                 metadata={metadata}
+                                initialShowSampleData={openSampleData}
                             />
                         </TabsContent>
 
@@ -309,6 +324,7 @@ export default function VectorSetPage() {
                                     isLoading={isVectorSetChanging}
                                     results={results}
                                     setResults={setResults}
+                                    changeTab={changeTab}
                                 />
                             )}
                         </TabsContent>

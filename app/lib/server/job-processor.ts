@@ -2,11 +2,13 @@ import {
     CSVJobMetadata,
     getJobStatusKey,
     JobProgress,
+    CSVRow,
 } from "@/app/types/job-queue"
 import { JobQueueService } from "./job-queue"
 import RedisClient from "../../redis-server/server/commands"
 import eventBus, { AppEvents } from "@/app/utils/eventEmitter"
 import { registerCompletedJob } from "@/app/api/jobs/completed/route"
+import { broadcastEvent } from "@/app/api/sse/route"
 
 export class JobProcessor {
     private url: string
@@ -49,9 +51,9 @@ export class JobProcessor {
         if (!response.ok) {
             console.error(
                 "[JobProcessor] Failed to get embedding for text:",
-                text
+                text.substring(0, 40) + "..."
             )
-            throw new Error(`Failed to get embedding: ${text}`)
+            throw new Error(`Failed to get embedding: ${text.substring(0, 10)}..., ${response.statusText}`)
         }
 
         const data = await response.json()
@@ -76,41 +78,49 @@ export class JobProcessor {
     private async updateProgress(
         progress: Partial<JobProgress>
     ): Promise<void> {
-        console.log(
-            `[JobProcessor] Updating progress for job ${this.jobId}:`,
-            progress
-        )
-        await RedisClient.withConnection(this.url, async (client) => {
-            const statusKey = getJobStatusKey(this.jobId)
+        try {
+            // Use the JobQueueService's implementation to update progress
+            // This provides a single consistent implementation and avoids duplication
+            const updatedProgress = await JobQueueService.updateJobProgress(
+                this.url,
+                this.jobId,
+                progress
+            );
+            
+            // If there was a status change, try to emit an event and register for client notification
+            if (progress.status && this.metadata?.vectorSetName) {
+                const statusData = {
+                    vectorSetName: this.metadata.vectorSetName,
+                    status: progress.status,
+                    jobId: this.jobId
+                };
 
-            // First check if the job status key exists
-            const exists = await client.exists(statusKey)
-            if (!exists) {
-                console.log(
-                    `[JobProcessor] Job ${this.jobId} status no longer exists, skipping progress update`
-                )
-                return
+                // Try to emit an event (works client-side)
+                try {
+                    eventBus.emit(AppEvents.JOB_STATUS_CHANGED, statusData)
+                } catch (error) {
+                    console.warn("Could not emit job status change event directly (expected in server context)", error)
+                }
+                
+                // Broadcast using SSE
+                try {
+                    broadcastEvent(AppEvents.JOB_STATUS_CHANGED, statusData);
+                    console.log(`Broadcast job status ${progress.status} for ${this.metadata.vectorSetName} via SSE`);
+                } catch (error) {
+                    console.warn("Could not broadcast via SSE:", error);
+                }
+                
+                // Register status change for client notification via completed jobs API
+                if (progress.status === "completed" || progress.status === "failed" || progress.status === "cancelled") {
+                    registerCompletedJob(this.jobId, this.metadata.vectorSetName)
+                }
             }
-
-            const currentStatus = await client.hGetAll(statusKey)
-            const currentData = currentStatus?.data
-                ? JSON.parse(currentStatus.data)
-                : {}
-
-            // If the job is already marked as cancelled, don't update unless we're explicitly setting cancelled status
-            if (
-                currentData.status === "cancelled" &&
-                progress.status !== "cancelled"
-            ) {
-                console.log(
-                    `[JobProcessor] Job ${this.jobId} is cancelled, skipping non-cancellation progress update`
-                )
-                return
-            }
-
-            const updatedData = { ...currentData, ...progress }
-            await client.hSet(statusKey, { data: JSON.stringify(updatedData) })
-        })
+        } catch (error) {
+            console.error(
+                `Error updating progress for job ${this.jobId}:`,
+                error
+            )
+        }
     }
 
     private async addToRedis(
@@ -138,7 +148,6 @@ export class JobProcessor {
 
         // Add attributes if they exist
         if (attributes && Object.keys(attributes).length > 0) {
-            console.log(`[JobProcessor] Adding attributes:`, attributes)
             command.push("SETATTR")
 
             // Convert attributes to JSON string
@@ -250,14 +259,24 @@ export class JobProcessor {
                     if (this.metadata?.vectorSetName) {
                         console.log(`[JobProcessor] Emitting VECTORS_IMPORTED event for ${this.metadata.vectorSetName}`)
                         
+                        const importData = {
+                            vectorSetName: this.metadata.vectorSetName,
+                            jobId: this.jobId
+                        };
+                        
                         // Try to emit an event, which only works client-side
                         try {
-                            eventBus.emit(AppEvents.VECTORS_IMPORTED, {
-                                vectorSetName: this.metadata.vectorSetName,
-                                jobId: this.jobId
-                            })
+                            eventBus.emit(AppEvents.VECTORS_IMPORTED, importData)
                         } catch (error) {
                             console.warn("Could not emit event directly (expected in server context)", error)
+                        }
+                        
+                        // Broadcast through SSE
+                        try {
+                            broadcastEvent(AppEvents.VECTORS_IMPORTED, importData);
+                            console.log(`Broadcast VECTORS_IMPORTED for ${this.metadata.vectorSetName} via SSE`);
+                        } catch (error) {
+                            console.warn("Could not broadcast via SSE:", error);
                         }
                         
                         // Register the completed job for client polling
@@ -338,14 +357,14 @@ export class JobProcessor {
                     console.log(
                         `[JobProcessor] Processing item ${item.index + 1}`
                     )
-                    console.log(
-                        `[JobProcessor] Raw row data:`,
-                        JSON.stringify(item.rowData, null, 2)
-                    )
+                    // console.log(
+                    //     `[JobProcessor] Raw row data:`,
+                    //     JSON.stringify(item.rowData, null, 2)
+                    // )
 
                     let elementId: string
                     let textToEmbed: string
-                    let embedding: number[]
+                    let embedding: number[] | undefined
 
                     // Handle image file type with pre-computed vector
                     if (this.metadata.fileType === 'image' || this.metadata.fileType === 'images') {

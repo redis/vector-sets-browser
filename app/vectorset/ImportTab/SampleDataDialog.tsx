@@ -18,7 +18,7 @@ interface SampleDataDialogProps {
     vectorSetName: string
     metadata: VectorSetMetadata | null
     onUpdateMetadata?: (metadata: VectorSetMetadata) => void
-    onImportComplete?: () => void
+    onImportComplete?: (success: boolean) => void
 }
 
 export function SampleDataDialog({
@@ -32,6 +32,7 @@ export function SampleDataDialog({
     const [step, setStep] = useState<"select" | "import">("select")
     const [selectedDataset, setSelectedDataset] =
         useState<SampleDataset | null>(null)
+    const [importSuccess, setImportSuccess] = useState(false)
 
     const handleSelectDataset = (dataset: SampleDataset) => {
         setSelectedDataset(dataset)
@@ -39,7 +40,12 @@ export function SampleDataDialog({
     }
 
     const handleClose = () => {
-        console.log("handleClose")
+        console.log("handleClose called with importSuccess:", importSuccess)
+        
+        // Check if we need to signal import completion before closing
+        const wasInImportStep = step === "import"
+        const successState = importSuccess; // Capture current success state
+        
         // Reset state when dialog closes
         onOpenChange(false)
 
@@ -50,8 +56,14 @@ export function SampleDataDialog({
             setSelectedDataset(null)
         }, 200)
 
-        if (step === "import" && onImportComplete) {
-            onImportComplete()
+        // Only call onImportComplete after the dialog is closed
+        // and only if we were in the import step
+        if (wasInImportStep && onImportComplete) {
+            // Add a longer delay to ensure the dialog is closed first
+            setTimeout(() => {
+                console.log("Calling onImportComplete with success:", successState)
+                onImportComplete(successState)
+            }, 500)
         }
     }
 
@@ -93,7 +105,15 @@ export function SampleDataDialog({
                             vectorSetName={vectorSetName}
                             metadata={metadata}
                             onUpdateMetadata={onUpdateMetadata}
-                            onClose={handleClose}
+                            onClose={() => {
+                                console.log("SampleDataImporter onClose called");
+                                // Set import success flag explicitly
+                                setImportSuccess(true);
+                                // Use setTimeout to ensure state is updated before handleClose is called
+                                setTimeout(() => {
+                                    handleClose();
+                                }, 100);
+                            }}
                         />
                     )}
                 </div>

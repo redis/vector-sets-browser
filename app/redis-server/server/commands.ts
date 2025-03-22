@@ -1,10 +1,13 @@
 import {
     validateAndCorrectMetadata,
     VectorSetMetadata,
+    getExpectedDimensions
 } from "@/app/embeddings/types/config"
 import { VaddRequestBody } from "@/app/redis-server/api"
 import { cookies } from "next/headers"
 import { createClient, RedisClientType } from "redis"
+import { OllamaProvider } from "@/app/embeddings/providers/ollama"
+import { EmbeddingService } from "@/app/embeddings/service"
 
 // Types for Redis operations
 export interface RedisVectorMetadata {
@@ -284,10 +287,14 @@ export async function vadd(redisUrl: string, request: VaddRequestBody) : Promise
         if (request.useCAS) {
             command.push("CAS")
         }
+        if (request.quantization) {
+            command.push(request.quantization)
+        }
 
         if (request.ef) {
             command.push("EF", request.ef.toString())
         }
+
         const finalCommand = command.join(" ")
 
         // If returnCommandOnly is set, just return the command string
@@ -783,56 +790,43 @@ export async function createVectorSet(
 
         let effectiveDimensions = dimensions
 
-        // If dimensions is 0 and we have Ollama config, get dimensions from a test embedding
-        if (
-            metadata?.embedding?.provider === "ollama" &&
-            metadata.embedding.ollama
-        ) {
-            try {
-                const ollama = metadata.embedding.ollama
-                // Get a test embedding to determine dimensions
-                const response = await fetch(ollama.apiUrl, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        model: ollama.modelName,
-                        prompt: "test", // Simple test prompt
-                    }),
-                })
-                if (!response.ok) {
-                    throw new Error(`Ollama API error: ${response.statusText}`)
-                }
-
-                const data = await response.json()
-                effectiveDimensions = data.embedding.length
-            } catch (error) {
-                throw new Error(
-                    `Failed to get dimensions from Ollama: ${
-                        error instanceof Error ? error.message : String(error)
-                    }`
-                )
-            }
-        }
-        // If dimensions is 0 and we have TensorFlow config, get dimensions from metadata
-        else if (metadata?.embedding?.provider === "tensorflow") {
-            try {
-                // Get dimensions from metadata
-                if (metadata.dimensions) {
-                    effectiveDimensions = metadata.dimensions
-                } else {
+        // If dimensions is not specified or zero, try to determine from metadata and/or embedding service
+        if (!dimensions || dimensions < 2) {
+            // First, try to get dimensions from metadata directly
+            if (metadata?.dimensions && metadata.dimensions >= 2) {
+                effectiveDimensions = metadata.dimensions;
+                console.log(`Using dimensions from metadata: ${effectiveDimensions}`)
+            } 
+            // If not available in metadata, try to determine from embedding configuration
+            else if (metadata?.embedding) {
+                try {
+                    // Try to get expected dimensions from config
+                    const expectedDimensions = getExpectedDimensions(metadata.embedding)
+                    
+                    if (expectedDimensions >= 2) {
+                        effectiveDimensions = expectedDimensions
+                        console.log(`Using dimensions from config: ${effectiveDimensions}`)
+                    } else {
+                        // If can't determine from config, use EmbeddingService to get a test embedding
+                        const embeddingService = new EmbeddingService()
+                        console.log("Getting dimensions from EmbeddingService")
+                        console.log("metadata.embedding", metadata.embedding)
+                        
+                        // Get a test embedding to determine dimensions
+                        const testEmbedding = await embeddingService.getEmbedding("test", metadata.embedding)
+                        effectiveDimensions = testEmbedding.length
+                        console.log(`Determined dimensions using test embedding: ${effectiveDimensions}`)
+                    }
+                } catch (error) {
                     throw new Error(
-                        "TensorFlow dimensions not found in metadata"
+                        `Failed to determine vector dimensions: ${
+                            error instanceof Error ? error.message : String(error)
+                        }`
                     )
                 }
-            } catch (error) {
-                throw new Error(
-                    `Failed to get dimensions for TensorFlow: ${
-                        error instanceof Error ? error.message : String(error)
-                    }`
-                )
+            } else {
+                throw new Error("Dimensions must be at least 2")
             }
-        } else if (!dimensions || dimensions < 2) {
-            throw new Error("Dimensions must be at least 2")
         }
 
         // Create the vector set with either the custom vector or a dummy vector

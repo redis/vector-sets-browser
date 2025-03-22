@@ -8,8 +8,10 @@ export class OllamaProvider implements EmbeddingProvider {
         }
 
         const prompt = config.ollama.promptTemplate?.replace("{text}", input) || input
+        console.log("[OllamaProvider] config: ", config.ollama)
+        console.log("[OllamaProvider] prompt: ", prompt)
 
-        const response = await fetch(config.ollama.apiUrl, {
+        const response = await fetch(`${config.ollama.apiUrl}/api/embeddings`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({

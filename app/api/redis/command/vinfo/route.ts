@@ -15,7 +15,7 @@ export async function POST(request: Request) {
             )
         }
 
-        const redisUrl = redis.getRedisUrl()
+        const redisUrl = await redis.getRedisUrl()
         if (!redisUrl) {
             return NextResponse.json(
                 { success: false, error: "No Redis connection available" },

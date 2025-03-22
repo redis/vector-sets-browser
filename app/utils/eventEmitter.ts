@@ -8,7 +8,8 @@ export enum AppEvents {
   VECTOR_SET_UPDATED = "vector_set_updated",
   VECTOR_ADDED = "vector_added",
   VECTOR_DELETED = "vector_deleted",
-  VECTORS_IMPORTED = "vectors_imported"
+  VECTORS_IMPORTED = "vectors_imported",
+  JOB_STATUS_CHANGED = "job_status_changed"
 }
 
 class EventEmitter {

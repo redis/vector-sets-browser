@@ -14,6 +14,7 @@ export interface JobProgress {
     status: JobStatus
     message?: string
     error?: string
+    timestamp?: number
 }
 
 export interface CSVJobMetadata {

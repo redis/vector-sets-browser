@@ -42,6 +42,7 @@ import {
 } from "lucide-react"
 import { useEffect, useMemo, useRef, useState } from "react"
 import EditAttributesDialog from "./EditAttributesDialog"
+import EmptyVectorSet from "./EmptyVectorSet"
 
 interface VectorResultsProps {
     results: VectorTuple[]
@@ -58,6 +59,7 @@ interface VectorResultsProps {
     isSearching?: boolean
     isLoading?: boolean
     searchType?: "Vector" | "Element" | "Image"
+    changeTab?: (tab: string, options?: { openSampleData?: boolean }) => void
 }
 
 type SortColumn = "element" | "score" | "none"
@@ -205,6 +207,7 @@ export default function VectorResults({
     searchTime,
     isLoading,
     searchType,
+    changeTab,
 }: VectorResultsProps) {
     const [isCompact, setIsCompact] = useState(true)
     const {
@@ -677,6 +680,13 @@ export default function VectorResults({
         }
     }
 
+    // Check if the only result is the default first vector
+    const isEmptyVectorSet = useMemo(() => {
+        return (
+            results.length === 1 && results[0][0] === "First Vector (Default)"
+        )
+    }, [results])
+
     // Update the early return to handle both empty results and loading state
     if (!isLoaded || isLoading || isSearching) {
         return (
@@ -696,6 +706,16 @@ export default function VectorResults({
         )
     }
 
+    // Check for empty vector set (only has default vector)
+    if (isEmptyVectorSet) {
+        return (
+            <EmptyVectorSet
+                onAddVector={onAddVector || (() => {})}
+                onChangeTab={changeTab || (() => {})}
+            />
+        )
+    }
+
     if (results.length === 0) {
         // Only show "No results" message if we're not in a loading state
         // and we have a valid vector set name
@@ -706,7 +726,7 @@ export default function VectorResults({
             return (
                 <div className="flex flex-col items-center justify-center py-12 space-y-4 text-gray-500">
                     <p className="text-sm">
-                        Enter en element or vector to search on
+                        Enter an element or vector to search on
                     </p>
                 </div>
             )

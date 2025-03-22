@@ -8,9 +8,7 @@ export async function GET(
     request: NextRequest,
     { params }: { params: { setname: string } }
 ) {
-    try {
-        console.log("GET /api/vectorset/[setname]/metadata", params)
-        
+    try {        
         const parsedParams = await params;
         
         if (!parsedParams || !parsedParams.setname) {

@@ -7,7 +7,7 @@ import {
     VectorSetSearchState,
 } from "@/app/hooks/useVectorSearch"
 import { VectorTuple, vlinks } from "@/app/redis-server/api"
-import { useCallback, useState } from "react"
+import { useCallback, useState, useEffect } from "react"
 import { toast } from "sonner"
 import VectorResults from "./VectorResults"
 import { userSettings } from "@/app/utils/userSettings"
@@ -26,6 +26,7 @@ interface VectorSearchTabProps {
     isLoading: boolean
     results: VectorTuple[]
     setResults: (results: VectorTuple[]) => void
+    changeTab: (tab: string, options?: { openSampleData?: boolean }) => void
 }
 
 export default function VectorSearchTab({
@@ -39,6 +40,7 @@ export default function VectorSearchTab({
     isLoading,
     results,
     setResults,
+    changeTab,
 }: VectorSearchTabProps) {
     // Load persisted expansion factor settings
     const useCustomEF = userSettings.get("useCustomEF") ?? false
@@ -225,6 +227,7 @@ export default function VectorSearchTab({
                             searchTime={searchTime}
                             isLoading={isLoading}
                             onBulkDeleteClick={handleBulkDeleteClick}
+                            changeTab={changeTab}
                         />
                     </TabsContent>
 

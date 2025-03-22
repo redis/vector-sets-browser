@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { AlertCircle } from "lucide-react"
+import { AlertCircle, Edit2, CheckCircle2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Slider } from "@/components/ui/slider"
@@ -20,6 +20,8 @@ import { SampleDataset } from "./SampleDataSelect"
 import { VectorSetMetadata, isImageEmbedding, isTextEmbedding, createVectorSetMetadata } from "@/app/embeddings/types/config"
 import { jobs, ImportJobConfig } from "@/app/api/jobs"
 import { getImageEmbedding } from "@/app/utils/imageEmbedding"
+import EditEmbeddingConfigModal from "@/app/components/EmbeddingConfig/EditEmbeddingConfigDialog"
+import { EmbeddingConfig } from "@/app/embeddings/types/config"
 
 interface SampleDataImporterProps {
     dataset: SampleDataset
@@ -50,6 +52,17 @@ export function SampleDataImporter({
         open: boolean
         currentEmbedding: VectorSetMetadata | null
     }>({ open: false, currentEmbedding: null })
+    const [isEditingEmbedding, setIsEditingEmbedding] = useState(false)
+    const [currentEmbeddingConfig, setCurrentEmbeddingConfig] = useState<EmbeddingConfig | null>(
+        dataset.recommendedEmbedding || null
+    )
+
+    // Initialize the current embedding config from dataset's recommended embedding
+    useEffect(() => {
+        if (dataset && dataset.recommendedEmbedding) {
+            setCurrentEmbeddingConfig(dataset.recommendedEmbedding)
+        }
+    }, [dataset])
 
     // Check if the embedding is compatible with the dataset
     const isEmbeddingCompatible = (
@@ -82,10 +95,10 @@ export function SampleDataImporter({
                 return
             }
         } else {
-            // If no metadata exists, create one with the recommended embedding
-            if (onUpdateMetadata) {
+            // If no metadata exists, create one with the current embedding config
+            if (onUpdateMetadata && currentEmbeddingConfig) {
                 const newMetadata = createVectorSetMetadata(
-                    dataset.recommendedEmbedding,
+                    currentEmbeddingConfig,
                     `Automatically configured for ${dataset.name}`
                 )
                 onUpdateMetadata(newMetadata)
@@ -130,6 +143,15 @@ export function SampleDataImporter({
 
         // For non-image datasets, start import directly
         startImport()
+    }
+
+    const handleEditEmbedding = () => {
+        setIsEditingEmbedding(true)
+    }
+
+    const handleSaveEmbeddingConfig = (config: EmbeddingConfig) => {
+        setCurrentEmbeddingConfig(config)
+        setIsEditingEmbedding(false)
     }
 
     const startImport = async () => {
@@ -296,101 +318,152 @@ export function SampleDataImporter({
 
     return (
         <div className="flex flex-col h-full">
-            {importStarted && (
-                <h3 className="text-lg mb-4">`Importing ${dataset.name}`</h3>
-            )}
-
-            <div className="bg-[white] rounded-lg border p-4 mb-4">
-                <div className="flex items-center mb-4">
-                    <div className="mr-3 bg-gray-50 p-2 rounded-full">
-                        {dataset.icon}
-                    </div>
-                    <h3 className="text-lg font-medium">{dataset.name}</h3>
-                    <Badge variant="outline" className="ml-2">
-                        {dataset.dataType}
-                    </Badge>
-                </div>
-
-                <p className="text-sm text-gray-600 mb-4">
-                    {dataset.description}
-                </p>
-
-                <div className="flex justify-between items-center text-xs text-gray-500 mb-2">
-                    <span>Records: {dataset.recordCount.toLocaleString()}</span>
-                </div>
-
-                <div className="flex items-center text-xs text-gray-500 mb-2">
-                    <span className="font-medium mr-1">Embedding Model:</span>
-                    <Badge
-                        variant="secondary"
-                        className="text-xs"
-                        title="Recommended embedding provider and model"
-                    >
-                        {dataset.recommendedEmbedding.provider}
-                        {dataset.recommendedEmbedding.provider === "openai" &&
-                            dataset.recommendedEmbedding.openai?.model &&
-                            `: ${dataset.recommendedEmbedding.openai.model}`}
-                        {dataset.recommendedEmbedding.provider ===
-                            "tensorflow" &&
-                            dataset.recommendedEmbedding.tensorflow?.model &&
-                            `: ${dataset.recommendedEmbedding.tensorflow.model}`}
-                        {dataset.recommendedEmbedding.provider === "image" &&
-                            dataset.recommendedEmbedding.image?.model &&
-                            `: ${dataset.recommendedEmbedding.image.model}`}
-                    </Badge>
-                </div>
-            </div>
-
-            <p className="text-gray-600 mb-4">
-                {!importStarted
-                    ? "Click 'Start Import' to begin importing the selected dataset."
-                    : "Your vector set has been created and the sample data is being imported. You can monitor the import progress from the Import Data tab."}
-            </p>
-
-            {importProgress && (
-                <div className="mb-4">
-                    <div className="flex flex-col space-y-2">
-                        <p className="text-sm">
-                            Importing: {importProgress.current} of{" "}
-                            {importProgress.total}
-                        </p>
-                        <div className="w-full bg-gray-200 rounded-full h-2.5">
-                            <div
-                                className="bg-primary h-2.5 rounded-full"
-                                style={{
-                                    width: `${
-                                        (importProgress.current /
-                                            importProgress.total) *
-                                        100
-                                    }%`,
-                                }}
-                            ></div>
+            {!importStarted && (
+                <>
+                    <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 mb-6">
+                        <div className="flex items-center justify-between mb-2">
+                            <h3 className="text-lg font-semibold">Dataset Summary</h3>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <p className="text-sm text-gray-600 dark:text-gray-400">
+                                    <span className="font-medium">Name:</span> {dataset.name}
+                                </p>
+                                <p className="text-sm text-gray-600 dark:text-gray-400">
+                                    <span className="font-medium">Record Count:</span> {dataset.recordCount}
+                                </p>
+                                <p className="text-sm text-gray-600 dark:text-gray-400">
+                                    <span className="font-medium">Data Type:</span> {dataset.dataType}
+                                </p>
+                            </div>
+                            <div>
+                                <div className="flex flex-col">
+                                    <div className="flex items-center justify-between text-sm text-gray-600 dark:text-gray-400">
+                                        <div className="flex items-center gap-1">
+                                            <span className="font-medium">Embedding Engine:</span> 
+                                            <Badge variant="secondary" className="text-xs">
+                                                {currentEmbeddingConfig?.provider}
+                                                {currentEmbeddingConfig?.provider === "ollama" && 
+                                                    currentEmbeddingConfig.ollama?.modelName && 
+                                                    `: ${currentEmbeddingConfig.ollama.modelName}`}
+                                                {currentEmbeddingConfig?.provider === "openai" &&
+                                                    currentEmbeddingConfig.openai?.model &&
+                                                    `: ${currentEmbeddingConfig.openai.model}`}
+                                                {currentEmbeddingConfig?.provider === "tensorflow" &&
+                                                    currentEmbeddingConfig.tensorflow?.model &&
+                                                    `: ${currentEmbeddingConfig.tensorflow.model}`}
+                                                {currentEmbeddingConfig?.provider === "image" &&
+                                                    currentEmbeddingConfig.image?.model &&
+                                                    `: ${currentEmbeddingConfig.image.model}`}
+                                            </Badge>
+                                        </div>
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className="p-1 h-auto"
+                                            onClick={handleEditEmbedding}
+                                        >
+                                            <Edit2 className="h-3.5 w-3.5 mr-1" />
+                                            Change
+                                        </Button>
+                                    </div>
+                                    
+                                    {currentEmbeddingConfig?.provider === "ollama" && (
+                                        <div className="text-xs text-green-600 font-medium mt-1">
+                                            ✓ Using locally installed Ollama
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
                         </div>
                     </div>
-                </div>
-            )}
 
-            <div className="flex gap-3 w-full">
-                <div className="grow"></div>
-                {importStarted ? (
-                    <Button variant="default" onClick={onClose}>
-                        Close and Go to Vector Set
-                    </Button>
-                ) : (
-                    <>
+                    <div className="mb-6">
+                        <h3 className="text-lg font-semibold mb-3">Import Preview</h3>
+                        <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
+                            <p className="text-sm mb-3">
+                                This will import the {dataset.name} dataset into your vector set.
+                                {dataset.name === "UTK Faces" ? 
+                                    " You can specify how many images to import." : 
+                                    ""}
+                            </p>
+                            
+                            {/* Image count slider for UTK Faces */}
+                            {dataset.name === "UTK Faces" && (
+                                <div className="space-y-2 mt-4">
+                                    <div className="flex justify-between">
+                                        <Label htmlFor="import-count">
+                                            Number of images to import:
+                                        </Label>
+                                        <span className="font-medium">{importCount}</span>
+                                    </div>
+                                    <Slider 
+                                        id="import-count"
+                                        min={1}
+                                        max={100}
+                                        step={1}
+                                        value={[importCount]}
+                                        onValueChange={(values) => setImportCount(values[0])}
+                                    />
+                                    <p className="text-xs text-gray-500">
+                                        Note: Images will be imported in batches
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    <div className="flex justify-end space-x-3 mt-auto">
                         <Button variant="outline" onClick={onClose}>
                             Cancel
                         </Button>
-                        <Button
-                            variant="default"
-                            onClick={handleStartImport}
-                            disabled={isImporting}
-                        >
-                            {isImporting ? "Importing..." : "Start Import"}
+                        <Button onClick={handleStartImport} disabled={isImporting}>
+                            Start Import
                         </Button>
-                    </>
-                )}
-            </div>
+                    </div>
+                </>
+            )}
+
+            {/* Import progress */}
+            {importStarted && (
+                <>
+                    <h3 className="text-lg mb-4">Importing {dataset.name}</h3>
+                    {/* Progress UI */}
+                    {importProgress && (
+                        <div className="my-4">
+                            <div className="flex justify-between text-sm mb-1">
+                                <span>Progress</span>
+                                <span>
+                                    {importProgress.current} / {importProgress.total}
+                                </span>
+                            </div>
+                            <div className="w-full bg-gray-200 rounded-full h-2.5">
+                                <div
+                                    className="bg-blue-600 h-2.5 rounded-full"
+                                    style={{
+                                        width: `${Math.round(
+                                            (importProgress.current /
+                                                importProgress.total) *
+                                                100
+                                        )}%`,
+                                    }}
+                                ></div>
+                            </div>
+                        </div>
+                    )}
+                    
+                    <div className="flex justify-end mt-auto">
+                        <Button variant="default" onClick={() => {
+                            console.log("Import complete button clicked, closing dialog");
+                            onClose();
+                        }}>
+                            {isImporting 
+                              ? "Close" 
+                              : "Import Complete - Close and Go to Vector Set"}
+                        </Button>
+                    </div>
+                </>
+            )}
 
             {error && (
                 <Alert variant="destructive" className="mt-4">
@@ -399,11 +472,28 @@ export function SampleDataImporter({
                 </Alert>
             )}
 
-            {/* Image Count Dialog for UTK Faces */}
-            <Dialog
-                open={showImageCountDialog}
-                onOpenChange={setShowImageCountDialog}
-            >
+            {!error && importStarted && !isImporting && (
+                <Alert variant="default" className="mt-4 bg-green-50 border-green-200">
+                    <CheckCircle2 className="h-4 w-4 text-green-500" />
+                    <AlertDescription className="text-green-700">
+                        Import completed successfully! Click the button above to return to the Vector Set.
+                    </AlertDescription>
+                </Alert>
+            )}
+
+            {/* Edit embedding config dialog */}
+            {isEditingEmbedding && (
+                <EditEmbeddingConfigModal
+                    isOpen={isEditingEmbedding}
+                    onClose={() => setIsEditingEmbedding(false)}
+                    config={currentEmbeddingConfig || undefined}
+                    onSave={handleSaveEmbeddingConfig}
+                    dataFormat={dataset.embeddingType}
+                />
+            )}
+
+            {/* Image count dialog */}
+            <Dialog open={showImageCountDialog} onOpenChange={setShowImageCountDialog}>
                 <DialogContent className="sm:max-w-md">
                     <DialogHeader>
                         <DialogTitle>Import UTK Faces Dataset</DialogTitle>
@@ -467,10 +557,10 @@ export function SampleDataImporter({
                 </DialogContent>
             </Dialog>
 
-            {/* Embedding Mismatch Dialog */}
+            {/* Embedding mismatch dialog */}
             <Dialog
                 open={embeddingMismatch.open}
-                onOpenChange={(open) =>
+                onOpenChange={(open) => 
                     setEmbeddingMismatch({ ...embeddingMismatch, open })
                 }
             >

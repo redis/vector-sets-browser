@@ -1,9 +1,9 @@
+import { apiClient } from "@/app/api/client"
 import { jobs, type ImportLogEntry, type Job } from "@/app/api/jobs"
 import { VectorSetMetadata, getModelName } from "@/app/embeddings/types/config"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Progress } from "@/components/ui/progress"
 import {
     Dialog,
     DialogContent,
@@ -11,19 +11,18 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@/components/ui/dialog"
+import { Progress } from "@/components/ui/progress"
 import {
     ArrowLeft,
     CheckCircle2,
     Database,
     FileSpreadsheet,
-    RefreshCcw,
     XCircle,
 } from "lucide-react"
 import { useCallback, useEffect, useState } from "react"
 import ImportFromCSV from "./ImportFromCSV"
-import ImportSampleData from "./ImportSampleData"
-import { apiClient } from "@/app/api/client"
 import { SampleDataDialog } from "./SampleDataDialog"
+import { vectorSets } from "@/app/api/vector-sets"
 
 // Helper function to format dates nicely
 const formatDate = (dateString: string): string => {
@@ -41,21 +40,35 @@ const formatDate = (dateString: string): string => {
 interface ImportTabProps {
     vectorSetName: string
     metadata: VectorSetMetadata | null
+    initialShowSampleData?: boolean
 }
 
-export default function ImportTab({ vectorSetName, metadata }: ImportTabProps) {
+export default function ImportTab({
+    vectorSetName,
+    metadata,
+    initialShowSampleData = false,
+}: ImportTabProps) {
     const [jobList, setJobList] = useState<Job[]>([])
     // Keep error state for potential future use but mark it as intentionally unused
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const [error, setError] = useState<string | null>(null)
     const [showImportCSV, setShowImportCSV] = useState(false)
-    const [showImportSample, setShowImportSample] = useState(false)
+    const [showImportSample, setShowImportSample] = useState(
+        initialShowSampleData
+    )
     const [dismissedJobIds, setDismissedJobIds] = useState<Set<string>>(
         new Set()
     )
     const [importLogs, setImportLogs] = useState<ImportLogEntry[]>([])
     const [successJob, setSuccessJob] = useState<Job | null>(null)
     const [showSuccessDialog, setShowSuccessDialog] = useState(false)
+
+    // Effect to open the sample data dialog when initialShowSampleData changes
+    useEffect(() => {
+        if (initialShowSampleData) {
+            setShowImportSample(true)
+        }
+    }, [initialShowSampleData])
 
     // Keep this for potential future use but mark it as intentionally unused
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -209,6 +222,7 @@ export default function ImportTab({ vectorSetName, metadata }: ImportTabProps) {
         //fetchImportLogs()
         // Poll for updates every 2 seconds
         const interval = setInterval(() => {
+            // TODO DEBUG
             fetchJobs()
             fetchImportLogs()
         }, 2000)
@@ -221,20 +235,6 @@ export default function ImportTab({ vectorSetName, metadata }: ImportTabProps) {
                 <CardHeader>
                     <div className="flex justify-between items-center">
                         <CardTitle>Import Data</CardTitle>
-                        {/* <div className="flex gap-2">
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => {
-                                    fetchJobs()
-                                    fetchImportLogs()
-                                }}
-                                className="flex items-center gap-2"
-                            >
-                                <RefreshCcw className="h-4 w-4" />
-                                Refresh
-                            </Button>
-                        </div> */}
                     </div>
                 </CardHeader>
                 <CardContent>
@@ -281,36 +281,63 @@ export default function ImportTab({ vectorSetName, metadata }: ImportTabProps) {
                                         </div>
                                         <SampleDataDialog
                                             open={showImportSample}
-                                            onOpenChange={(open) => {setShowImportSample(open)}}
-                                            vectorSetName={vectorSetName}
-                                            metadata={metadata}
-                                            onImportComplete={() => {setShowImportSample(false)}}
-                                            onUpdateMetadata={async (
-                                                newMetadata
-                                            ) => {
-                                                console.log("Updating metadata:", newMetadata)
+                                            onOpenChange={(open) => {
+                                                setShowImportSample(open)
                                             }}
-                                        />
-                                        {/* <ImportSampleData
-                                            onClose={() =>
-                                                setShowImportSample(false)
-                                            }
-                                            metadata={metadata}
                                             vectorSetName={vectorSetName}
+                                            metadata={metadata}
+                                            onImportComplete={(success) => {
+                                                // This will be called after the dialog is closed
+                                                // Refresh job list to show newly created import job
+                                                console.log("onImportComplete called with success:", success);
+                                                fetchJobs();
+                                                
+                                                // If import was successful, show the success dialog
+                                                if (success) {
+                                                    console.log("Import was successful, showing success dialog soon");
+                                                    // Find the most recent job for this vector set
+                                                    setTimeout(async () => {
+                                                        try {
+                                                            const latestJobs = await jobs.getJobsByVectorSet(vectorSetName);
+                                                            console.log("Latest jobs:", latestJobs);
+                                                            if (latestJobs && latestJobs.length > 0) {
+                                                                // Sort jobs by timestamp to get most recent one
+                                                                const sortedJobs = [...latestJobs].sort((a, b) => 
+                                                                    new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+                                                                );
+                                                                
+                                                                // Find recent completed jobs or use the most recent job
+                                                                const completedJob = sortedJobs.find(j => j.status.status === "completed") || sortedJobs[0];
+                                                                console.log("Found job to display:", completedJob);
+                                                                
+                                                                if (completedJob) {
+                                                                    setSuccessJob(completedJob);
+                                                                    // Use a direct state update to ensure the dialog opens
+                                                                    setTimeout(() => {
+                                                                        setShowSuccessDialog(true);
+                                                                        console.log("Success dialog should now be visible");
+                                                                    }, 100);
+                                                                }
+                                                            }
+                                                        } catch (error) {
+                                                            console.error("Error fetching latest job:", error);
+                                                        }
+                                                    }, 1000); // Increased delay to ensure job is registered
+                                                }
+                                            }}
                                             onUpdateMetadata={async (
                                                 newMetadata
                                             ) => {
+                                                console.log(
+                                                    "Updating metadata:",
+                                                    newMetadata
+                                                )
                                                 try {
                                                     // Update the metadata on the server
-                                                    await apiClient.patch(
-                                                        `/api/vector-sets/${encodeURIComponent(
-                                                            vectorSetName
-                                                        )}/metadata`,
-                                                        {
-                                                            metadata:
-                                                                newMetadata,
-                                                        }
-                                                    )
+                                                    await vectorSets.setMetadata({
+                                                        name: vectorSetName,
+                                                        metadata: newMetadata
+                                                    })
 
                                                     // Refresh the page to load updated metadata
                                                     window.location.reload()
@@ -322,7 +349,7 @@ export default function ImportTab({ vectorSetName, metadata }: ImportTabProps) {
                                                     // Could show an error message here
                                                 }
                                             }}
-                                        /> */}
+                                        />
                                     </div>
                                 ) : (
                                     <div>

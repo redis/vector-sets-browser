@@ -42,6 +42,7 @@ interface EditEmbeddingConfigModalProps {
     onClose: () => void
     config?: EmbeddingConfig
     onSave: (config: EmbeddingConfig) => void
+    dataFormat?: "text" | "image"
 }
 
 export default function EditEmbeddingConfigModal({
@@ -49,6 +50,7 @@ export default function EditEmbeddingConfigModal({
     onClose,
     config = DEFAULT_CONFIG,
     onSave,
+    dataFormat,
 }: EditEmbeddingConfigModalProps) {
     const [error, setError] = useState<string | null>(null)
     const [provider, setProvider] = useState<EmbeddingProvider>(
@@ -115,6 +117,24 @@ export default function EditEmbeddingConfigModal({
         }
     }, [config])
 
+    // Update provider if it doesn't match the dataFormat
+    useEffect(() => {
+        if (!dataFormat) return
+        
+        const isCurrentProviderValid = 
+            (dataFormat === "text" && ["openai", "ollama", "tensorflow"].includes(provider)) ||
+            (dataFormat === "image" && ["image"].includes(provider))
+            
+        if (!isCurrentProviderValid) {
+            // Set default provider based on data format
+            if (dataFormat === "text") {
+                setProvider("tensorflow")
+            } else if (dataFormat === "image") {
+                setProvider("image")
+            }
+        }
+    }, [dataFormat, provider])
+
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault()
         setError(null)
@@ -154,6 +174,19 @@ export default function EditEmbeddingConfigModal({
         }
     }
 
+    // Filter providers based on dataFormat
+    const getFilteredProviders = () => {
+        if (!dataFormat) {
+            return ["tensorflow", "image", "ollama", "openai"]
+        }
+        
+        if (dataFormat === "text") {
+            return ["tensorflow", "ollama", "openai"]
+        } else {
+            return ["image"]
+        }
+    }
+
     if (!isOpen) return null
 
     return (
@@ -187,50 +220,58 @@ export default function EditEmbeddingConfigModal({
                                 <SelectValue placeholder="Select provider" />
                             </SelectTrigger>
                             <SelectContent className="w-full">
-                                <SelectItem key="tensorflow" value="tensorflow">
-                                    <div className="flex flex-col items-start">
-                                        <div className="font-medium text-lg">
-                                            TensorFlow - Text Embeddings
-                                            (built-in)
+                                {getFilteredProviders().includes("tensorflow") && (
+                                    <SelectItem key="tensorflow" value="tensorflow">
+                                        <div className="flex flex-col items-start">
+                                            <div className="font-medium text-lg">
+                                                TensorFlow - Text Embeddings
+                                                (built-in)
+                                            </div>
+                                            <div className="  text-gray-500">
+                                                Built in model for text embeddings -
+                                                uses Tensorflow.js
+                                            </div>
                                         </div>
-                                        <div className="  text-gray-500">
-                                            Built in model for text embeddings -
-                                            uses Tensorflow.js
+                                    </SelectItem>
+                                )}
+                                {getFilteredProviders().includes("image") && (
+                                    <SelectItem key="image" value="image">
+                                        <div className="flex flex-col items-start">
+                                            <div className="font-medium text-lg">
+                                                TensorFlow - Image Embeddings
+                                                (built-in)
+                                            </div>
+                                            <div className=" text-gray-500">
+                                                Built in model for image embeddings
+                                                - uses Tensorflow.js
+                                            </div>
                                         </div>
-                                    </div>
-                                </SelectItem>
-                                <SelectItem key="image" value="image">
-                                    <div className="flex flex-col items-start">
-                                        <div className="font-medium text-lg">
-                                            TensorFlow - Image Embeddings
-                                            (built-in)
+                                    </SelectItem>
+                                )}
+                                {getFilteredProviders().includes("ollama") && (
+                                    <SelectItem key="ollama" value="ollama">
+                                        <div className="flex flex-col items-start">
+                                            <div className="font-medium text-lg">
+                                                Ollama
+                                            </div>
+                                            <div className="text-gray-500">
+                                                Ollama provider - uses Ollama API
+                                            </div>
                                         </div>
-                                        <div className=" text-gray-500">
-                                            Built in model for image embeddings
-                                            - uses Tensorflow.js
+                                    </SelectItem>
+                                )}
+                                {getFilteredProviders().includes("openai") && (
+                                    <SelectItem key="openai" value="openai">
+                                        <div className="flex flex-col items-start">
+                                            <div className="font-medium text-lg">
+                                                OpenAI
+                                            </div>
+                                            <div className="text-gray-500">
+                                                OpenAI provider - uses OpenAI API
+                                            </div>
                                         </div>
-                                    </div>
-                                </SelectItem>
-                                <SelectItem key="ollama" value="ollama">
-                                    <div className="flex flex-col items-start">
-                                        <div className="font-medium text-lg">
-                                            Ollama
-                                        </div>
-                                        <div className="text-gray-500">
-                                            Ollama provider - uses Ollama API
-                                        </div>
-                                    </div>
-                                </SelectItem>
-                                <SelectItem key="openai" value="openai">
-                                    <div className="flex flex-col items-start">
-                                        <div className="font-medium text-lg">
-                                            OpenAI
-                                        </div>
-                                        <div className="text-gray-500">
-                                            OpenAI provider - uses OpenAI API
-                                        </div>
-                                    </div>
-                                </SelectItem>
+                                    </SelectItem>
+                                )}
                             </SelectContent>
                         </Select>
                     </div>

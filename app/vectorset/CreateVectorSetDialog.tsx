@@ -1,10 +1,13 @@
 import {
     createVectorSetMetadata,
     EmbeddingConfig,
-    EmbeddingProvider,
     getExpectedDimensions,
     VectorSetMetadata,
 } from "@/app/embeddings/types/config"
+import { vadd } from "@/app/redis-server/api"
+import {
+    getDefaultTextEmbeddingConfig
+} from "@/app/utils/embeddingUtils"
 import { Button } from "@/components/ui/button"
 import {
     Form,
@@ -16,48 +19,19 @@ import {
     FormMessage,
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
-import { Switch } from "@/components/ui/switch"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Textarea } from "@/components/ui/textarea"
 import { zodResolver } from "@hookform/resolvers/zod"
 import {
     ArrowLeft,
-    ChevronRight,
-    Database,
-    BookOpen,
-    Film,
-    User,
-    ChevronLeft,
+    ChevronRight
 } from "lucide-react"
-import { useState, useEffect } from "react"
-import { FormProvider, useForm, UseFormReturn } from "react-hook-form"
-import { z } from "zod"
+import { useEffect, useState } from "react"
+import { FormProvider, useForm } from "react-hook-form"
 import EditEmbeddingConfigModal from "../components/EmbeddingConfig/EditEmbeddingConfigDialog"
-import ImportSampleData from "./ImportTab/ImportSampleData"
-import {
-    Dialog,
-    DialogContent,
-    DialogHeader,
-    DialogTitle,
-} from "@/components/ui/dialog"
-import ImportSampleDataDialog from "./ImportTab/ImportSampleDataDialog"
-import {
-    getDefaultTextEmbeddingConfig,
-    getDefaultEmbeddingConfig,
-} from "@/app/utils/embeddingUtils"
-import {
-    SampleDataset,
-    sampleDatasets as configuredDatasets,
-} from "./ImportTab/SampleDataSelect"
-import AdvancedConfigurationPanel, {
-    vectorSetSchema,
-    FormValues,
-} from "./AdvancedConfigurationPanel"
-import { vadd } from "@/app/redis-server/api"
 import RedisCommandBox from "../components/RedisCommandBox"
-
-// Define sample datasets for use in the component
-const sampleDatasets = configuredDatasets
+import AdvancedConfigurationPanel, {
+    FormValues,
+    vectorSetSchema,
+} from "./AdvancedConfigurationPanel"
 
 interface CreateVectorSetModalProps {
     isOpen: boolean
@@ -102,7 +76,6 @@ export default function CreateVectorSetModal({
             reduceDimensions: "",
             defaultCAS: undefined,
             buildExplorationFactor: undefined,
-            loadSampleData: false,
             selectedDataset: undefined,
         },
     })
@@ -110,17 +83,11 @@ export default function CreateVectorSetModal({
     const [activeTab, setActiveTab] = useState("automatic")
     const [isEditConfigModalOpen, setIsEditConfigModalOpen] = useState(false)
     const [vectorDataChoice, setVectorDataChoice] = useState<
-        "manual" | "embedding" | "sample"
+        "manual" | "embedding"
     >("embedding")
-    const [selectedSampleDataset, setSelectedSampleDataset] = useState<
-        string | null
-    >(null)
     const [activePanel, setActivePanel] = useState<string | null>(null)
-    const [isSampleDataImportStarted, setIsSampleDataImportStarted] =
-        useState(false)
     const [currentMetadata, setCurrentMetadata] =
         useState<VectorSetMetadata | null>(null)
-    const [isSampleDataDialogOpen, setIsSampleDataDialogOpen] = useState(false)
 
     // Initialize embedding configurations only once
     useEffect(() => {
@@ -138,19 +105,8 @@ export default function CreateVectorSetModal({
                 setIsOllamaAvailable(defaultConfig.provider === "ollama")
 
                 // Also load embedding configs for all sample datasets
-                const configs: Record<string, EmbeddingConfig> = {}
-                for (const dataset of sampleDatasets) {
-                    const config = await getDefaultEmbeddingConfig(
-                        dataset.embeddingType
-                    )
-                    configs[dataset.name] = config
-                }
-                setEmbeddingConfigs(configs)
                 setIsConfigInitialized(true)
 
-                console.log(
-                    "[CreateVectorSetDialog] Config initialization complete"
-                )
             } catch (error) {
                 console.error("Error initializing embedding config:", error)
             }
@@ -169,14 +125,7 @@ export default function CreateVectorSetModal({
                     dimensions: form.getValues("dimensions"),
                 },
             }
-        } else if (vectorDataChoice === "sample" && selectedSampleDataset) {
-            const selectedDataset = sampleDatasets.find(
-                (ds) => ds.name === selectedSampleDataset
-            )
-            if (selectedDataset && embeddingConfigs[selectedDataset.name]) {
-                return embeddingConfigs[selectedDataset.name]
-            }
-        }
+        } 
         // Default to the current embedding config (for "embedding" choice or fallback)
         return embeddingConfig
     }
@@ -219,6 +168,10 @@ export default function CreateVectorSetModal({
                 reduceDimensions: values.reduceDimensions
                     ? parseInt(values.reduceDimensions, 10)
                     : undefined,
+                ef: values.buildExplorationFactor
+                    ? parseInt(values.buildExplorationFactor, 10)
+                    : undefined,
+                quantization: values.quantization || undefined,
                 returnCommandOnly: true,
             }
 
@@ -272,21 +225,6 @@ export default function CreateVectorSetModal({
             updatePreviewCommand(true)
         }
     }, [vectorDataChoice, isConfigInitialized])
-
-    // Update preview when sample dataset selection changes
-    useEffect(() => {
-        if (
-            isConfigInitialized &&
-            vectorDataChoice === "sample" &&
-            selectedSampleDataset &&
-            form.getValues("name")
-        ) {
-            console.log(
-                "[CreateVectorSetDialog] Sample dataset changed, updating preview"
-            )
-            updatePreviewCommand(true)
-        }
-    }, [selectedSampleDataset, isConfigInitialized])
 
     // Handle edit config changes
     const handleEditConfig = (config: EmbeddingConfig) => {
@@ -374,12 +312,6 @@ export default function CreateVectorSetModal({
                     setIsCreating(false)
                     return
                 }
-            } else if (vectorDataChoice === "sample") {
-                if (!selectedSampleDataset) {
-                    setError("Please select a sample dataset")
-                    setIsCreating(false)
-                    return
-                }
             }
 
             // Get metadata based on selection
@@ -395,7 +327,7 @@ export default function CreateVectorSetModal({
             let customData = undefined
             if (vectorDataChoice === "manual") {
                 customData = {
-                    element: `initial_vector_${Date.now()}`,
+                    element: `First Vector (Default)`,
                     vector: Array(effectiveDimensions).fill(0),
                 }
             }
@@ -407,16 +339,7 @@ export default function CreateVectorSetModal({
                 customData
             )
 
-            // Don't close dialog if sample data import is selected
-            if (vectorDataChoice === "sample") {
-                console.log(
-                    `[CreateVectorSetDialog] Setting up sample data import for: ${selectedSampleDataset}`
-                )
-                // Set state to show the import panel
-                setIsSampleDataImportStarted(true)
-            } else {
-                onClose()
-            }
+            onClose()
         } catch (err) {
             console.error("Error in CreateVectorSetModal handleSubmit:", err)
             setError(
@@ -438,7 +361,7 @@ export default function CreateVectorSetModal({
                     {/* Main Form Content */}
                     <div
                         className={`transition-transform duration-300 ${
-                            activePanel || isSampleDataImportStarted
+                            activePanel 
                                 ? "transform -translate-x-full"
                                 : ""
                         } w-full`}
@@ -507,9 +430,6 @@ export default function CreateVectorSetModal({
                                                         {vectorDataChoice ===
                                                             "embedding" &&
                                                             "Automatic"}
-                                                        {vectorDataChoice ===
-                                                            "sample" &&
-                                                            "Sample Data"}
                                                     </div>
                                                     {vectorDataChoice ===
                                                         "embedding" && (
@@ -520,15 +440,7 @@ export default function CreateVectorSetModal({
                                                             }
                                                         </div>
                                                     )}
-                                                    {vectorDataChoice ===
-                                                        "sample" &&
-                                                        selectedSampleDataset && (
-                                                            <div>
-                                                                {
-                                                                    selectedSampleDataset
-                                                                }
-                                                            </div>
-                                                        )}
+                                                   
                                                 </div>
                                                 <div>
                                                     <ChevronRight className="h-5 w-5" />
@@ -748,7 +660,7 @@ export default function CreateVectorSetModal({
                                                 automatic vector creation
                                             </p>
                                             <p className="text-sm text-primary-600 mt-1">
-                                                Click to change
+                                                You can change this later
                                             </p>
                                         </div>
                                     </div>
@@ -834,53 +746,6 @@ export default function CreateVectorSetModal({
                                 )}
                             </div>
 
-                            {/* Sample Data Option Panel */}
-                            <div
-                                className={`w-full border rounded-lg p-6 cursor-pointer transition-all duration-200 ${
-                                    vectorDataChoice === "sample"
-                                        ? "border-primary ring-2 ring-primary/20 shadow-md"
-                                        : "hover:border-gray-400"
-                                }`}
-                                onClick={() => {
-                                    setVectorDataChoice("sample")
-                                    setIsSampleDataDialogOpen(true)
-                                    updatePreviewCommand(true)
-                                }}
-                            >
-                                <div className="flex justify-between items-start">
-                                    <div className="flex flex-col gap-2 items-start">
-                                        <div className="flex items-center gap-2">
-                                            <div
-                                                className={`w-5 h-5 shrink-0 rounded-full border flex items-center justify-center ${
-                                                    vectorDataChoice ===
-                                                    "sample"
-                                                        ? "border-primary"
-                                                        : "border-gray-300"
-                                                }`}
-                                            >
-                                                {vectorDataChoice ===
-                                                    "sample" && (
-                                                    <div className="w-3 h-3 rounded-full bg-red-500"></div>
-                                                )}
-                                            </div>
-                                            <h4 className="text-lg font-medium">
-                                                Sample Data
-                                            </h4>
-                                        </div>
-                                        <p className="text-sm text-gray-600 mt-2">
-                                            Choose from one of 3 pre-built
-                                            datasets, including text and images.
-                                            Movies, Books, Faces, etc.
-                                        </p>
-                                        {selectedSampleDataset && (
-                                            <p className="text-sm text-primary-600 mt-2">
-                                                Selected:{" "}
-                                                {selectedSampleDataset}
-                                            </p>
-                                        )}
-                                    </div>
-                                </div>
-                            </div>
                         </div>
 
                         <div className="flex justify-end mt-6">
@@ -907,153 +772,7 @@ export default function CreateVectorSetModal({
                         />
                     </div>
 
-                    {/* Sample Data Import Panel - This is shown after vector set is created */}
-                    <div
-                        className={`absolute top-0 left-0 w-full h-full bg-[white] p-6 transition-transform duration-300 transform ${
-                            isSampleDataImportStarted
-                                ? "translate-x-0"
-                                : "translate-x-full"
-                        } overflow-y-auto`}
-                    >
-                        <div className="flex items-center mb-4 border-b pb-4">
-                            <h2 className="text-xl font-semibold">
-                                Import Sample Data
-                            </h2>
-                        </div>
-
-                        <div className="bg-green-50 border border-green-100 rounded-md p-3 mb-4">
-                            <p className="text-green-700 text-sm">
-                                <span className="font-semibold">
-                                    Vector set "{form.getValues("name").trim()}"
-                                    created successfully!
-                                </span>{" "}
-                                Now you can import the sample data.
-                            </p>
-                        </div>
-
-                        {isSampleDataImportStarted && (
-                            <ImportSampleData
-                                onClose={onClose}
-                                metadata={
-                                    vectorDataChoice === "embedding"
-                                        ? {
-                                              ...createVectorSetMetadata(
-                                                  embeddingConfig
-                                              ),
-                                              redisConfig: form.getValues(
-                                                  "quantization"
-                                              )
-                                                  ? {
-                                                        quantization:
-                                                            form.getValues(
-                                                                "quantization"
-                                                            ),
-                                                    }
-                                                  : undefined,
-                                          }
-                                        : vectorDataChoice === "sample" &&
-                                            selectedSampleDataset
-                                          ? (() => {
-                                                const selectedDataset =
-                                                    sampleDatasets.find(
-                                                        (ds) =>
-                                                            ds.name ===
-                                                            selectedSampleDataset
-                                                    )
-                                                return selectedDataset
-                                                    ? {
-                                                          ...createVectorSetMetadata(
-                                                              embeddingConfigs[
-                                                                  selectedDataset
-                                                                      .name
-                                                              ] || {
-                                                                  provider:
-                                                                      "tensorflow",
-                                                                  tensorflow: {
-                                                                      model: "universal-sentence-encoder",
-                                                                  },
-                                                              }
-                                                          ),
-                                                          redisConfig:
-                                                              form.getValues(
-                                                                  "quantization"
-                                                              )
-                                                                  ? {
-                                                                        quantization:
-                                                                            form.getValues(
-                                                                                "quantization"
-                                                                            ),
-                                                                    }
-                                                                  : undefined,
-                                                      }
-                                                    : {
-                                                          embedding: {
-                                                              provider:
-                                                                  "none" as EmbeddingProvider,
-                                                          },
-                                                          created:
-                                                              new Date().toISOString(),
-                                                          redisConfig:
-                                                              form.getValues(
-                                                                  "quantization"
-                                                              )
-                                                                  ? {
-                                                                        quantization:
-                                                                            form.getValues(
-                                                                                "quantization"
-                                                                            ),
-                                                                    }
-                                                                  : undefined,
-                                                      }
-                                            })()
-                                          : {
-                                                embedding: {
-                                                    provider:
-                                                        "none" as EmbeddingProvider,
-                                                },
-                                                created:
-                                                    new Date().toISOString(),
-                                                redisConfig: form.getValues(
-                                                    "quantization"
-                                                )
-                                                    ? {
-                                                          quantization:
-                                                              form.getValues(
-                                                                  "quantization"
-                                                              ),
-                                                      }
-                                                    : undefined,
-                                            }
-                                }
-                                vectorSetName={form.getValues("name").trim()}
-                                onUpdateMetadata={(newMetadata) => {
-                                    // Update embedding config based on the new metadata
-                                    setEmbeddingConfig(newMetadata.embedding)
-                                }}
-                                selectedDataset={selectedSampleDataset}
-                                // The user will control when to start the import, not automatically
-                                importMode={false}
-                            />
-                        )}
-                    </div>
                 </FormProvider>
-
-                {/* Replace the inline dialog with the new component */}
-                <ImportSampleDataDialog
-                    isOpen={isSampleDataDialogOpen}
-                    onClose={() => setIsSampleDataDialogOpen(false)}
-                    metadata={currentMetadata}
-                    vectorSetName={form.getValues("name").trim()}
-                    onUpdateMetadata={(newMetadata) => {
-                        // Update embedding config based on the new metadata
-                        setEmbeddingConfig(newMetadata.embedding)
-                        setCurrentMetadata(newMetadata)
-                    }}
-                    onSelectDataset={(datasetName) => {
-                        setSelectedSampleDataset(datasetName)
-                        setIsSampleDataDialogOpen(false)
-                    }}
-                />
 
                 <EditEmbeddingConfigModal
                     isOpen={isEditConfigModalOpen}

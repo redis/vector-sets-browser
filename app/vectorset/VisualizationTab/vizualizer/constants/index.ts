@@ -29,9 +29,6 @@ export type ColorScheme = typeof COLORS_REDIS_DARK | typeof COLORS_REDIS_LIGHT
 // Maximum number of nodes to show labels for
 export const MAX_LABELED_NODES = 50
 
-// Local storage key for color scheme
-export const COLOR_SCHEME_STORAGE_KEY = "hnsw_color_scheme"
-
 // Force simulation constants
 export const FORCE_SIMULATION_CONSTANTS = {
     REPULSION: 1.0,

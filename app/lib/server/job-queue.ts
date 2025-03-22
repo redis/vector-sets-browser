@@ -17,18 +17,48 @@ export class JobQueueService {
         url: string,
         jobId: string,
         progress: Partial<JobProgress>
-    ) {
+    ): Promise<JobProgress> {
         console.log(`[JobQueue] Updating progress for job ${jobId}:`, progress)
         const result = await RedisClient.withConnection(url, async (client) => {
             const statusKey = getJobStatusKey(jobId)
+            let currentProgress: JobProgress = {
+                status: "pending",
+                message: "",
+                current: 0,
+                total: 0,
+                timestamp: Date.now(),
+            }
+            
+            // Get current status
             const currentStatus = await client.hGetAll(statusKey)
-            const currentData = currentStatus?.data
-                ? JSON.parse(currentStatus.data)
-                : {}
-            const updatedData = { ...currentData, ...progress }
-            await client.hSet(statusKey, { data: JSON.stringify(updatedData) })
-            return true
+            
+            // If we have existing data, parse it
+            if (currentStatus?.data) {
+                try {
+                    // Handle the case where data might be an object already
+                    if (typeof currentStatus.data === 'object' && currentStatus.data !== null) {
+                        currentProgress = currentStatus.data;
+                    } else {
+                        currentProgress = JSON.parse(currentStatus.data);
+                    }
+                } catch (error) {
+                    console.error(`[JobQueue] Error parsing job progress for ${jobId}:`, error);
+                    // Continue with default progress
+                }
+            }
+            
+            // Update with new values
+            const updatedProgress: JobProgress = {
+                ...currentProgress,
+                ...progress,
+                timestamp: Date.now(),
+            }
+            
+            // Store the updated progress
+            await client.hSet(statusKey, { data: JSON.stringify(updatedProgress) })
+            return updatedProgress;
         })
+        
         if (!result.success) {
             console.error(
                 `[JobQueue] Failed to update progress for job ${jobId}:`,
@@ -36,7 +66,9 @@ export class JobQueueService {
             )
             throw new Error(result.error)
         }
+        
         console.log(`[JobQueue] Progress updated successfully for job ${jobId}`)
+        return result.result;
     }
 
     public static async createJob(
@@ -102,7 +134,7 @@ export class JobQueueService {
                         image: file.name,
                         index: String(index),
                         // Add any attribute columns with empty values
-                        ...(options.attributeColumns?.reduce((acc, col) => {
+                        ...(options?.attributeColumns?.reduce((acc, col) => {
                             acc[col] = "";
                             return acc;
                         }, {} as Record<string, string>) || {})
@@ -114,19 +146,19 @@ export class JobQueueService {
                     return record;
                 });
                 
-                availableColumns = ["image", "index", ...(options.attributeColumns || [])];
+                availableColumns = ["image", "index", ...(options?.attributeColumns || [])];
             } else {
                 // Just a single record for the image without pre-computed vector
                 records = [{
                     image: file.name,
                     index: "0",
                     // Add any attribute columns with empty values
-                    ...(options.attributeColumns?.reduce((acc, col) => {
+                    ...(options?.attributeColumns?.reduce((acc, col) => {
                         acc[col] = "";
                         return acc;
                     }, {} as Record<string, string>) || {})
                 }];
-                availableColumns = ["image", "index", ...(options.attributeColumns || [])];
+                availableColumns = ["image", "index", ...(options?.attributeColumns || [])];
             }
         }
         
@@ -230,13 +262,26 @@ export class JobQueueService {
         url: string,
         jobId: string
     ): Promise<JobProgress | null> {
-        //console.log(`[JobQueue] Getting progress for job ${jobId}`);
+        // console.log(`[JobQueue] Getting progress for job ${jobId}`);
         const result = await RedisClient.withConnection(url, async (client) => {
             const statusKey = getJobStatusKey(jobId)
             const status = await client.hGetAll(statusKey)
+            
             if (!status || !status.data) return null
-            return JSON.parse(status.data) as JobProgress
+            
+            // Handle the case where data might already be an object
+            try {
+                if (typeof status.data === 'object' && status.data !== null) {
+                    return status.data as JobProgress;
+                } else {
+                    return JSON.parse(status.data) as JobProgress;
+                }
+            } catch (error) {
+                console.error(`[JobQueue] Error parsing job progress for ${jobId}:`, error);
+                return null;
+            }
         })
+        
         if (!result.success) {
             console.error(
                 `[JobQueue] Failed to get progress for job ${jobId}:`,
@@ -244,7 +289,7 @@ export class JobQueueService {
             )
             throw new Error(result.error)
         }
-        //console.log(`[JobQueue] Progress for job ${jobId}:`, result.result);
+        
         return result.result
     }
 
