@@ -209,7 +209,7 @@ export function SampleDataSelect({
                     <p>Loading embedding configurations...</p>
                 </div>
             ) : useCarousel ? (
-                <div className="relative w-full overflow-visible px-6">
+                <div className="relative w-full overflow-visible px-12">
                     <Carousel 
                         className="w-full"
                         opts={{
@@ -217,7 +217,7 @@ export function SampleDataSelect({
                             slidesToScroll: 1
                         }}
                     >
-                        <CarouselContent className="-ml-4">
+                        <CarouselContent className="">
                             {sampleDatasets.map((dataset) => (
                                 <CarouselItem key={dataset.name} className="pl-4 basis-full sm:basis-1/2 md:basis-1/2">
                                     <DatasetCard 
@@ -280,21 +280,17 @@ interface DatasetCardProps {
 function DatasetCard({ dataset, isSelected, onSelect, embeddingConfig }: DatasetCardProps) {
     return (
         <div
-            className={`bg-[white] rounded-lg border shadow-sm overflow-hidden flex flex-col h-full
-              ${isSelected ? "ring-2 ring-primary border-primary" : ""}`}
+            className={`bg-[white] rounded-md border shadow-sm overflow-hidden flex flex-col h-full
+              ${isSelected ? "border-red-500 border-2" : ""}`}
+            onClick={() => onSelect(dataset)}
         >
             <div className="p-4 grow">
                 <div className="flex items-center mb-4">
                     <div className="mr-3 bg-gray-50 p-2 rounded-full">
                         {dataset.icon}
                     </div>
-                    <h3 className="text-lg font-medium">
-                        {dataset.name}
-                    </h3>
-                    <Badge
-                        variant="outline"
-                        className="ml-2"
-                    >
+                    <h3 className="text-lg font-medium">{dataset.name}</h3>
+                    <Badge variant="outline" className="ml-2">
                         {dataset.dataType}
                     </Badge>
                 </div>
@@ -309,13 +305,10 @@ function DatasetCard({ dataset, isSelected, onSelect, embeddingConfig }: Dataset
                             Embedding Engine:
                         </span>
                         {embeddingConfig ? (
-                            <Badge
-                                variant="secondary"
-                                className="text-xs"
-                            >
+                            <Badge variant="secondary" className="text-xs">
                                 {embeddingConfig.provider}
-                                {embeddingConfig.provider === "ollama" && 
-                                    embeddingConfig.ollama?.modelName && 
+                                {embeddingConfig.provider === "ollama" &&
+                                    embeddingConfig.ollama?.modelName &&
                                     `: ${embeddingConfig.ollama.modelName}`}
                                 {embeddingConfig.provider === "openai" &&
                                     embeddingConfig.openai?.model &&
@@ -328,12 +321,15 @@ function DatasetCard({ dataset, isSelected, onSelect, embeddingConfig }: Dataset
                                     `: ${embeddingConfig.image.model}`}
                             </Badge>
                         ) : (
-                            <Badge variant="outline" className="text-xs animate-pulse">
+                            <Badge
+                                variant="outline"
+                                className="text-xs animate-pulse"
+                            >
                                 Loading...
                             </Badge>
                         )}
                     </div>
-                    
+
                     {embeddingConfig?.provider === "ollama" && (
                         <div className="text-xs text-green-600 font-medium">
                             ✓ Using locally installed Ollama
@@ -354,23 +350,12 @@ function DatasetCard({ dataset, isSelected, onSelect, embeddingConfig }: Dataset
                 )}
 
                 <div className="text-xs text-gray-500 mt-3">
-                    <span className="font-medium">
-                        Includes:
-                    </span>{" "}
+                    <span className="font-medium">Includes:</span>{" "}
                     {dataset.columns.slice(0, 6).join(", ")}
                     {dataset.columns.length > 6 ? "..." : ""}
                 </div>
             </div>
 
-            <div className="border-t p-4">
-                <Button
-                    variant={isSelected ? "secondary" : "default"}
-                    className="w-full"
-                    onClick={() => onSelect(dataset)}
-                >
-                    {isSelected ? "Selected" : "Select Dataset"}
-                </Button>
-            </div>
         </div>
     )
 } 

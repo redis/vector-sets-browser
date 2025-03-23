@@ -22,6 +22,7 @@ import { jobs, ImportJobConfig } from "@/app/api/jobs"
 import { getImageEmbedding } from "@/app/utils/imageEmbedding"
 import EditEmbeddingConfigModal from "@/app/components/EmbeddingConfig/EditEmbeddingConfigDialog"
 import { EmbeddingConfig } from "@/app/embeddings/types/config"
+import { vcard, vsim, vrem } from "@/app/redis-server/api"
 
 interface SampleDataImporterProps {
     dataset: SampleDataset
@@ -160,6 +161,9 @@ export function SampleDataImporter({
         setImportStarted(true)
 
         try {
+            // Check if this vectorset is a placeholder with only one record "First Record (Default)"
+            await checkAndRemovePlaceholderRecord();
+
             // For regular CSV datasets
             if (dataset.dataType === "text") {
                 // Step 1: Fetch the CSV file
@@ -198,9 +202,8 @@ export function SampleDataImporter({
 
                 // Step 3: Create the import job
                 await jobs.createImportJob(vectorSetName, file, config)
-            }
-            // For image dataset
-            else {
+            } else if (dataset.dataType === "image") {
+                // For image datasets
                 // Step 1: Get the list of images from the _classes.csv file
                 const classesResponse = await fetch(
                     "/sample-data/UTKFace/images/_classes.csv"
@@ -315,6 +318,46 @@ export function SampleDataImporter({
             setImportProgress(null)
         }
     }
+
+    // Function to check if the vectorset has only one record with "First Record (Default)"
+    // and delete it if found to prevent issues with embedding type or REDUCE option
+    const checkAndRemovePlaceholderRecord = async () => {
+        try {
+            // Check how many records are in the vector set
+            const count = await vcard({ keyName: vectorSetName });
+            
+            // If there's only one record, check if it's the default placeholder
+            if (count === 1) {
+                // Get the record using vsim with high count to ensure we get the record
+                const searchResult = await vsim({ 
+                    keyName: vectorSetName,
+                    count: 1,
+                    searchElement: "First Vector (Default)"
+                })
+                
+                if (searchResult.result) {
+                    const recordName = searchResult.result[0][0]; // First element, element name
+                    
+                    // Check if it's the default placeholder record
+                    if (recordName === "First Vector (Default)") {
+                        console.log("Removing placeholder record before import:", recordName);
+                        
+                        // Delete the default record
+                        await vrem({
+                            keyName: vectorSetName,
+                            element: recordName
+                        });
+                        
+                        console.log("Placeholder record removed successfully");
+                    }
+                }
+            }
+        } catch (error) {
+            // Log but don't throw error - this is a best-effort operation
+            console.error("Error checking/removing placeholder record:", error);
+            // Continue with import regardless of this error
+        }
+    };
 
     return (
         <div className="flex flex-col h-full">

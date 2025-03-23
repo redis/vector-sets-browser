@@ -302,9 +302,13 @@ export default function ImportTab({
                                                             console.log("Latest jobs:", latestJobs);
                                                             if (latestJobs && latestJobs.length > 0) {
                                                                 // Sort jobs by timestamp to get most recent one
-                                                                const sortedJobs = [...latestJobs].sort((a, b) => 
-                                                                    new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-                                                                );
+                                                                const sortedJobs = [...latestJobs].sort((a, b) => {
+                                                                    // Use creation time from the job's timestamp property if available
+                                                                    // If not available, fallback to using status object creation time
+                                                                    const timeA = a.status?.timestamp || new Date(a.status?.createdAt || 0).getTime();
+                                                                    const timeB = b.status?.timestamp || new Date(b.status?.createdAt || 0).getTime();
+                                                                    return timeB - timeA;
+                                                                });
                                                                 
                                                                 // Find recent completed jobs or use the most recent job
                                                                 const completedJob = sortedJobs.find(j => j.status.status === "completed") || sortedJobs[0];
