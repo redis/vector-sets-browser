@@ -3,12 +3,11 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useEffect, useState } from "react"
-import EditEmbeddingConfigModal from "../components/EmbeddingConfig/EditEmbeddingConfigDialog"
 import { useRedisConnection } from "../hooks/useRedisConnection"
 import { VectorSetSearchState } from "../hooks/useVectorSearch"
 import { useVectorSet } from "../hooks/useVectorSet"
 import { getConnection, removeConnection } from "../redis-server/connectionManager"
-import { EmbeddingConfig, VectorSetMetadata } from "@/app/embeddings/types/config"
+import { EmbeddingConfig, VectorSetMetadata } from "@/app/embeddings/types/embeddingModels"
 import { userSettings } from "../utils/userSettings"
 import AddVectorModal from "./AddVectorDialog"
 import ImportTab from "./ImportTab/ImportTab"
@@ -16,6 +15,7 @@ import InfoPanel from "./InfoTab/InfoPanel"
 import VectorSearchTab from "./SearchTab/VectorSearchTab"
 import VectorSetHeader from "./VectorSetHeader"
 import VectorSetNav from "./VectorSetNav"
+import VectorSettings from "./SettingsTab/VectorSettings"
 
 /**
  * VectorSetPage handles the display and management of vector sets.
@@ -49,7 +49,6 @@ export default function VectorSetPage() {
     const [isRestoring, setIsRestoring] = useState(true)
     const [redisName, setRedisName] = useState<string | null>(null)
     const [isAddVectorModalOpen, setIsAddVectorModalOpen] = useState(false)
-    const [isEditConfigModalOpen, setIsEditConfigModalOpen] = useState(false)
     const [activeTab, setActiveTab] = useState("search")
     // Keep track of search state per vector set
     const [isVectorSetChanging, setIsVectorSetChanging] = useState(false)
@@ -176,47 +175,6 @@ export default function VectorSetPage() {
         restoreConnection()
     }, [connectionId, router, handleConnect])
 
-    const handleEditConfig = async (newConfig: EmbeddingConfig) => {
-        try {
-            if (!vectorSetName) {
-                throw new Error("No vector set selected")
-            }
-
-            // Create the new metadata object, preserving other metadata fields
-            const updatedMetadata: VectorSetMetadata = {
-                ...metadata,
-                embedding: newConfig,
-                created: metadata?.created || new Date().toISOString(),
-                lastUpdated: new Date().toISOString(),
-            }
-
-            const response = await fetch(
-                `/api/vectorset/${vectorSetName}/metadata`,
-                {
-                    method: "PUT",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        metadata: updatedMetadata,
-                    }),
-                }
-            )
-            if (!response.ok) {
-                const errorData = await response.json()
-                console.error("Failed to save metadata:", errorData)
-                throw new Error(errorData.error || "Failed to save metadata")
-            }
-            const data = await response.json()
-            if (!data.success) {
-                console.error("Save metadata failed:", data.error)
-                throw new Error(data.error || "Failed to save metadata")
-            }
-            console.log("Metadata saved successfully:", data)
-            setIsEditConfigModalOpen(false)
-        } catch (error) {
-            console.error("[VectorSetPage] Error saving config:", error)
-        }
-    }
-
     const handleVectorSetChange = (newVectorSet: string | null) => {
         setIsVectorSetChanging(true)
         setVectorSetName(newVectorSet)
@@ -284,6 +242,9 @@ export default function VectorSetPage() {
                             <TabsTrigger className="w-full" value="info">
                                 Information
                             </TabsTrigger>
+                            <TabsTrigger className="w-full" value="settings">
+                                Vector Settings
+                            </TabsTrigger>
                             <TabsTrigger className="w-full" value="import">
                                 Import Data
                             </TabsTrigger>
@@ -292,12 +253,15 @@ export default function VectorSetPage() {
                         <TabsContent value="info">
                             <InfoPanel
                                 vectorSetName={vectorSetName}
-                                recordCount={recordCount}
                                 dim={dim}
                                 metadata={metadata}
-                                onEditConfig={() =>
-                                    setIsEditConfigModalOpen(true)
-                                }
+                            />
+                        </TabsContent>
+
+                        <TabsContent value="settings">
+                            <VectorSettings
+                                vectorSetName={vectorSetName}
+                                metadata={metadata}
                             />
                         </TabsContent>
 
@@ -346,12 +310,6 @@ export default function VectorSetPage() {
                     />
                 )}
 
-                <EditEmbeddingConfigModal
-                    isOpen={isEditConfigModalOpen}
-                    onClose={() => setIsEditConfigModalOpen(false)}
-                    config={metadata?.embedding}
-                    onSave={handleEditConfig}
-                />
             </div>
         </div>
     )

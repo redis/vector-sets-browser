@@ -1,5 +1,4 @@
-import { VectorSetMetadata } from '@/app/embeddings/types/config';
-import { apiClient } from "../api/client"
+import { apiClient } from "../api/client";
 
 // Base API response type
 export interface ApiResponse<T = unknown> {

@@ -1,4 +1,4 @@
-import { EmbeddingProvider } from "../types/config"
+import { EmbeddingProvider } from "../types/embeddingModels"
 
 export interface ValidationResult {
     isValid: boolean

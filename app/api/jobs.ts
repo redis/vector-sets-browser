@@ -1,5 +1,6 @@
 import { CSVJobMetadata } from "@/app/types/job-queue"
-import { VectorSetMetadata } from "@/app/embeddings/types/config"
+import { VectorSetMetadata } from "@/app/types/vectorSetMetaData"
+
 import { apiClient } from "./client"
 
 export interface Job {

@@ -1,4 +1,4 @@
-import { EmbeddingConfig, getModelData } from "../types/config"
+import { EmbeddingConfig, getModelData } from "../types/embeddingModels"
 import { EmbeddingProvider } from "./base"
 import { getImageEmbedding } from "@/app/utils/imageEmbedding"
 

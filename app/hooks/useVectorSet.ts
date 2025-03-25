@@ -1,16 +1,18 @@
 import { ApiError } from "@/app/api/client"
-import { 
-    VectorTuple, 
-    vdim, 
-    vcard, 
-    vadd, 
-    vemb, 
-    vgetattr, 
-    vrem 
-} from "@/app/redis-server/api"
 import { vectorSets } from "@/app/api/vector-sets"
 import { embeddings } from "@/app/embeddings/client"
-import { getExpectedDimensions, VectorSetMetadata } from "@/app/embeddings/types/config"
+import { getExpectedDimensions } from "@/app/embeddings/types/embeddingModels"
+import {
+    VectorTuple,
+    vadd,
+    vcard,
+    vdim,
+    vemb,
+    vgetattr,
+    vrem
+} from "@/app/redis-server/api"
+import { VectorSetMetadata } from "@/app/types/vectorSetMetaData"
+
 import { validateVector } from "@/app/embeddings/utils/validation"
 import eventBus, { AppEvents } from "@/app/utils/eventEmitter"
 import { useEffect, useRef, useState } from "react"

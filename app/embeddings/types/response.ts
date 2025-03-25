@@ -1,4 +1,4 @@
-import { EmbeddingConfig } from "./config"
+import { EmbeddingConfig } from "./embeddingModels"
 
 // Embedding API types
 export interface EmbeddingRequestBody {

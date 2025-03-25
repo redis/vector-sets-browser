@@ -4,7 +4,7 @@ import {
     ImageModelName,
     OpenAIModelName,
     TensorFlowModelName,
-} from "@/app/embeddings/types/config"
+} from "@/app/embeddings/types/embeddingModels"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import {
@@ -23,6 +23,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select"
+import { userSettings } from "@/app/utils/userSettings"
 import { useEffect, useState } from "react"
 import ImageModelSelector from "./ImageModelSelector"
 import OllamaModelSelector from "./OllamaModelSelector"
@@ -31,10 +32,32 @@ import TensorFlowModelSelector from "./TensorFlowModelSelector"
 const DEFAULT_CONFIG: EmbeddingConfig = {
     provider: "openai",
     openai: {
-        apiKey: "",
         model: "text-embedding-3-small",
         batchSize: 100,
     },
+}
+
+// Hook to manage OpenAI API key
+function useOpenAIKey() {
+    const [apiKey, setApiKey] = useState<string>("")
+    const [isLoaded, setIsLoaded] = useState(false)
+
+    useEffect(() => {
+        const savedKey = userSettings.get<string>("openai_api_key")
+        if (savedKey) {
+            setApiKey(savedKey)
+        }
+        setIsLoaded(true)
+    }, [])
+
+    const saveApiKey = (key: string) => {
+        if (key) {
+            userSettings.set("openai_api_key", key)
+            setApiKey(key)
+        }
+    }
+
+    return { apiKey, saveApiKey, isLoaded }
 }
 
 interface EditEmbeddingConfigModalProps {
@@ -56,10 +79,11 @@ export default function EditEmbeddingConfigModal({
     const [provider, setProvider] = useState<EmbeddingProvider>(
         config.provider || "openai"
     )
+    const { apiKey, saveApiKey, isLoaded } = useOpenAIKey()
+    const [tempApiKey, setTempApiKey] = useState("")
 
     // OpenAI specific state
     const [openaiConfig, setOpenaiConfig] = useState({
-        apiKey: config.openai?.apiKey ?? "",
         model:
             config.openai?.model ??
             ("text-embedding-3-small" as OpenAIModelName),
@@ -85,13 +109,19 @@ export default function EditEmbeddingConfigModal({
         inputSize: config.image?.inputSize || 224,
     })
 
+    // Initialize temp API key when user's saved API key is loaded
+    useEffect(() => {
+        if (isLoaded) {
+            setTempApiKey(apiKey || "")
+        }
+    }, [isLoaded, apiKey])
+
     // Update state when config changes
     useEffect(() => {
         if (config) {
             setProvider(config.provider || "openai")
             if (config.provider === "openai" && config.openai) {
                 setOpenaiConfig({
-                    apiKey: config.openai.apiKey ?? "",
                     model: config.openai.model ?? "text-embedding-3-small",
                     batchSize: config.openai.batchSize ?? 100,
                 })
@@ -145,11 +175,22 @@ export default function EditEmbeddingConfigModal({
             }
 
             if (provider === "openai") {
-                if (!openaiConfig.apiKey) {
+                // Check if we have an API key either globally or in the form
+                if (!apiKey && !tempApiKey) {
                     setError("Please enter an OpenAI API key")
                     return
                 }
-                newConfig.openai = openaiConfig
+                
+                // If user entered a new API key in the form, save it globally
+                if (tempApiKey && tempApiKey !== apiKey) {
+                    saveApiKey(tempApiKey)
+                }
+                
+                // No need to include apiKey in the config anymore
+                newConfig.openai = {
+                    model: openaiConfig.model,
+                    batchSize: openaiConfig.batchSize,
+                }
             } else if (provider === "ollama") {
                 if (!ollamaConfig.apiUrl) {
                     setError("Please enter an Ollama API URL")
@@ -280,19 +321,23 @@ export default function EditEmbeddingConfigModal({
                             <>
                                 <div className="space-y-2">
                                     <Label htmlFor="apiKey">
-                                        OpenAI API Key
+                                        OpenAI API Key {apiKey ? "(Saved)" : "(Not Saved)"}
                                     </Label>
                                     <Input
                                         id="apiKey"
                                         type="password"
-                                        value={openaiConfig.apiKey}
+                                        value={tempApiKey}
                                         onChange={(e) =>
-                                            setOpenaiConfig({
-                                                ...openaiConfig,
-                                                apiKey: e.target.value,
-                                            })
+                                            setTempApiKey(e.target.value)
                                         }
+                                        placeholder={apiKey ? "Using saved API key" : "Enter API key"}
                                     />
+                                    {apiKey && (
+                                        <p className="text-xs text-gray-500">
+                                            A global API key is already saved. Leave empty to use the saved key,
+                                            or enter a new one to update it.
+                                        </p>
+                                    )}
                                 </div>
                                 <div className="space-y-2">
                                     <Label

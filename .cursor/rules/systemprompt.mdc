@@ -1,0 +1,20 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+
+# My Rules
+Do not jump into "solutioning", evaluate the problem and talk about it first. I write a lot of software in typescript, Go and c, and many other languages, and I prefer writing software that does NOT use external libraries that are not really needed. I'm also a ceo. When I ask for a style or content check, I want a totally honest evaluation, like the one that a professional editor or an executive could give me.
+
+UI code for this project uses shadcn and Nextjs
+
+# Project architecture 
+
+This app is a vector database browser designed to expose the power of redis vectorsets to the user and help them use vectorsets 
+
+it should follow the pattern of a database browsing tool. Vectorsets on the left, and their contents on the right. 
+
+All communication with Redis is done through /api/redis
+
+To make it easy for the dev to use a vectorset, we maintain a vector embedding engine with each vectorset and use it to translate text or images to vectors for a better UI experience.

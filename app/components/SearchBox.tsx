@@ -26,8 +26,12 @@ import { Check, Filter, Settings, Shuffle, X } from "lucide-react"
 import { useEffect, useMemo, useRef, useState } from "react"
 import {
     getEmbeddingDataFormat,
-    VectorSetMetadata,
-} from "@/app/embeddings/types/config"
+} from "@/app/embeddings/types/embeddingModels"
+import {
+    type
+        VectorSetMetadata
+} from "@/app/types/vectorSetMetaData"
+
 import SmartFilterInput from "./SmartFilterInput"
 import { VectorTuple } from "@/app/redis-server/api"
 import RedisCommandBox from "./RedisCommandBox"
@@ -99,7 +103,7 @@ export default function SearchBox({
     })
     // Add local filter state to debounce filter changes
     const [localFilter, setLocalFilter] = useState(searchFilter)
-    const filterTimeoutRef = useRef<NodeJS.Timeout>()
+    const filterTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
     // State for custom expansion factor
     const [useCustomEF, setUseCustomEF] = useState(() => {

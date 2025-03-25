@@ -1,7 +1,7 @@
 import { useState } from "react"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Label } from "@/components/ui/label"
-import { TensorFlowModelName, TENSORFLOW_MODELS } from "@/app/embeddings/types/config"
+import { TensorFlowModelName, TENSORFLOW_MODELS } from "@/app/embeddings/types/embeddingModels"
 
 interface TensorFlowModelSelectorProps {
     value: string

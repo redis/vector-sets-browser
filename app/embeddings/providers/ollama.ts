@@ -1,4 +1,4 @@
-import { EmbeddingConfig, getModelData } from "../types/config"
+import { EmbeddingConfig, getModelData } from "../types/embeddingModels"
 import { EmbeddingProvider } from "./base"
 
 export class OllamaProvider implements EmbeddingProvider {

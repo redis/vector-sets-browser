@@ -1,4 +1,4 @@
-import { EmbeddingConfig, EmbeddingProvider } from "@/app/embeddings/types/config";
+import { EmbeddingConfig, EmbeddingProvider } from "@/app/embeddings/types/embeddingModels";
 
 /**
  * Checks if Ollama is available on the default port

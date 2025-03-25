@@ -1,4 +1,4 @@
-import { EmbeddingConfig } from "@/app/embeddings/types/config"
+import { EmbeddingConfig } from "@/app/embeddings/types/embeddingModels"
 import {
     CSVJobMetadata,
     CSVRow,

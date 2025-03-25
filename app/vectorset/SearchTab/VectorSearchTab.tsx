@@ -1,7 +1,7 @@
 "use client"
 
 import SearchBox from "@/app/components/SearchBox"
-import { VectorSetMetadata } from "@/app/embeddings/types/config"
+import { VectorSetMetadata } from "@/app/embeddings/types/embeddingModels"
 import {
     useVectorSearch,
     VectorSetSearchState,

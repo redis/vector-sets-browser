@@ -1,4 +1,4 @@
-import { EmbeddingConfig, getExpectedDimensions } from "./types/config"
+import { EmbeddingConfig, getExpectedDimensions } from "./types/embeddingModels"
 import { OpenAIProvider } from "./providers/openai"
 import { OllamaProvider } from "./providers/ollama"
 import { TensorFlowProvider } from "./providers/tensorflow"

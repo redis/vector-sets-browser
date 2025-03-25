@@ -1,5 +1,5 @@
 import { ApiError } from "@/app/api/client"
-import { EmbeddingConfig } from "@/app/embeddings/types/config"
+import { EmbeddingConfig } from "@/app/embeddings/types/embeddingModels"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import {

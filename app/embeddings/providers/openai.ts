@@ -1,5 +1,6 @@
-import { EmbeddingConfig, OpenAIConfig, getModelData } from "../types/config"
+import { EmbeddingConfig, OpenAIConfig, getModelData } from "../types/embeddingModels"
 import { EmbeddingProvider } from "./base"
+import { getOpenAIKey } from "@/app/api/openai/helpers"
 
 export class OpenAIProvider implements EmbeddingProvider {
     async getEmbedding(input: string, config: EmbeddingConfig): Promise<number[]> {
@@ -7,11 +8,16 @@ export class OpenAIProvider implements EmbeddingProvider {
             throw new Error("OpenAI configuration is missing")
         }
 
+        const apiKey = await getOpenAIKey()
+        if (!apiKey) {
+            throw new Error("OpenAI API key is missing. Please configure it in your user settings.")
+        }
+
         const response = await fetch("https://api.openai.com/v1/embeddings", {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
-                Authorization: `Bearer ${config.openai.apiKey}`,
+                Authorization: `Bearer ${apiKey}`,
                 "OpenAI-Organization": process.env.OPENAI_ORG_ID || "",
             },
             body: JSON.stringify({
@@ -46,6 +52,11 @@ export class OpenAIProvider implements EmbeddingProvider {
             throw new Error("OpenAI configuration is missing")
         }
 
+        const apiKey = await getOpenAIKey()
+        if (!apiKey) {
+            throw new Error("OpenAI API key is missing. Please configure it in your user settings.")
+        }
+
         const batchSize = config.openai.batchSize || 20
         const batches = []
 
@@ -61,7 +72,7 @@ export class OpenAIProvider implements EmbeddingProvider {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
-                    Authorization: `Bearer ${config.openai.apiKey}`,
+                    Authorization: `Bearer ${apiKey}`,
                     "OpenAI-Organization": process.env.OPENAI_ORG_ID || "",
                 },
                 body: JSON.stringify({

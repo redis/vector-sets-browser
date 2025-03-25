@@ -1,5 +1,5 @@
 import { apiClient } from "@/app/api/client"
-import { EmbeddingConfig } from "@/app/embeddings/types/config"
+import { EmbeddingConfig } from "@/app/embeddings/types/embeddingModels"
 import { EmbeddingRequestBody } from "@/app/embeddings/types/response"
 
 export interface ApiResponse<T = unknown> {

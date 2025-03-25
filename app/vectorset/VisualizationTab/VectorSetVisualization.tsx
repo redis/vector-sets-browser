@@ -16,7 +16,7 @@ import {
     useVectorSearch,
     VectorSetSearchState,
 } from "@/app/hooks/useVectorSearch"
-import { VectorSetMetadata } from "@/app/embeddings/types/config"
+import { VectorSetMetadata } from "@/app/embeddings/types/embeddingModels"
 import VectorViz3D from "./VectorViz3D"
 import HNSWVizPure from "./vizualizer/HNSWVizPure"
 

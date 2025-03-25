@@ -1,6 +1,6 @@
 import { apiClient } from "@/app/api/client"
 import { jobs, type ImportLogEntry, type Job } from "@/app/api/jobs"
-import { VectorSetMetadata, getModelName } from "@/app/embeddings/types/config"
+import { VectorSetMetadata, getModelName } from "@/app/embeddings/types/embeddingModels"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"

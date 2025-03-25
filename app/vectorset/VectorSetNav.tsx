@@ -1,7 +1,7 @@
 import { ApiError } from "@/app/api/client"
 import { jobs } from "@/app/api/jobs"
 import { vectorSets } from "@/app/api/vector-sets"
-import { VectorSetMetadata } from "@/app/embeddings/types/config"
+import { VectorSetMetadata } from "@/app/embeddings/types/embeddingModels"
 import { useCallback, useEffect, useRef, useState } from "react"
 import EditEmbeddingConfigModal from "../components/EmbeddingConfig/EditEmbeddingConfigDialog"
 import CreateVectorSetModal from "./CreateVectorSetDialog"

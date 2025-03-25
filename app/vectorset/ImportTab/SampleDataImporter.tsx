@@ -1,28 +1,30 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { ImportJobConfig, jobs } from "@/app/api/jobs"
+import EditEmbeddingConfigModal from "@/app/components/EmbeddingConfig/EditEmbeddingConfigDialog"
+import { EmbeddingConfig, isImageEmbedding, isTextEmbedding } from "@/app/embeddings/types/embeddingModels"
+import { vcard, vrem, vsim } from "@/app/redis-server/api"
+import {
+    VectorSetMetadata,
+    createVectorSetMetadata,
+} from "@/app/types/vectorSetMetaData"
+import { getImageEmbedding } from "@/app/utils/imageEmbedding"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { AlertCircle, Edit2, CheckCircle2 } from "lucide-react"
-import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Slider } from "@/components/ui/slider"
-import { Label } from "@/components/ui/label"
-import Image from "next/image"
+import { Button } from "@/components/ui/button"
 import {
     Dialog,
     DialogContent,
-    DialogHeader,
-    DialogTitle,
     DialogDescription,
     DialogFooter,
+    DialogHeader,
+    DialogTitle,
 } from "@/components/ui/dialog"
+import { Label } from "@/components/ui/label"
+import { Slider } from "@/components/ui/slider"
+import { AlertCircle, CheckCircle2, Edit2 } from "lucide-react"
+import { useEffect, useState } from "react"
 import { SampleDataset } from "./SampleDataSelect"
-import { VectorSetMetadata, isImageEmbedding, isTextEmbedding, createVectorSetMetadata } from "@/app/embeddings/types/config"
-import { jobs, ImportJobConfig } from "@/app/api/jobs"
-import { getImageEmbedding } from "@/app/utils/imageEmbedding"
-import EditEmbeddingConfigModal from "@/app/components/EmbeddingConfig/EditEmbeddingConfigDialog"
-import { EmbeddingConfig } from "@/app/embeddings/types/config"
-import { vcard, vsim, vrem } from "@/app/redis-server/api"
 
 interface SampleDataImporterProps {
     dataset: SampleDataset
@@ -48,7 +50,6 @@ export function SampleDataImporter({
     } | null>(null)
     const [importCount, setImportCount] = useState<number>(5)
     const [availableImageCount, setAvailableImageCount] = useState<number>(100)
-    const [showImageCountDialog, setShowImageCountDialog] = useState(false)
     const [embeddingMismatch, setEmbeddingMismatch] = useState<{
         open: boolean
         currentEmbedding: VectorSetMetadata | null
@@ -106,7 +107,7 @@ export function SampleDataImporter({
             }
         }
 
-        // For image datasets, show the image count dialog first
+        //For image datasets, show the image count dialog first
         if (dataset.name === "UTK Faces") {
             try {
                 const classesResponse = await fetch(
@@ -130,7 +131,6 @@ export function SampleDataImporter({
                 // Set the available count and make sure import count doesn't exceed it
                 setAvailableImageCount(count)
                 setImportCount(Math.min(importCount, count))
-                setShowImageCountDialog(true)
             } catch (error) {
                 console.error("Error fetching image count:", error)
                 setError(
@@ -139,7 +139,6 @@ export function SampleDataImporter({
                     }`
                 )
             }
-            return
         }
 
         // For non-image datasets, start import directly
@@ -534,71 +533,6 @@ export function SampleDataImporter({
                     dataFormat={dataset.embeddingType}
                 />
             )}
-
-            {/* Image count dialog */}
-            <Dialog open={showImageCountDialog} onOpenChange={setShowImageCountDialog}>
-                <DialogContent className="sm:max-w-md">
-                    <DialogHeader>
-                        <DialogTitle>Import UTK Faces Dataset</DialogTitle>
-                        <DialogDescription>
-                            The UTK Faces dataset contains over 20,000 face
-                            images. Choose how many sample images to import
-                            using the slider below.
-                        </DialogDescription>
-                    </DialogHeader>
-                    <div className="py-4">
-                        <Image
-                            src="/sample-data/UTKFace/samples.png"
-                            alt="UTK Faces sample"
-                            width={400}
-                            height={200}
-                            className="rounded-md object-cover mb-4"
-                        />
-
-                        <div className="space-y-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="import-count">
-                                    Number of images to import: {importCount}
-                                </Label>
-                                <Slider
-                                    id="import-count"
-                                    min={1}
-                                    max={availableImageCount}
-                                    step={1}
-                                    value={[importCount]}
-                                    onValueChange={(value) =>
-                                        setImportCount(value[0])
-                                    }
-                                />
-                                <div className="flex justify-between text-xs text-muted-foreground">
-                                    <span>1</span>
-                                    <span>
-                                        {Math.round(availableImageCount / 2)}
-                                    </span>
-                                    <span>{availableImageCount}</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <DialogFooter>
-                        <Button
-                            variant="outline"
-                            onClick={() => setShowImageCountDialog(false)}
-                        >
-                            Cancel
-                        </Button>
-                        <Button
-                            variant="default"
-                            onClick={() => {
-                                setShowImageCountDialog(false)
-                                startImport()
-                            }}
-                        >
-                            Import {importCount} Images
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
 
             {/* Embedding mismatch dialog */}
             <Dialog

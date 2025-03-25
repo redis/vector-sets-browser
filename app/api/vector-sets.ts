@@ -1,4 +1,4 @@
-import { VectorSetMetadata } from '@/app/embeddings/types/config';
+import { VectorSetMetadata } from '@/app/types/vectorSetMetaData';
 import { apiClient } from './client';
 
 // Vector set management types

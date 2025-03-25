@@ -1,5 +1,5 @@
 import { RedisClient, getRedisUrl } from "@/app/redis-server/server/commands"
-import { EmbeddingConfig } from "../types/config"
+import { EmbeddingConfig } from "../types/embeddingModels"
 
 export const EMBEDDING_CACHE_KEY = "embeddingCache"
 export const EMBEDDING_CACHE_LOG_KEY = "embeddingCache:log"

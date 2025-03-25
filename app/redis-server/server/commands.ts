@@ -1,13 +1,12 @@
+import { EmbeddingService } from "@/app/embeddings/service"
+import { getExpectedDimensions } from "@/app/embeddings/types/embeddingModels"
+import { VaddRequestBody } from "@/app/redis-server/api"
 import {
     validateAndCorrectMetadata,
     VectorSetMetadata,
-    getExpectedDimensions
-} from "@/app/embeddings/types/config"
-import { VaddRequestBody } from "@/app/redis-server/api"
+} from "@/app/types/vectorSetMetaData"
 import { cookies } from "next/headers"
 import { createClient, RedisClientType } from "redis"
-import { OllamaProvider } from "@/app/embeddings/providers/ollama"
-import { EmbeddingService } from "@/app/embeddings/service"
 
 // Types for Redis operations
 export interface RedisVectorMetadata {

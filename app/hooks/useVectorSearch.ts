@@ -2,7 +2,7 @@ import { ApiError } from "@/app/api/client"
 import { embeddings } from "@/app/embeddings/client"
 import { VectorTuple, vdim, vsim } from "@/app/redis-server/api"
 import { useCallback, useEffect, useRef, useState } from "react"
-import { VectorSetMetadata } from "@/app/embeddings/types/config"
+import { VectorSetMetadata } from "@/app/types/vectorSetMetaData"
 
 export interface VectorSetSearchState {
     searchType: "Vector" | "Element" | "Image"

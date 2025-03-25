@@ -1,6 +1,6 @@
 import { RedisClient, getRedisUrl } from "@/app/redis-server/server/commands"
 import { NextResponse } from "next/server"
-import { EmbeddingConfig } from "@/app/embeddings/types/config"
+import { EmbeddingConfig } from "@/app/embeddings/types/embeddingModels"
 
 // Redis key for storing cache configuration
 const EMBEDDING_CACHE_CONFIG_KEY = "embedding_cache_config"

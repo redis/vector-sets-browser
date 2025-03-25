@@ -60,6 +60,55 @@ export default function DocsPage() {
                         <h3 className="text-xl font-medium mb-2">
                             VADD: Add Items into a Vector Set
                         </h3>
+
+                        <div id="cas-option" className="pt-4">
+                            <h4 className="text-lg font-medium mb-2">CAS Option</h4>
+                            <p className="text-gray-700 mb-4">
+                                The CAS (Check-and-Set) option enables high-performance multi-threading for vector additions.
+                                When enabled, the neighbor candidates collection is performed in the background while the
+                                command executes in the main thread. This can significantly speed up vector additions,
+                                especially for large datasets.
+                            </p>
+                        </div>
+
+                        <div id="exploration-factor" className="pt-4">
+                            <h4 className="text-lg font-medium mb-2">Exploration Factor (EF)</h4>
+                            <p className="text-gray-700 mb-4">
+                                The Exploration Factor controls the effort made to find good candidates when connecting
+                                new nodes to the existing HNSW graph. The default value is 200. Using a larger value
+                                may help achieve better recall at the cost of increased processing time. Values typically
+                                range from 100 to 1000, with higher values providing better accuracy but slower performance.
+                            </p>
+                        </div>
+
+                        <div id="vector-quantization" className="pt-4">
+                            <h4 className="text-lg font-medium mb-2">Vector Quantization</h4>
+                            <p className="text-gray-700 mb-4">
+                                Vector quantization reduces memory usage by compressing vector representations:
+                            </p>
+                            <ul className="list-disc pl-6 space-y-2 text-gray-700">
+                                <li><strong>NOQUANT:</strong> No quantization, uses full precision (32-bit floats)</li>
+                                <li><strong>Q8:</strong> 8-bit quantization, good balance of precision and memory usage</li>
+                                <li><strong>BIN:</strong> Binary quantization, fastest and lowest memory usage but reduced accuracy</li>
+                            </ul>
+                            <p className="text-gray-700 mt-4">
+                                Note: Quantization cannot be changed after the first vector is added to the set.
+                            </p>
+                        </div>
+
+                        <div id="dimension-reduction" className="pt-4">
+                            <h4 className="text-lg font-medium mb-2">Dimension Reduction</h4>
+                            <p className="text-gray-700 mb-4">
+                                Dimension reduction uses random projection to reduce the dimensionality of vectors,
+                                resulting in faster searches and lower memory usage. However, this comes at the cost
+                                of reduced precision. The reduction matrix is saved with the vector set and used
+                                consistently for all operations.
+                            </p>
+                            <p className="text-gray-700 mb-4">
+                                Note: Dimension reduction cannot be changed after the first vector is added to the set.
+                            </p>
+                        </div>
+
                         <pre className="bg-gray-100 p-4 rounded-lg mb-4 font-mono">
                             VADD key [REDUCE dim] FP32|VALUES vector element
                             [CAS] [NOQUANT] [BIN] [Q8] [EF

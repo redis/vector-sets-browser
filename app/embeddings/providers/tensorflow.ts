@@ -1,4 +1,4 @@
-import { EmbeddingConfig, getModelData } from "../types/config"
+import { EmbeddingConfig, getModelData } from "../types/embeddingModels"
 import { EmbeddingProvider } from "./base"
 
 // Define a type for the TensorFlow model

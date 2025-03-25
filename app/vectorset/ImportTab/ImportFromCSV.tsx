@@ -29,7 +29,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { AlertCircle, CheckCircle2, Info, Sparkles } from "lucide-react"
 import { useEffect, useRef, useState } from "react"
 import { toast } from "sonner"
-import { VectorSetMetadata } from "@/app/embeddings/types/config"
+import { VectorSetMetadata } from "@/app/embeddings/types/embeddingModels"
 
 interface ImportFromCSVProps {
     onClose: () => void

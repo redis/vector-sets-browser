@@ -1,4 +1,4 @@
-import { OLLAMA_MODELS } from "@/app/embeddings/types/config"
+import { OLLAMA_MODELS } from "@/app/embeddings/types/embeddingModels"
 import { Input } from "@/components/ui/input"
 import {
     Select,

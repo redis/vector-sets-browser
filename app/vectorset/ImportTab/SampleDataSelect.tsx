@@ -13,7 +13,7 @@ import {
     CarouselNext,
     CarouselPrevious,
 } from "@/components/ui/carousel"
-import { EmbeddingConfig } from "@/app/embeddings/types/config"
+import { EmbeddingConfig } from "@/app/embeddings/types/embeddingModels"
 import { getDefaultEmbeddingConfig } from "@/app/utils/embeddingUtils"
 
 // Define the sample dataset interface

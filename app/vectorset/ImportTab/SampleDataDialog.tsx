@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/dialog"
 import { SampleDataSelect, SampleDataset } from "./SampleDataSelect"
 import { SampleDataImporter } from "./SampleDataImporter"
-import { VectorSetMetadata } from "@/app/embeddings/types/config"
+import { VectorSetMetadata } from "@/app/embeddings/types/embeddingModels"
 
 interface SampleDataDialogProps {
     open: boolean

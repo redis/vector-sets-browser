@@ -1,4 +1,4 @@
-import { IMAGE_MODELS, ImageModelName } from "@/app/embeddings/types/config"
+import { IMAGE_MODELS, ImageModelName } from "@/app/embeddings/types/embeddingModels"
 import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { useState } from "react"

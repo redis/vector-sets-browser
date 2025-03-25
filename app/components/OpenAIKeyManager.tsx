@@ -1,40 +1,77 @@
 "use client";
 
-import { userSettings } from "@/app/utils/userSettings";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 export default function OpenAIKeyManager() {
   const [apiKey, setApiKey] = useState<string>("");
-  const [, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
   const [isSaved, setIsSaved] = useState<boolean>(false);
   
   useEffect(() => {
-    async function loadApiKey() {
-      const savedKey = userSettings.get<string>("openai_api_key");
-      if (savedKey) {
-        setApiKey(savedKey);
-        setIsSaved(true);
+    async function checkApiKey() {
+      try {
+        const response = await fetch('/api/openai');
+        const data = await response.json();
+        setIsSaved(data.success);
+      } catch (error) {
+        console.error('Error checking API key:', error);
+      } finally {
+        setIsLoading(false);
       }
-      setIsLoading(false);
     }
-    loadApiKey();
+    checkApiKey();
   }, []);
 
   const handleSave = async () => {
     if (apiKey) {
-      userSettings.set("openai_api_key", apiKey);
-      setIsSaved(true);
-      toast.success("API key saved successfully");
+      try {
+        const response = await fetch('/api/openai', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ apiKey }),
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+          setIsSaved(true);
+          toast.success("API key saved successfully");
+        } else {
+          toast.error(data.error || "Failed to save API key");
+        }
+      } catch (error) {
+        console.error('Error saving API key:', error);
+        toast.error("Failed to save API key");
+      }
     }
   };
 
   const handleClear = async () => {
-    userSettings.delete("openai_api_key");
-    setApiKey("");
-    setIsSaved(false);
-    toast.success("API key cleared");
+    try {
+      const response = await fetch('/api/openai', {
+        method: 'DELETE',
+      });
+      
+      if (response.ok) {
+        setApiKey("");
+        setIsSaved(false);
+        toast.success("API key cleared");
+      } else {
+        const data = await response.json();
+        toast.error(data.error || "Failed to clear API key");
+      }
+    } catch (error) {
+      console.error('Error clearing API key:', error);
+      toast.error("Failed to clear API key");
+    }
   };
+
+  if (isLoading) {
+    return <div>Loading...</div>;
+  }
 
   return (
     <div className="bg-[white] dark:bg-gray-800 p-6 rounded-lg shadow-md">

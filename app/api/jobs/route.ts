@@ -1,7 +1,7 @@
 import { JobProcessor } from "@/app/lib/server/job-processor"
 import { JobQueueService } from "@/app/lib/server/job-queue"
 import RedisClient, * as redis from "@/app/redis-server/server/commands"
-import { VectorSetMetadata } from "@/app/embeddings/types/config"
+import { VectorSetMetadata } from "@/app/types/vectorSetMetaData"
 import { NextRequest, NextResponse } from "next/server"
 
 // Map to store active job processors
