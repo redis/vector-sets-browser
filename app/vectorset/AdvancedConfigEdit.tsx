@@ -92,7 +92,14 @@ export default function AdvancedConfigEdit({
             <div className="form-body space-y-6">
                 {/* Runtime configurable options */}
                 <div className="space-y-2">
-                    <h4 className="text-sm font-semibold">Runtime Options</h4>
+                    <div className="w-full flex items-center">
+                        <h4 className="text-sm font-semibold grow">
+                            Runtime Options
+                        </h4>
+                        <div className="text-gray-500 text-xs">
+                            (You can change these settings later.)
+                        </div>
+                    </div>
                     <div className="form-section border-none">
                         <div className="border-none">
                             <div className="flex w-full space-x-2 items-center">
@@ -109,19 +116,15 @@ export default function AdvancedConfigEdit({
                                             with VADD command. When set, the CAS
                                             option will be used for all VADD
                                             calls
+                                            <a
+                                                href="/docs#cas-option"
+                                                className="text-xs pl-2 whitespace-nowrap text-blue-500 hover:underline"
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                            >
+                                                Learn more
+                                            </a>
                                         </p>
-                                        <p className="text-xs text-gray-500">
-                                            CAS Speeds up adds to the vector set
-                                            using multi-threading
-                                        </p>
-                                        <a 
-                                            href="/docs#cas-option" 
-                                            className="text-xs text-blue-500 hover:underline"
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                        >
-                                            Learn more about CAS
-                                        </a>
                                     </div>
                                 </label>
                                 <div className="w-auto">
@@ -149,22 +152,22 @@ export default function AdvancedConfigEdit({
                                     </label>
                                     <p className="text-xs text-gray-500">
                                         Controls the EF option used with VSIM
-                                        command.  When set, the EF option will be
+                                        command. When set, the EF option will be
                                         used for all VSIM calls
                                     </p>
                                     <p className="text-xs text-gray-500">
                                         Higher values improve recall, but
-                                        increase search time (default
-                                        is 200, values between 100 and 1000)
+                                        increase search time (default is 200,
+                                        values between 100 and 1000)
+                                        <a
+                                            href="/docs#exploration-factor"
+                                            className="pl-2 whitespace-nowrap text-xs text-blue-500 hover:underline"
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                        >
+                                            Learn more
+                                        </a>
                                     </p>
-                                    <a 
-                                        href="/docs#exploration-factor" 
-                                        className="text-xs text-blue-500 hover:underline"
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                    >
-                                        Learn more about Exploration Factor
-                                    </a>
                                 </div>
                                 <div className="grow"></div>
                                 <Input
@@ -187,13 +190,12 @@ export default function AdvancedConfigEdit({
 
                 {/* Immutable options */}
                 <div className="space-y-2 pt-4">
-                    <div>
-                        <h4 className="text-sm font-semibold">
+                    <div className="w-full flex items-center">
+                        <h4 className="text-sm grow font-semibold">
                             Vector Options
                         </h4>
-                        <div className="text-xs text-red-500">
-                            (WARNING: Quantization and Dimension Reduction
-                            cannot be changed after the first vector is added)
+                        <div className="text-xs text-gray-500">
+                            (Cannot be changed after the first vector is added)
                         </div>
                     </div>
                     <div className="form-section border-none">
@@ -209,15 +211,15 @@ export default function AdvancedConfigEdit({
                                     <p className="text-xs text-gray-500">
                                         Reduce storage size at the expense of
                                         precision
+                                        <a
+                                            href="/docs#vector-quantization"
+                                            className="pl-2 whitespace-nowrap text-xs text-blue-500 hover:underline"
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                        >
+                                            Learn more
+                                        </a>
                                     </p>
-                                    <a 
-                                        href="/docs#vector-quantization" 
-                                        className="text-xs text-blue-500 hover:underline"
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                    >
-                                        Learn more about Vector Quantization
-                                    </a>
                                 </div>
                                 <div className="grow"></div>
                                 <Select
@@ -260,15 +262,15 @@ export default function AdvancedConfigEdit({
                                     <p className="text-xs text-gray-500">
                                         Reduce dimensions for faster search,
                                         lower precision
+                                        <a
+                                            href="/docs#dimension-reduction"
+                                            className="text-xs whitespace-nowrap pl-2 text-blue-500 hover:underline"
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                        >
+                                            Learn more
+                                        </a>
                                     </p>
-                                    <a 
-                                        href="/docs#dimension-reduction" 
-                                        className="text-xs text-blue-500 hover:underline"
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                    >
-                                        Learn more about Dimension Reduction
-                                    </a>
                                 </div>
                                 <div className="grow"></div>
                                 <Input
