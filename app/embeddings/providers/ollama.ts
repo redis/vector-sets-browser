@@ -11,7 +11,7 @@ export class OllamaProvider implements EmbeddingProvider {
         console.log("[OllamaProvider] config: ", config.ollama)
         console.log("[OllamaProvider] prompt: ", prompt)
 
-        const response = await fetch(`${config.ollama.apiUrl}/api/embeddings`, {
+        const response = await fetch(`${config.ollama.apiUrl}/api/embed`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({

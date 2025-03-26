@@ -68,7 +68,7 @@ export const sampleDatasets: SampleDataset[] = [
             provider: "ollama",
             ollama: {
                 modelName: "mxbai-embed-large",
-                apiUrl: "http://localhost:11434/api/embeddings"
+                apiUrl: "http://localhost:11434"
             }
         }
     },

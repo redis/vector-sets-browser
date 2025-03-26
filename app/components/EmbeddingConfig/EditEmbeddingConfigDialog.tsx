@@ -93,7 +93,7 @@ export default function EditEmbeddingConfigModal({
     // Ollama specific state
     const [ollamaConfig, setOllamaConfig] = useState({
         apiUrl:
-            config.ollama?.apiUrl ?? "http://localhost:11434/api/embeddings",
+            config.ollama?.apiUrl ?? "http://localhost:11434",
         modelName: config.ollama?.modelName ?? "llama2",
         promptTemplate: config.ollama?.promptTemplate ?? "",
     })
@@ -129,7 +129,7 @@ export default function EditEmbeddingConfigModal({
                 setOllamaConfig({
                     apiUrl:
                         config.ollama.apiUrl ??
-                        "http://localhost:11434/api/embeddings",
+                        "http://localhost:11434",
                     modelName: config.ollama.modelName ?? "llama2",
                     promptTemplate: config.ollama.promptTemplate ?? "",
                 })
