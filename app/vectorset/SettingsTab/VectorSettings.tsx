@@ -16,23 +16,25 @@ import { vectorSets } from "@/app/api/vector-sets"
 interface VectorSettingsProps {
     vectorSetName: string
     metadata: VectorSetMetadata | null
+    onMetadataUpdate?: (metadata: VectorSetMetadata) => void
 }
 
 export default function VectorSettings({
     vectorSetName,
     metadata,
+    onMetadataUpdate,
 }: VectorSettingsProps) {
     const [isEditConfigModalOpen, setIsEditConfigModalOpen] = useState(false)
     const [isAdvancedConfigPanelOpen, setIsAdvancedConfigPanelOpen] = useState(false)
     const [workingMetadata, setWorkingMetadata] = useState<VectorSetMetadata | null>(null)
 
     const handleEditConfig = async (newConfig: EmbeddingConfig) => {
+        console.log(`[handleEditConfig] New config: ${JSON.stringify(newConfig)}`)
         try {
             if (!vectorSetName) {
                 throw new Error("No vector set selected")
             }
 
-            // Create the new metadata object, preserving other metadata fields
             const updatedMetadata: VectorSetMetadata = {
                 ...metadata,
                 embedding: newConfig,
@@ -45,7 +47,9 @@ export default function VectorSettings({
                 metadata: updatedMetadata,
             })
             
-            console.log("Metadata saved successfully")
+            // Notify parent of metadata update
+            onMetadataUpdate?.(updatedMetadata)
+            
             setIsEditConfigModalOpen(false)
         } catch (error) {
             console.error("[VectorSetPage] Error saving config:", error)
@@ -58,13 +62,18 @@ export default function VectorSettings({
                 throw new Error("No vector set or metadata selected")
             }
 
+            const updatedMetadata = {
+                ...workingMetadata,
+                lastUpdated: new Date().toISOString(),
+            }
+
             await vectorSets.setMetadata({
                 name: vectorSetName,
-                metadata: {
-                    ...workingMetadata,
-                    lastUpdated: new Date().toISOString(),
-                },
+                metadata: updatedMetadata,
             })
+            
+            // Notify parent of metadata update
+            onMetadataUpdate?.(updatedMetadata)
             
             console.log("Advanced config saved successfully")
             setIsAdvancedConfigPanelOpen(false)
@@ -88,58 +97,41 @@ export default function VectorSettings({
                         stores your vector set. Modifying these settings may
                         require recreating the vector set.
                     </p>
-                    {metadata?.redisConfig && (
-                        <div className="flex items-center gap-4 p-4">
-                            <div className="grow">
-                                <div className="grid grid-cols-2 gap-2 text-sm">
-                                    <div className="text-gray-600">
-                                        Quantization:
-                                    </div>
-                                    <div>
-                                        {metadata.redisConfig.quantization}
-                                    </div>
+                    <div className="flex items-center gap-4 p-4">
+                        <div className="grow">
+                            <div className="grid grid-cols-2 gap-2 text-sm">
+                                <div className="text-gray-600">
+                                    Quantization:
+                                </div>
+                                <div>
+                                    {metadata?.redisConfig?.quantization || <span>Default: <span className="font-bold">Q8</span></span>}
+                                </div>
 
-                                    {metadata.redisConfig.reduceDimensions && (
-                                        <>
-                                            <div className="text-gray-600">
-                                                Reduced Dimensions:
-                                            </div>
-                                            <div>
-                                                {
-                                                    metadata.redisConfig
-                                                        .reduceDimensions
-                                                }
-                                            </div>
-                                        </>
-                                    )}
+                                <div className="text-gray-600">
+                                    Reduced Dimensions:
+                                </div>
+                                <div>
+                                    {metadata?.redisConfig?.reduceDimensions || <span>Default: <span className="font-bold">None (No dimension reduction)</span></span>}
+                                </div>
 
-                                    <div className="text-gray-600">
-                                        Default CAS:
-                                    </div>
-                                    <div>
-                                        {metadata.redisConfig.defaultCAS
-                                            ? "Enabled"
-                                            : "Disabled"}
-                                    </div>
+                                <div className="text-gray-600">
+                                    Default CAS:
+                                </div>
+                                <div>
+                                    {metadata?.redisConfig?.defaultCAS !== undefined 
+                                        ? (metadata?.redisConfig.defaultCAS ? "Enabled" : "Disabled")
+                                        : <span>Default: <span className="font-bold">Disabled</span></span>}
+                                </div>
 
-                                    {metadata.redisConfig
-                                        .buildExplorationFactor && (
-                                        <>
-                                            <div className="text-gray-600">
-                                                Build EF:
-                                            </div>
-                                            <div>
-                                                {
-                                                    metadata.redisConfig
-                                                        .buildExplorationFactor
-                                                }
-                                            </div>
-                                        </>
-                                    )}
+                                <div className="text-gray-600">
+                                    Build Exploration Factor:
+                                </div>
+                                <div>
+                                    {metadata?.redisConfig?.buildExplorationFactor || <span>Default: <span className="font-bold">200</span></span>}
                                 </div>
                             </div>
                         </div>
-                    )}
+                    </div>
                     <div className="w-full flex">
                         <div className="grow"></div>
                         <Button 
@@ -180,8 +172,7 @@ export default function VectorSettings({
                                         Provider:
                                     </div>
                                     <div className="font-bold">
-                                        {metadata?.embedding?.provider ||
-                                            "None"}
+                                        {metadata?.embedding?.provider || "None"}
                                     </div>
                                 </div>
                                 <div className="flex space-x-2">

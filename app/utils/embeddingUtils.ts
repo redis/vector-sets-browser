@@ -22,10 +22,26 @@ export async function isOllamaAvailable(): Promise<boolean> {
 
 /**
  * Gets the best available text embedding configuration
- * Prioritizes: 1. Ollama (if available) 2. TensorFlow
+ * Prioritizes: 1. CLIP 2. Ollama (if available) 3. TensorFlow
  * @returns Promise<EmbeddingConfig> - the best available embedding config
  */
 export async function getDefaultTextEmbeddingConfig(): Promise<EmbeddingConfig> {
+  // Try to use CLIP first
+  try {
+    const { pipeline } = await import('@xenova/transformers')
+    // Just check if we can initialize the pipeline
+    await pipeline('feature-extraction', 'Xenova/clip-vit-base-patch32')
+    return {
+      provider: "clip",
+      image: {
+        model: "clip",
+        modelPath: "Xenova/clip-vit-base-patch32"
+      }
+    }
+  } catch (e) {
+    console.log("CLIP not available, falling back to other providers")
+  }
+  
   const ollamaAvailable = await isOllamaAvailable();
   
   if (ollamaAvailable) {
@@ -49,15 +65,29 @@ export async function getDefaultTextEmbeddingConfig(): Promise<EmbeddingConfig> 
 
 /**
  * Gets the default image embedding configuration
+ * Prioritizes: 1. CLIP 2. MobileNet
  * @returns EmbeddingConfig - the default image embedding config
  */
 export function getDefaultImageEmbeddingConfig(): EmbeddingConfig {
-  return {
-    provider: "image",
-    image: {
-      model: "mobilenet",
-    },
-  };
+  // Try to use CLIP first
+  try {
+    return {
+      provider: "clip",
+      image: {
+        model: "clip",
+        modelPath: "Xenova/clip-vit-base-patch32"
+      }
+    }
+  } catch (e) {
+    console.log("CLIP not available, falling back to MobileNet")
+    // Fall back to MobileNet
+    return {
+      provider: "image",
+      image: {
+        model: "mobilenet",
+      },
+    }
+  }
 }
 
 /**

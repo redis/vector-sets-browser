@@ -29,7 +29,6 @@ export default function RedisCommandBox({
     // Helper function to get and format the Redis command
     const getRedisCommand = (includeFullEmbedding: boolean = false) => {
         // If copying the full command, return as a simple string
-        console.log("Executed command:", executedCommand)
         if (includeFullEmbedding && executedCommand) {
             return executedCommand;
         }

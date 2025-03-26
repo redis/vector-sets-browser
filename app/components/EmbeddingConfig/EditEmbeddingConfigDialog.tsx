@@ -77,7 +77,7 @@ export default function EditEmbeddingConfigModal({
 }: EditEmbeddingConfigModalProps) {
     const [error, setError] = useState<string | null>(null)
     const [provider, setProvider] = useState<EmbeddingProvider>(
-        config.provider || "openai"
+        config?.provider || "openai"
     )
     const { apiKey, saveApiKey, isLoaded } = useOpenAIKey()
     const [tempApiKey, setTempApiKey] = useState("")
@@ -170,10 +170,9 @@ export default function EditEmbeddingConfigModal({
         setError(null)
 
         try {
-            const newConfig: EmbeddingConfig = {
+            let newConfig: EmbeddingConfig = {
                 provider,
             }
-
             if (provider === "openai") {
                 // Check if we have an API key either globally or in the form
                 if (!apiKey && !tempApiKey) {
@@ -206,6 +205,10 @@ export default function EditEmbeddingConfigModal({
                     model: imageConfig.model as ImageModelName,
                     inputSize: imageConfig.inputSize,
                 }
+            } else if (provider === "clip") {
+                newConfig.clip = {
+                    model: "clip-vit-base-patch32"
+                }
             }
 
             onSave(newConfig)
@@ -218,13 +221,13 @@ export default function EditEmbeddingConfigModal({
     // Filter providers based on dataFormat
     const getFilteredProviders = () => {
         if (!dataFormat) {
-            return ["tensorflow", "image", "ollama", "openai"]
+            return ["tensorflow", "image", "ollama", "openai", "clip"]
         }
         
         if (dataFormat === "text") {
-            return ["tensorflow", "ollama", "openai"]
+            return ["tensorflow", "ollama", "openai", "clip"]
         } else {
-            return ["image"]
+            return ["image", "clip"]
         }
     }
 
@@ -241,6 +244,7 @@ export default function EditEmbeddingConfigModal({
                         The Vector Set Browser will auto-encode new vectors when
                         you add them to a set, and use the encoder to encode
                         search queries.
+                        {provider}
                     </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-4">
@@ -271,6 +275,18 @@ export default function EditEmbeddingConfigModal({
                                             <div className="  text-gray-500">
                                                 Built in model for text embeddings -
                                                 uses Tensorflow.js
+                                            </div>
+                                        </div>
+                                    </SelectItem>
+                                )}
+                                {getFilteredProviders().includes("clip") && (
+                                    <SelectItem key="clip" value="clip">
+                                        <div className="flex flex-col items-start">
+                                            <div className="font-medium text-lg">
+                                                CLIP - Text & Image Embeddings
+                                            </div>
+                                            <div className="text-gray-500">
+                                                OpenAI's CLIP model for text-to-image and image-to-image search
                                             </div>
                                         </div>
                                     </SelectItem>

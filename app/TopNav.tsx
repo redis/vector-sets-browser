@@ -8,6 +8,7 @@ export default function TopNav({}: TopNavProps) {
 
     const navItems = [
         { href: "/vectorset", paths: ["/vectorset", "/console"], label: "Console", visible: true },
+        { href: "/calculator", paths: ["/calculator"], label: "Calculator", visible: true },
         { href: "/docs", paths: ["/docs"], label: "Docs", visible: true },
         {
             href: "/config",

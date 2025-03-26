@@ -1,10 +1,10 @@
-
 // Provider names
 export const PROVIDERS = {
     OPENAI: "openai",
     OLLAMA: "ollama",
     TENSORFLOW: "tensorflow",
     IMAGE: "image",
+    CLIP: "clip",
     NONE: "none",
 } as const
 

@@ -86,6 +86,9 @@ export default function VectorSetPage() {
         handleShowVector,
         results,
         setResults,
+        loadVectorSet,
+        setMetadata,
+        updateMetadata,
     } = useVectorSet()
 
     const handleDisconnect = () => {
@@ -262,6 +265,7 @@ export default function VectorSetPage() {
                             <VectorSettings
                                 vectorSetName={vectorSetName}
                                 metadata={metadata}
+                                onMetadataUpdate={updateMetadata}
                             />
                         </TabsContent>
 

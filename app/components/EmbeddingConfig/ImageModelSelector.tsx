@@ -15,7 +15,7 @@ interface ModelInfo {
     dimensions: number
 }
 
-// Create model info from IMAGE_MODELS
+// Create model info from IMAGE_MODELS only
 const imageModels: ModelInfo[] = [
     {
         id: "mobilenet",
@@ -23,21 +23,7 @@ const imageModels: ModelInfo[] = [
         description:
             "Lightweight model optimized for mobile and web applications. Good balance of speed and accuracy.",
         dimensions: IMAGE_MODELS["mobilenet"].dimensions,
-    },
-    // Other models removed due to dependency conflicts
-    // Uncomment when supported
-    // {
-    //   id: "efficientnet",
-    //   name: "EfficientNet B0",
-    //   description: "Optimized CNN architecture with better accuracy and efficiency than many larger models.",
-    //   dimensions: 1280
-    // },
-    // {
-    //   id: "resnet50",
-    //   name: "ResNet50",
-    //   description: "Deep residual network with 50 layers. Higher accuracy but more computationally intensive.",
-    //   dimensions: 2048
-    // }
+    }
 ]
 
 export default function ImageModelSelector({
@@ -82,8 +68,7 @@ export default function ImageModelSelector({
                 -dimensional embeddings
             </p>
             <p className="text-xs text-gray-500">
-                Note: Currently only MobileNet is supported due to dependency
-                constraints.
+                Note: MobileNet is optimized for image similarity tasks.
             </p>
         </div>
     )

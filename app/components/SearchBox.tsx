@@ -26,6 +26,10 @@ import { Check, Filter, Settings, Shuffle, X } from "lucide-react"
 import { useEffect, useMemo, useRef, useState } from "react"
 import {
     getEmbeddingDataFormat,
+    isImageEmbedding,
+    isTextEmbedding,
+    isMultiModalEmbedding,
+    type EmbeddingConfig
 } from "@/app/embeddings/types/embeddingModels"
 import {
     type
@@ -39,23 +43,27 @@ import ImageUploader from "./ImageUploader"
 
 const searchTypes = [
     {
-        value: "Vector",
-        label: "Vector",
+        value: "RawVector",
+        label: "Raw Vector",
     },
     {
-        value: "Element",
-        label: "Element",
+        value: "Text",
+        label: "Text",
     },
     {
         value: "Image",
         label: "Image",
     },
+    {
+        value: "Element",
+        label: "Element",
+    },
 ] as const
 
 interface SearchBoxProps {
     vectorSetName: string
-    searchType: "Vector" | "Element" | "Image"
-    setSearchType: (type: "Vector" | "Element" | "Image") => void
+    searchType: "RawVector" | "Text" | "Element" | "Image"
+    setSearchType: (type: "RawVector" | "Text" | "Element" | "Image") => void
     searchQuery: string
     setSearchQuery: (query: string) => void
     searchFilter: string
@@ -71,6 +79,8 @@ interface SearchBoxProps {
     lastTextEmbedding?: number[]
     executedCommand?: string
     results?: VectorTuple[]
+    onSearch: (search: { type: string; content: string | File }) => Promise<void>
+    config: VectorSetMetadata
 }
 
 export default function SearchBox({
@@ -92,6 +102,8 @@ export default function SearchBox({
     lastTextEmbedding,
     executedCommand,
     results = [],
+    onSearch,
+    config,
 }: SearchBoxProps) {
     const [showFilters, setShowFilters] = useState(() => {
         return userSettings.get("showFilters") ?? true
@@ -184,19 +196,32 @@ export default function SearchBox({
         }
     }, [])
 
-    const isImageEmbedding =
+    const imageEmbedding =
         metadata && getEmbeddingDataFormat(metadata?.embedding) === "image"
-    const isTextEmbedding =
+    const textEmbedding =
         metadata && getEmbeddingDataFormat(metadata?.embedding) === "text"
     const supportsEmbeddings =
         metadata?.embedding.provider && metadata?.embedding.provider !== "none"
+    const isMultiModal = isMultiModalEmbedding(metadata?.embedding)
+    const canUseText = isTextEmbedding(metadata?.embedding)
+    const canUseImage = isImageEmbedding(metadata?.embedding)
+    const showInputToggle = isMultiModal
 
-    const filteredSearchTypes = searchTypes.filter((type) => {
-        if (type.value === "Image" && !isImageEmbedding) {
-            return false
-        }
-        return true
-    })
+    const filteredSearchTypes = useMemo(() => {
+        return searchTypes.filter((type) => {
+            switch (type.value) {
+                case "Image":
+                    return canUseImage
+                case "Text":
+                    return canUseText
+                case "RawVector":
+                case "Element":
+                    return true
+                default:
+                    return false
+            }
+        })
+    }, [canUseImage, canUseText])
 
     // Compute the placeholder text based on current searchType
     const searchBoxPlaceholder = useMemo(() => {
@@ -205,28 +230,28 @@ export default function SearchBox({
                 return "Enter Element"
             case "Image":
                 return "Enter image data"
-            case "Vector":
-                return supportsEmbeddings && isTextEmbedding
-                    ? "Enter search text or vector data (0.1, 0.2, ...)"
-                    : "Enter vector data (0.1, 0.2, ...)"
+            case "Text":
+                return "Enter search text"
+            case "RawVector":
+                return "Enter vector data (0.1, 0.2, ...)"
             default:
                 return ""
         }
-    }, [searchType, supportsEmbeddings, isTextEmbedding])
+    }, [searchType])
 
     // set default searchType only when metadata changes
     useEffect(() => {
         if (!metadata) return // Don't set defaults if no metadata
         
         // Only set default on first metadata load
-        if (supportsEmbeddings && !initialSearchTypeSetRef.current) {
+        if (!initialSearchTypeSetRef.current) {
             // Choose appropriate default search type based on embedding format
-            let newSearchType: "Vector" | "Element" | "Image";
+            let newSearchType: "RawVector" | "Text" | "Element" | "Image";
             
-            if (isImageEmbedding) {
+            if (isTextEmbedding(metadata?.embedding)) {
+                newSearchType = "Text";
+            } else if (isImageEmbedding(metadata?.embedding)) {
                 newSearchType = "Image";
-            } else if (isTextEmbedding) {
-                newSearchType = "Vector";
             } else {
                 newSearchType = "Element";
             }
@@ -234,7 +259,7 @@ export default function SearchBox({
             setSearchType(newSearchType);
             initialSearchTypeSetRef.current = true;
         }
-    }, [metadata, isImageEmbedding, isTextEmbedding, setSearchType, supportsEmbeddings])
+    }, [metadata, setSearchType])
 
     // Debug logging for results
     useEffect(() => {
@@ -258,6 +283,24 @@ export default function SearchBox({
         //console.log("Executed command updated:", executedCommand);
     }, [executedCommand])
 
+    const [searchText, setSearchText] = useState("")
+    const [searchImage, setSearchImage] = useState<File | null>(null)
+    const [inputMode, setInputMode] = useState<'text' | 'image'>('text')
+    const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+
+    // Handle text search with debounce
+    const handleTextChange = (value: string) => {
+        setSearchText(value)
+
+        if (searchTimeoutRef.current) {
+            clearTimeout(searchTimeoutRef.current)
+        }
+
+        searchTimeoutRef.current = setTimeout(() => {
+            setSearchQuery(value)
+        }, 500)
+    }
+
     // Handle image embedding generation
     const handleImageSelect = (base64Data: string) => {
         setSearchQuery(base64Data)
@@ -270,6 +313,22 @@ export default function SearchBox({
         // Set search query to a vector representation (needed for the search)
         setSearchQuery(embedding.join(", "))
     }
+
+    const handleImageUpload = (fileName: string) => {
+        setInputMode('image')
+    }
+
+    // Clean up timeouts on unmount
+    useEffect(() => {
+        return () => {
+            if (filterTimeoutRef.current) {
+                clearTimeout(filterTimeoutRef.current)
+            }
+            if (searchTimeoutRef.current) {
+                clearTimeout(searchTimeoutRef.current)
+            }
+        }
+    }, [])
 
     return (
         <section className="mb-2">
@@ -287,7 +346,7 @@ export default function SearchBox({
                                 if (value !== searchType) {
                                     setSearchQuery('');
                                 }
-                                setSearchType(value as "Vector" | "Element" | "Image");
+                                setSearchType(value as "RawVector" | "Text" | "Element" | "Image");
                             }}
                         >
                             <SelectTrigger className="w-[120px]">
@@ -368,27 +427,34 @@ export default function SearchBox({
                     </DropdownMenu>
                 </div>
                 <div className="flex flex-col gap-2 grow w-full">
-                    {searchType === "Image" ? (
-                        // Show ImageUploader for Image search type
-                        (<ImageUploader 
-                            onImageSelect={handleImageSelect}
-                            onEmbeddingGenerated={handleImageEmbeddingGenerated}
-                            config={metadata?.embedding?.image || { model: "mobilenet" }}
-                            className="w-full"
-                            allowMultiple={false}
-                        />)
-                    ) : (
-                        // Show regular search input for other types
-                        (<div className="relative flex gap-2">
+                    {showInputToggle && (
+                        <div className="flex gap-2 mb-2">
+                            <button
+                                className={`px-3 py-1 rounded ${inputMode === 'text' ? 'bg-blue-500 text-white' : 'bg-gray-200'}`}
+                                onClick={() => setInputMode('text')}
+                            >
+                                Text
+                            </button>
+                            <button
+                                className={`px-3 py-1 rounded ${inputMode === 'image' ? 'bg-blue-500 text-white' : 'bg-gray-200'}`}
+                                onClick={() => setInputMode('image')}
+                            >
+                                Image
+                            </button>
+                        </div>
+                    )}
+                    
+                    <div className="flex gap-2">
+                        {((searchType === 'Text' && canUseText) || searchType === 'RawVector' || searchType === 'Element') && (
                             <div className="flex-1 relative">
                                 <Input
                                     type="text"
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    value={searchText}
+                                    onChange={(e) => handleTextChange(e.target.value)}
                                     placeholder={searchBoxPlaceholder}
                                     className="border rounded p-3 w-full pr-12"
                                 />
-                                {searchType === "Vector" && (
+                                {searchType === "RawVector" && (
                                     <Button
                                         variant="ghost"
                                         size="icon"
@@ -399,9 +465,7 @@ export default function SearchBox({
                                                     { length: dim },
                                                     () => Math.random()
                                                 ).map((n) => n.toFixed(4))
-                                                setSearchQuery(
-                                                    randomVector.join(", ")
-                                                )
+                                                handleTextChange(randomVector.join(", "))
                                             }
                                         }}
                                     >
@@ -409,20 +473,18 @@ export default function SearchBox({
                                     </Button>
                                 )}
                             </div>
-                            <Button
-                                variant="outline"
-                                size="icon"
-                                className={`h-9 ${
-                                    showFilters
-                                        ? "bg-gray-500 hover:bg-gray-600 text-white"
-                                        : "bg-[white] hover:bg-gray-100"
-                                }`}
-                                onClick={() => setShowFilters(!showFilters)}
-                            >
-                                <Filter className="h-4 w-4" />
-                            </Button>
-                        </div>)
-                    )}
+                        )}
+                        {(searchType === 'Image' && canUseImage) && (
+                            <ImageUploader
+                                onImageSelect={handleImageSelect}
+                                onEmbeddingGenerated={handleImageEmbeddingGenerated}
+                                config={metadata?.embedding?.image || { model: "mobilenet" }}
+                                className="flex-1"
+                                allowMultiple={false}
+                                onFileNameSelect={handleImageUpload}
+                            />
+                        )}
+                    </div>
 
                     {showFilters && (
                         <div className="flex gap-2 items-center w-full mt-2">
@@ -455,9 +517,9 @@ export default function SearchBox({
                 </div>
             {/* Use the new RedisCommandBox component */}
                 {showRedisCommand && (
-            <div className="bg-[white] w-full px-2 py-2 rounded border-t border-gray-200 flex flex-col gap-2 items-start mt-2">
+            <div className="bg-[white] w-full py-2 flex-col -space-y-1 rounded border-t border-gray-200 items-start mt-2">
                 <div className="flex items-center w-full">
-                    <label className="text-sm font-medium text-gray-700">
+                    <label className="text-sm font-medium text-gray-500">
                         Redis Command
                     </label>
                     <div className="grow"></div>
@@ -469,7 +531,7 @@ export default function SearchBox({
                     vectorSetName={vectorSetName}
                     dim={dim}
                     executedCommand={executedCommand}
-                    searchQuery={searchQuery}
+                    searchQuery={searchText}
                     searchFilter={localFilter}
                     showRedisCommand={showRedisCommand}
                     setShowRedisCommand={setShowRedisCommand}

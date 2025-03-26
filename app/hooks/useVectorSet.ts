@@ -23,6 +23,7 @@ interface UseVectorSetReturn {
     dim: number | null
     recordCount: number | null
     metadata: VectorSetMetadata | null
+    setMetadata: (metadata: VectorSetMetadata | null) => void
     statusMessage: string
     results: VectorTuple[]
     setResults: (results: VectorTuple[]) => void
@@ -35,6 +36,7 @@ interface UseVectorSetReturn {
     handleDeleteVector: (element: string) => Promise<void>
     handleDeleteVector_multi: (elements: string[]) => Promise<void>
     handleShowVector: (element: string) => Promise<number[] | null>
+    updateMetadata: (newMetadata: VectorSetMetadata) => Promise<void>
 }
 
 // Cache for vector set data to prevent unnecessary reloading
@@ -58,6 +60,7 @@ export function useVectorSet(): UseVectorSetReturn {
 
     // Load metadata when vector set changes
     const loadMetadata = async () => {
+        console.log("[loadMetadata] Loading metadata", vectorSetName)
         if (!vectorSetName) return null
 
         // Check if metadata is already cached
@@ -87,17 +90,8 @@ export function useVectorSet(): UseVectorSetReturn {
 
     // Load vector set data when name changes
     const loadVectorSet = async () => {
+        console.log("[loadVectorSet] Loading vector set", vectorSetName)
         if (!vectorSetName) return
-
-        // Check if vector set data is already cached
-        const cache = vectorSetCacheRef.current[vectorSetName]
-        if (cache?.loaded) {
-            setDim(cache.dim)
-            setRecordCount(cache.recordCount)
-            setMetadata(cache.metadata)
-            setStatusMessage("")
-            return
-        }
 
         try {
             // Clear any previous results
@@ -115,13 +109,11 @@ export function useVectorSet(): UseVectorSetReturn {
             setDim(dimResult)
             setRecordCount(recordCountResult)
 
-            // Load metadata if not already cached and get the result
-            let metadataValue = cache?.metadata
-            if (!metadataValue) {
-                metadataValue = await loadMetadata()
-            }
+            // Always load fresh metadata when loadVectorSet is called
+            const metadataValue = await loadMetadata()
+            console.log("[loadVectorSet] Loading metadata", metadataValue)
 
-            // Cache the vector set data with the correct metadata
+            // Update the cache with fresh data
             vectorSetCacheRef.current[vectorSetName] = {
                 dim: dimResult,
                 recordCount: recordCountResult,
@@ -456,12 +448,42 @@ export function useVectorSet(): UseVectorSetReturn {
         }
     }, [vectorSetName])
 
+    // Add a new method specifically for metadata updates
+    const updateMetadata = async (newMetadata: VectorSetMetadata) => {
+        if (!vectorSetName) return;
+
+        try {
+            // Save to server
+            await vectorSets.setMetadata({
+                name: vectorSetName,
+                metadata: newMetadata,
+            });
+
+            // Update local state and cache
+            setMetadata(newMetadata);
+            vectorSetCacheRef.current[vectorSetName] = {
+                ...vectorSetCacheRef.current[vectorSetName],
+                metadata: newMetadata,
+            };
+
+            // Emit event for other components that might need to know
+            eventBus.emit(AppEvents.METADATA_UPDATED, { 
+                vectorSetName, 
+                metadata: newMetadata 
+            });
+        } catch (error) {
+            console.error("[useVectorSet] Error updating metadata:", error);
+            throw error;
+        }
+    };
+
     return {
         vectorSetName,
         setVectorSetName,
         dim,
         recordCount,
         metadata,
+        setMetadata,
         statusMessage,
         results,
         setResults,
@@ -470,5 +492,6 @@ export function useVectorSet(): UseVectorSetReturn {
         handleDeleteVector,
         handleDeleteVector_multi,
         handleShowVector,
+        updateMetadata,
     }
 }
