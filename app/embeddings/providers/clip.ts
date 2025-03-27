@@ -1,22 +1,61 @@
-import { EmbeddingConfig, getModelData } from "../types/embeddingModels"
+import { EmbeddingConfig, getModelData, CLIP_MODELS } from "../types/embeddingModels"
 import { EmbeddingProvider } from "./base"
-
-// Cache for loaded models
-const modelCache = new Map<string, any>()
+import { AutoProcessor, AutoTokenizer, CLIPTextModelWithProjection, CLIPVisionModelWithProjection, RawImage } from '@xenova/transformers'
 
 export class CLIPProvider implements EmbeddingProvider {
-    private pipeline: any = null
+    private imageProcessor: any = null
+    private visionModel: any = null
+    private textModel: any = null
+    private tokenizer: any = null
     
+    async getImageEmbedding(imageData: string, modelPath: string): Promise<number[]> {
+        try {
+            // Initialize the image models if not already done
+            if (!this.imageProcessor || !this.visionModel) {
+                this.imageProcessor = await AutoProcessor.from_pretrained(modelPath)
+                this.visionModel = await CLIPVisionModelWithProjection.from_pretrained(modelPath, {
+                    quantized: true
+                })
+            }
+
+            // Convert base64 to blob
+            const response = await fetch(imageData)
+            const blob = await response.blob()
+
+            // Create a File object from the blob
+            const file = new File([blob], 'image.jpg', { type: blob.type })
+
+            // Create an object URL for the file
+            const objectUrl = URL.createObjectURL(file)
+
+            try {
+                // Process the image
+                const image = await RawImage.read(objectUrl)
+                const imageInputs = await this.imageProcessor(image)
+                const { image_embeds } = await this.visionModel(imageInputs)
+                return Array.from(image_embeds.data)
+            } finally {
+                // Clean up the object URL
+                URL.revokeObjectURL(objectUrl)
+            }
+        } catch (error) {
+            console.error("[CLIP] Error generating image embedding:", error)
+            throw error
+        }
+    }
+
     async getEmbedding(input: string, config: EmbeddingConfig): Promise<number[]> {
-        if (!config.image) {
+        if (!config.clip) {
             throw new Error("CLIP configuration is missing")
         }
 
         try {
-            // Initialize the pipeline if not already done
-            if (!this.pipeline) {
-                const { pipeline } = await import('@xenova/transformers')
-                this.pipeline = await pipeline('feature-extraction', config.image.modelPath || 'Xenova/clip-vit-base-patch32')
+            const modelPath = config.clip.model 
+                ? CLIP_MODELS[config.clip.model].modelPath 
+                : 'Xenova/clip-vit-base-patch32'
+
+            if (!modelPath) {
+                throw new Error("Model path is undefined")
             }
 
             // Determine if input is base64 image data or text
@@ -24,14 +63,23 @@ export class CLIPProvider implements EmbeddingProvider {
             
             let embedding: number[]
             if (isBase64Image) {
-                // Process image input
-                const imageData = await this.preprocessImage(input)
-                const result = await this.pipeline(imageData, { pooling: 'mean', normalize: true })
-                embedding = Array.from(result.data)
+                embedding = await this.getImageEmbedding(input, modelPath)
             } else {
+                // Initialize the text model and tokenizer if not already done
+                if (!this.textModel || !this.tokenizer) {
+                    this.tokenizer = await AutoTokenizer.from_pretrained(modelPath)
+                    this.textModel = await CLIPTextModelWithProjection.from_pretrained(modelPath, {
+                        quantized: true
+                    })
+                }
+
                 // Process text input
-                const result = await this.pipeline(input, { pooling: 'mean', normalize: true })
-                embedding = Array.from(result.data)
+                const textInputs = this.tokenizer([input], { 
+                    padding: true, 
+                    truncation: true 
+                })
+                const { text_embeds } = await this.textModel(textInputs)
+                embedding = Array.from(text_embeds.data)
             }
 
             // Validate embedding dimensions
@@ -43,18 +91,20 @@ export class CLIPProvider implements EmbeddingProvider {
                 )
             }
 
+            // Validate vector values
+            if (embedding.some(v => typeof v !== 'number' || isNaN(v) || !isFinite(v))) {
+                console.error("Invalid vector values:", embedding)
+                throw new Error("Vector contains invalid values (NaN or Infinity)")
+            }
+
+            console.log("Generated embedding dimensions:", embedding.length)
+            console.log("First few values:", embedding.slice(0, 5))
+
             return embedding
         } catch (error) {
             console.error("[CLIP] Error generating embedding:", error)
             throw error
         }
-    }
-
-    private async preprocessImage(base64Data: string): Promise<any> {
-        // Convert base64 to blob
-        const response = await fetch(base64Data)
-        const blob = await response.blob()
-        return blob
     }
 
     // Batch processing is not yet supported for CLIP

@@ -15,6 +15,7 @@ import { Shuffle } from "lucide-react"
 import { useEffect, useMemo, useState } from "react"
 import ImageUploader from "../components/ImageUploader"
 import RedisCommandBox from "../components/RedisCommandBox"
+import { CLIP_MODELS } from "@/app/embeddings/types/embeddingModels" 
 
 // Import ImageFileInfo type 
 import type { ImageFileInfo } from "../components/ImageUploader"
@@ -340,12 +341,12 @@ export default function AddVectorModal({
             setError(null);
 
             // Use the pre-generated embedding if available for images
-            if (activeTab === "image" && imageEmbedding) {
+            if (activeTab === "image") {
+                if (!imageEmbedding) {
+                    throw new Error("No image embedding available. Please try uploading the image again.");
+                }
                 console.log("Adding image embedding:", imageEmbedding.length);
                 await onAdd(element, imageEmbedding, useCAS);
-                setStatus("Vector added successfully!");
-            } else if (activeTab === "image") {
-                await onAdd(element, imageData, useCAS);
                 setStatus("Vector added successfully!");
             } else if (activeTab === "rawVector") {
                 // Convert string of numbers to an actual number array
@@ -726,7 +727,7 @@ export default function AddVectorModal({
                                             onEmbeddingGenerated={handleEmbeddingGenerated}
                                             onFileNameSelect={handleFileNameSelect}
                                             onImagesChange={handleImagesChange}
-                                            config={metadata?.embedding?.image || { model: "mobilenet" }}
+                                            config={metadata?.embedding || { provider: "image", image: { model: "mobilenet" }}}
                                             allowMultiple={true}
                                         />
                                         {imageEmbedding && uploadImages.length <= 1 && (

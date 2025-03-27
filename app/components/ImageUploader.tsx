@@ -1,4 +1,4 @@
-import { ImageConfig } from "@/app/embeddings/types/embeddingModels"
+import { ImageConfig, EmbeddingConfig, CLIP_MODELS } from "@/app/embeddings/types/embeddingModels"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import Image from "next/image"
@@ -28,7 +28,7 @@ interface ImageUploaderProps {
     onEmbeddingGenerated?: (embedding: number[]) => void
     onFileNameSelect?: (fileName: string) => void
     onImagesChange?: (images: ImageFileInfo[]) => void
-    config?: ImageConfig
+    config?: EmbeddingConfig
     className?: string
     allowMultiple?: boolean
 }
@@ -38,7 +38,12 @@ export default function ImageUploader({
     onEmbeddingGenerated,
     onFileNameSelect,
     onImagesChange,
-    config = { model: "mobilenet" },
+    config = { 
+        provider: "clip", 
+        clip: { 
+            model: "clip-vit-base-patch32" 
+        } 
+    },
     className = "",
     allowMultiple = false,
 }: ImageUploaderProps) {
@@ -313,47 +318,67 @@ export default function ImageUploader({
         const data = dataToProcess || imageData
         if (!data) throw new Error("No image data provided");
 
+        let embedding: number[] = [] 
+
         try {
             setIsProcessingEmbedding(true)
             setStatus("Loading model...")
 
-            // Load the model
-            const model = await loadImageModel()
+            // Check if we're using CLIP
+            if (config.provider === "clip") {
+                // Use the CLIPProvider
+                const { CLIPProvider } = await import('@/app/embeddings/providers/clip')
+                const clipProvider = new CLIPProvider()
+                
+                setStatus("Generating embedding using CLIP...")
+                console.log("Generating embedding using CLIP...")
 
-            setStatus("Processing image...")
-            // Preprocess the image
-            const tensor = await preprocessImage(data)
+                const modelPath = config.clip?.model
+                    ? CLIP_MODELS[config.clip.model].modelPath
+                    : 'Xenova/clip-vit-base-patch32'
 
-            setStatus("Generating embedding...")
+                embedding = await clipProvider.getImageEmbedding(data, modelPath)
+                
+    
+            } else if (config.provider === "image") {
 
-            // Get the internal model to access the penultimate layer
-            // @ts-ignore - accessing internal property
-            const internalModel = model.model
+                // For MobileNet, continue with existing flow
+                const model = await loadImageModel()
 
-            // Execute the model up to the penultimate layer
-            // This gives us the feature vector (embedding) before classification
+                setStatus("Processing image...")
+                // Preprocess the image
+                const tensor = await preprocessImage(data)
+
+                setStatus("Generating embedding using TensorFlow MobileNet...")
+                console.log("Generating embedding using TensorFlow MobileNet...")
+                // Get the internal model to access the penultimate layer
+                // @ts-ignore - accessing internal property
+                const internalModel = model.model
+
+                // Execute the model up to the penultimate layer
+                // This gives us the feature vector (embedding) before classification
             
-            let activationLayer;
+                let activationLayer;
             
-            try {
-                // MobileNet v1 has a layer usually called 'global_average_pooling2d'
-                activationLayer = internalModel.execute(
-                    tensor,
-                    ["global_average_pooling2d"] 
-                );
-            } catch (e) {
-                console.log("Couldn't find global_average_pooling2d layer, using default model output");
-                // If we can't get the specific layer, just use the model directly
-                activationLayer = model.infer(tensor, true);
+                try {
+                    // MobileNet v1 has a layer usually called 'global_average_pooling2d'
+                    activationLayer = internalModel.execute(
+                        tensor,
+                        ["global_average_pooling2d"]
+                    );
+                } catch (e) {
+                    console.log("Couldn't find global_average_pooling2d layer, using default model output");
+                    // If we can't get the specific layer, just use the model directly
+                    activationLayer = model.infer(tensor, true);
+                }
+
+                // Convert to array and check values
+                embedding = Array.from(await activationLayer.data()) as number[]
+
+                // Clean up the tensors
+                tensor.dispose()
+                activationLayer.dispose()
             }
-
-            // Convert to array and check values
-            const embedding = Array.from(await activationLayer.data()) as number[]
-
-            // Clean up the tensors
-            tensor.dispose()
-            activationLayer.dispose()
-
             setStatus("Embedding generated successfully")
             
             // If there's a callback, call it
@@ -362,6 +387,7 @@ export default function ImageUploader({
             }
             
             return embedding;
+            
         } catch (error) {
             console.error("Error generating embedding:", error)
             setStatus(
@@ -379,6 +405,11 @@ export default function ImageUploader({
      * Load a TensorFlow.js image model
      */
     async function loadImageModel(): Promise<any> {
+        // If using CLIP, we don't need to load MobileNet
+        if (config.provider === "clip") {
+            return null;
+        }
+
         const modelName = "mobilenet"
 
         // Return cached model if available

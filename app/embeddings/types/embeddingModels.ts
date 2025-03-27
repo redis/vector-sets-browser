@@ -71,7 +71,7 @@ export const CLIP_MODELS: Record<string, ModelData> = {
     "clip-vit-base-patch32": {
         name: "clip-vit-base-patch32",
         dimensions: 512,
-        dataFormat: "image",
+        dataFormat: "text-and-image",
         modelPath: "Xenova/clip-vit-base-patch32"
     }
 }
@@ -106,8 +106,8 @@ export type OpenAIModelName = keyof typeof OPENAI_MODELS
 // Type for TensorFlow model names
 export type TensorFlowModelName = keyof typeof TENSORFLOW_MODELS
 
-// Update the ImageModelName type to remove CLIP
-export type ImageModelName = "mobilenet"
+// Update the ImageModelName type to include CLIP
+export type ImageModelName = "mobilenet" | "clip"
 
 // Add a new type for CLIP models
 export type ClipModelName = keyof typeof CLIP_MODELS

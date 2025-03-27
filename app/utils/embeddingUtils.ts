@@ -33,9 +33,8 @@ export async function getDefaultTextEmbeddingConfig(): Promise<EmbeddingConfig> 
     await pipeline('feature-extraction', 'Xenova/clip-vit-base-patch32')
     return {
       provider: "clip",
-      image: {
-        model: "clip",
-        modelPath: "Xenova/clip-vit-base-patch32"
+      clip: {
+        model: "clip-vit-base-patch32"
       }
     }
   } catch (e) {
@@ -73,9 +72,8 @@ export function getDefaultImageEmbeddingConfig(): EmbeddingConfig {
   try {
     return {
       provider: "clip",
-      image: {
-        model: "clip",
-        modelPath: "Xenova/clip-vit-base-patch32"
+      clip: {
+        model: "clip-vit-base-patch32"
       }
     }
   } catch (e) {

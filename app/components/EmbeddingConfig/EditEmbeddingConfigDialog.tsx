@@ -206,8 +206,11 @@ export default function EditEmbeddingConfigModal({
                     inputSize: imageConfig.inputSize,
                 }
             } else if (provider === "clip") {
-                newConfig.clip = {
-                    model: "clip-vit-base-patch32"
+                newConfig = {
+                    provider: "clip",
+                    clip: {
+                        model: "clip-vit-base-patch32"
+                    }
                 }
             }
 

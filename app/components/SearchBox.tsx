@@ -1,3 +1,5 @@
+import { isImageEmbedding, isMultiModalEmbedding, isTextEmbedding } from "@/app/embeddings/types/embeddingModels"
+import { type VectorSetMetadata } from "@/app/types/vectorSetMetaData"
 import { userSettings } from "@/app/utils/userSettings"
 import { Button } from "@/components/ui/button"
 import {
@@ -24,26 +26,24 @@ import {
 import { Switch } from "@/components/ui/switch"
 import { Check, Filter, Settings, Shuffle, X } from "lucide-react"
 import { useEffect, useMemo, useRef, useState } from "react"
-import { getEmbeddingDataFormat } from "@/app/embeddings/types/embeddingModels"
-import { type VectorSetMetadata } from "@/app/types/vectorSetMetaData"
 
-import SmartFilterInput from "./SmartFilterInput"
 import { VectorTuple } from "@/app/redis-server/api"
-import RedisCommandBox from "./RedisCommandBox"
 import ImageUploader from "./ImageUploader"
+import RedisCommandBox from "./RedisCommandBox"
+import SmartFilterInput from "./SmartFilterInput"
 
 const searchTypes = [
     {
         value: "Vector",
-        label: "Vector",
-    },
-    {
-        value: "Element",
-        label: "Element",
+        label: "Text or Vector",
     },
     {
         value: "Image",
         label: "Image",
+    },
+    {
+        value: "Element",
+        label: "Element",
     },
 ] as const
 
@@ -181,15 +181,14 @@ export default function SearchBox({
         }
     }, [])
 
-    const isImageEmbedding =
-        metadata && getEmbeddingDataFormat(metadata?.embedding) === "image"
-    const isTextEmbedding =
-        metadata && getEmbeddingDataFormat(metadata?.embedding) === "text"
     const supportsEmbeddings =
         metadata?.embedding.provider && metadata?.embedding.provider !== "none"
 
     const filteredSearchTypes = searchTypes.filter((type) => {
-        if (type.value === "Image" && !isImageEmbedding) {
+        if (isMultiModalEmbedding(metadata?.embedding)) {
+            return true
+        }
+        if (type.value === "Image" && !isImageEmbedding(metadata?.embedding)) {
             return false
         }
         return true
@@ -197,13 +196,14 @@ export default function SearchBox({
 
     // Compute the placeholder text based on current searchType
     const searchBoxPlaceholder = useMemo(() => {
+        console.log("searchType", searchType)
         switch (searchType) {
             case "Element":
                 return "Enter Element"
             case "Image":
                 return "Enter image data"
             case "Vector":
-                return supportsEmbeddings && isTextEmbedding
+                return supportsEmbeddings && isTextEmbedding(metadata?.embedding)
                     ? "Enter search text or vector data (0.1, 0.2, ...)"
                     : "Enter vector data (0.1, 0.2, ...)"
             default:
@@ -220,9 +220,11 @@ export default function SearchBox({
             // Choose appropriate default search type based on embedding format
             let newSearchType: "Vector" | "Element" | "Image"
 
-            if (isImageEmbedding) {
+            if (isImageEmbedding(metadata?.embedding)) {
                 newSearchType = "Image"
-            } else if (isTextEmbedding) {
+            } else if (isTextEmbedding(metadata?.embedding)) {
+                newSearchType = "Vector"
+            } else if (isMultiModalEmbedding(metadata?.embedding)) {
                 newSearchType = "Vector"
             } else {
                 newSearchType = "Element"
@@ -263,6 +265,7 @@ export default function SearchBox({
 
     // Handle image embedding generation
     const handleImageSelect = (base64Data: string) => {
+        setSearchType("Image")  // Set search type to Image when an image is selected
         setSearchQuery(base64Data)
     }
 
@@ -295,7 +298,7 @@ export default function SearchBox({
                                 )
                             }}
                         >
-                            <SelectTrigger className="w-[120px]">
+                            <SelectTrigger className="w-[180px]">
                                 <SelectValue placeholder="Select type..." />
                             </SelectTrigger>
                             <SelectContent>
@@ -378,11 +381,7 @@ export default function SearchBox({
                         <ImageUploader
                             onImageSelect={handleImageSelect}
                             onEmbeddingGenerated={handleImageEmbeddingGenerated}
-                            config={
-                                metadata?.embedding?.image || {
-                                    model: "mobilenet",
-                                }
-                            }
+                            config={metadata?.embedding}
                             className="w-full"
                             allowMultiple={false}
                         />

@@ -2,7 +2,6 @@ import { EmbeddingService } from "@/app/embeddings/service"
 import { getExpectedDimensions } from "@/app/embeddings/types/embeddingModels"
 import { VaddRequestBody } from "@/app/redis-server/api"
 import {
-    validateAndCorrectMetadata,
     VectorSetMetadata,
 } from "@/app/types/vectorSetMetaData"
 import { cookies } from "next/headers"
@@ -394,6 +393,15 @@ export async function vsim(
             const baseCommand = ["VSIM", keyName]
 
             if (params.searchVector) {
+                // Validate vector values
+                if (params.searchVector.some(v => typeof v !== 'number' || isNaN(v) || !isFinite(v))) {
+                    console.error("Invalid vector values:", params.searchVector)
+                    throw new Error("Vector contains invalid values (NaN or Infinity)")
+                }
+
+                console.log("VSIM vector dimensions:", params.searchVector.length)
+                console.log("VSIM vector values:", params.searchVector)
+
                 baseCommand.push(
                     "VALUES",
                     String(params.searchVector.length),
@@ -708,7 +716,8 @@ export async function getMetadata(
             const parsedData = storedData ? JSON.parse(storedData) : null
 
             // Validate and correct the metadata
-            const validatedMetadata = validateAndCorrectMetadata(parsedData)
+           // const validatedMetadata = validateAndCorrectMetadata(parsedData)
+            const validatedMetadata = parsedData 
 
             // If the metadata needed correction, write it back to Redis
             if (
@@ -724,11 +733,12 @@ export async function getMetadata(
         } catch (error) {
             console.error(`Error processing metadata for ${keyName}:`, error)
             // Return a default metadata object in case of error
-            const defaultMetadata = validateAndCorrectMetadata(null)
-            await client.hSet(configKey, {
-                [hashKey]: JSON.stringify(defaultMetadata),
-            })
-            return defaultMetadata
+            // const defaultMetadata = validateAndCorrectMetadata(null)
+            
+            // await client.hSet(configKey, {
+            //     [hashKey]: JSON.stringify(defaultMetadata),
+            // })
+            // return defaultMetadata
         }
     })
 }
@@ -740,12 +750,12 @@ export async function setMetadata(
 ): Promise<VectorOperationResult> {
     return RedisClient.withConnection(url, async (client) => {
         // Validate and correct the metadata before storing
-        const validatedMetadata = validateAndCorrectMetadata(metadata)
+        //const validatedMetadata = validateAndCorrectMetadata(metadata)
 
         const configKey = "vector-set-browser:config"
         const hashKey = `vset:${keyName}:metadata`
         await client.hSet(configKey, {
-            [hashKey]: JSON.stringify(validatedMetadata),
+            [hashKey]: JSON.stringify(metadata),
         })
         return true
     })
