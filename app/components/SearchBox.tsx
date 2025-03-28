@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import {
     Dialog,
     DialogContent,
+    DialogFooter,
     DialogHeader,
     DialogTitle,
 } from "@/components/ui/dialog"
@@ -63,6 +64,8 @@ interface SearchBoxProps {
     clearError?: () => void
     expansionFactor?: number
     setExpansionFactor?: (value: number | undefined) => void
+    filterExpansionFactor?: number
+    setFilterExpansionFactor?: (value: number | undefined) => void
     lastTextEmbedding?: number[]
     executedCommand?: string
     results?: VectorTuple[]
@@ -84,6 +87,8 @@ export default function SearchBox({
     clearError,
     expansionFactor,
     setExpansionFactor,
+    filterExpansionFactor,
+    setFilterExpansionFactor,
     lastTextEmbedding,
     executedCommand,
     results = [],
@@ -121,6 +126,18 @@ export default function SearchBox({
 
     // Add a ref to track if we've initialized the search type
     const initialSearchTypeSetRef = useRef(false)
+
+    // State for custom filter expansion factor
+    const [useCustomFilterEF, setUseCustomFilterEF] = useState(() => {
+        return userSettings.get("useCustomFilterEF") ?? !!filterExpansionFactor
+    })
+    const [filterEFValue, setFilterEFValue] = useState(() => {
+        return (
+            userSettings.get("filterEFValue")?.toString() ||
+            filterExpansionFactor?.toString() ||
+            "100"
+        )
+    })
 
     // Update local filter when searchFilter prop changes, but only on initial mount
     // or when the vector set changes, not on every searchFilter change
@@ -169,6 +186,33 @@ export default function SearchBox({
             setExpansionFactor(efNumber)
             // Save the value when it changes
             userSettings.set("efValue", efNumber)
+        }
+    }
+
+    // Handle filter expansion factor changes
+    const handleFilterEFToggle = (checked: boolean) => {
+        setUseCustomFilterEF(checked)
+        userSettings.set("useCustomFilterEF", checked)
+
+        if (setFilterExpansionFactor) {
+            if (checked) {
+                const value = parseInt(filterEFValue)
+                const efNumber = isNaN(value) ? 100 : value
+                setFilterExpansionFactor(efNumber)
+                userSettings.set("filterEFValue", efNumber)
+            } else {
+                setFilterExpansionFactor(undefined)
+            }
+        }
+    }
+
+    const handleFilterEFValueChange = (value: string) => {
+        setFilterEFValue(value)
+        if (setFilterExpansionFactor && useCustomFilterEF) {
+            const numValue = parseInt(value)
+            const efNumber = isNaN(numValue) ? 100 : numValue
+            setFilterExpansionFactor(efNumber)
+            userSettings.set("filterEFValue", efNumber)
         }
     }
 
@@ -280,8 +324,8 @@ export default function SearchBox({
     return (
         <section className="mb-2">
             <div className="bg-[white] p-4 rounded shadow-md flex flex-col gap-2 items-start">
-                <div className="flex gap-2 items-center w-full justify-between">
-                    <div className="flex gap-2 items-center w-full">
+                <div className="flex gap-2 items-center w-full justify-between overflow-hidden">
+                    <div className="flex gap-2 items-center">
                         <label className="text-sm font-medium text-gray-700">
                             Search by
                         </label>
@@ -317,7 +361,7 @@ export default function SearchBox({
                         </Select>
                         <div className="grow"></div>
                         {setSearchCount && (
-                            <div className="flex items-center gap-1 pr-10">
+                            <div className="flex items-center gap-1">
                                 <label className="text-xs font-medium text-gray-500">
                                     Show
                                 </label>
@@ -338,7 +382,7 @@ export default function SearchBox({
                     </div>
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                            <Button variant="outline" size="icon">
+                            <Button variant="outline" size="icon" className="shrink-0">
                                 <Settings className="h-4 w-4" />
                             </Button>
                         </DropdownMenuTrigger>
@@ -465,9 +509,9 @@ export default function SearchBox({
                 </div>
                 {/* Use the new RedisCommandBox component */}
                 {showRedisCommand && (
-                    <div className="bg-[white] w-full px-2 py-2 rounded border-t border-gray-200 flex flex-col gap-2 items-start mt-2">
+                    <div className="bg-[white] w-full px-2 py-2 rounded border-t border-gray-200 flex flex-col items-start mt-2">
                         <div className="flex items-center w-full">
-                            <label className="text-sm font-medium text-gray-700">
+                            <label className="text-xs font-medium text-gray-500">
                                 Redis Command
                             </label>
                             <div className="grow"></div>
@@ -476,7 +520,7 @@ export default function SearchBox({
                                 size="icon"
                                 onClick={() => setShowRedisCommand(false)}
                             >
-                                <X className="h-4 w-4" />
+                                <X className="h-4 w-4 text-gray-500" />
                             </Button>
                         </div>
                         <RedisCommandBox
@@ -552,7 +596,7 @@ export default function SearchBox({
                 open={showSearchOptions}
                 onOpenChange={setShowSearchOptions}
             >
-                <DialogContent className="max-w-md">
+                <DialogContent className="max-w-2xl">
                     <DialogHeader>
                         <DialogTitle className="text-lg font-bold">
                             Search Options
@@ -601,8 +645,85 @@ export default function SearchBox({
                                     </p>
                                 </div>
                             )}
+
+                            <div className="flex items-center justify-between pt-4 border-t">
+                                <div className="space-y-0.5">
+                                    <Label htmlFor="custom-filter-ef">
+                                        Custom Filter Exploration Factor
+                                        (FILTER-EF)
+                                    </Label>
+                                    <p className="text-sm text-gray-500">
+                                        Enable to set a custom filter expansion
+                                        factor
+                                    </p>
+                                </div>
+                                <Switch
+                                    id="custom-filter-ef"
+                                    checked={useCustomFilterEF}
+                                    onCheckedChange={handleFilterEFToggle}
+                                />
+                            </div>
+
+                            {useCustomFilterEF && (
+                                <div className="space-y-2">
+                                    <Label htmlFor="filter-ef-value">
+                                        Filter EF Value
+                                    </Label>
+                                    <Input
+                                        id="filter-ef-value"
+                                        type="number"
+                                        value={filterEFValue}
+                                        onChange={(e) =>
+                                            handleFilterEFValueChange(
+                                                e.target.value
+                                            )
+                                        }
+                                        min="1"
+                                        className="w-full"
+                                    />
+                                    <div className="text-sm text-gray-500 space-y-2">
+                                        <p>
+                                            The Filter Expansion Factor
+                                            (FILTER-EF) affects search quality
+                                            when using filters:
+                                        </p>
+                                        <ul className="list-disc pl-5 space-y-1">
+                                            <li>
+                                                For highly selective filters
+                                                (few matches), use a higher
+                                                value
+                                            </li>
+                                            <li>
+                                                For less selective filters, the
+                                                default is usually sufficient
+                                            </li>
+                                            <li>
+                                                Very selective filters with low
+                                                values may return fewer items
+                                                than requested
+                                            </li>
+                                            <li>
+                                                Extremely high values may impact
+                                                performance without significant
+                                                benefit
+                                            </li>
+                                        </ul>
+                                        <p className="pt-2">
+                                            The optimal value depends on your
+                                            filter selectivity, data
+                                            distribution, and required recall
+                                            quality. Start with the default and
+                                            increase if needed when you observe
+                                            fewer results than expected.
+                                        </p>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
+                    <DialogFooter>
+                        <Button onClick={()=>setShowSearchOptions(false)}>Done</Button>
+                    </DialogFooter>
                 </DialogContent>
             </Dialog>
         </section>

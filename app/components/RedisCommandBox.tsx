@@ -132,7 +132,7 @@ export default function RedisCommandBox({
                     
                     // Render structured command
                     return (
-                        <>
+                        <div className="text-gray-500 font-mono text-xs">
                             {commandData.prefix}
                             <span 
                                 className="inline-flex items-center bg-yellow-50 rounded mx-1"
@@ -145,7 +145,7 @@ export default function RedisCommandBox({
                                 <span className="text-yellow-800 px-1 bg-yellow-50 rounded-r">...</span>
                             </span>
                             {commandData.suffix}
-                        </>
+                        </div>
                     );
                 })()}
             </div>
