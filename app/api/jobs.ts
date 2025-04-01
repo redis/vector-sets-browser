@@ -33,17 +33,19 @@ export interface ImportLogEntry {
 }
 
 export interface ImportJobConfig {
-    delimiter: string
-    hasHeader: boolean
-    skipRows: number
-    elementColumn: string
-    textColumn: string
+    delimiter?: string
+    hasHeader?: boolean
+    skipRows?: number
+    elementColumn?: string
+    textColumn?: string
     elementTemplate?: string
     textTemplate?: string
     attributeColumns?: string[]
     metadata?: VectorSetMetadata
     rawVectors?: number[][]
-    fileType?: 'csv' | 'image' | 'images'
+    fileType?: 'csv' | 'image' | 'images' | 'json'
+    exportType?: 'redis' | 'json'
+    outputFilename?: string
 }
 
 export const jobs = {
@@ -95,42 +97,21 @@ export const jobs = {
         file: File,
         config: ImportJobConfig
     ): Promise<{ jobId: string }> {
-        const formData = new FormData()
-        formData.append("file", file)
-        formData.append("vectorSetName", vectorSetName)
-
-        // Add individual config fields directly to FormData
-        formData.append("delimiter", config.delimiter)
-        formData.append("hasHeader", String(config.hasHeader))
-        formData.append("skipRows", String(config.skipRows))
-        formData.append("elementColumn", config.elementColumn)
-        formData.append("textColumn", config.textColumn)
-
-        // Add template fields if they exist
-        if (config.elementTemplate) {
-            formData.append("elementTemplate", config.elementTemplate)
-        }
-        if (config.textTemplate) {
-            formData.append("textTemplate", config.textTemplate)
-        }
-
-        // Handle attribute columns array
-        if (config.attributeColumns && config.attributeColumns.length > 0) {
-            config.attributeColumns.forEach((column) => {
-                formData.append("attributeColumns", column)
-            })
-        }
-
-        // Add file type if specified
-        if (config.fileType) {
-            formData.append("fileType", config.fileType)
-        }
-
-        // Add raw vectors if provided
-        if (config.rawVectors && config.rawVectors.length > 0) {
-            formData.append("rawVectors", JSON.stringify(config.rawVectors))
-        }
+        // Convert file to base64 for JSON transport
+        const fileContent = await file.text();
         
-        return apiClient.post(`/api/jobs`, formData)
+        // Create the request body
+        const requestBody = {
+            vectorSetName,
+            fileContent,
+            fileName: file.name,
+            config: {
+                ...config,
+                // Ensure we have the filename in the config
+                fileName: file.name
+            }
+        };
+
+        return apiClient.post(`/api/jobs`, requestBody);
     },
 }

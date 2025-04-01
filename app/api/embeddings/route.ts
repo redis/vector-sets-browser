@@ -15,8 +15,6 @@ export async function POST(request: NextRequest) {
             )
         }
 
-        console.log("[API /api/embeddings] Embedding request body:", body.config)
-
         // Handle text embedding
         if (body.text) {
             const startTime = performance.now()

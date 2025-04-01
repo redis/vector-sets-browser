@@ -30,7 +30,7 @@ The execute the tests with:
 **VADD: add items into a vector set**
 
     VADD key [REDUCE dim] FP32|VALUES vector element [CAS] [NOQUANT | Q8 | BIN]
-             [EF build-exploration-factor] [SETATTR <attributes>]
+             [EF build-exploration-factor] [SETATTR <attributes>] [M <numlinks>]
 
 Add a new element into the vector set specified by the key.
 The vector can be provided as FP32 blob of values, or as floating point
@@ -42,7 +42,7 @@ Meaning of the options:
 
 `REDUCE` implements random projection, in order to reduce the
 dimensionality of the vector. The projection matrix is saved and reloaded
-along with the vector set.
+along with the vector set. **Please note that** the `REDUCE` option must be passed immediately before the vector, like in `REDUCE 50 VALUES ...`.
 
 `CAS` performs the operation partially using threads, in a
 check-and-set style. The neighbor candidates collection, which is slow, is
@@ -58,9 +58,11 @@ performed in the background, while the command is executed in the main thread.
 
 `SETATTR` associates attributes to the newly created entry or update the entry attributes (if it already exists). It is the same as calling the `VSETATTR` attribute separately, so please check the documentation of that command in the filtered search section of this documentation.
 
+`M` defaults to 16 and is the HNSW famous `M` parameters. It is the maximum number of connections that each node of the graph have with other nodes: more connections mean more memory, but a better ability to explore the graph. Nodes at layer zero (every node exists at least at layer zero) have `M*2` connections, while the other layers only have `M` connections. This means that, for instance, an `M` of 64 will use at least 1024 bytes of memory for each node! That is, `64 links * 2 times * 8 bytes pointers`, and even more, since on average each node has something like 1.33 layers (but the other layers have just `M` connections, instead of `M*2`). If you don't have a recall quality problem, the default is fine, and uses a limited amount of memory.
+
 **VSIM: return elements by vector similarity**
 
-    VSIM key [ELE|FP32|VALUES] <vector or element> [WITHSCORES] [COUNT num] [EF search-exploration-factor] [FILTER expression] [FILTER-EF max-filtering-effort]
+    VSIM key [ELE|FP32|VALUES] <vector or element> [WITHSCORES] [COUNT num] [EF search-exploration-factor] [FILTER expression] [FILTER-EF max-filtering-effort] [TRUTH] [NOTHREAD]
 
 The command returns similar vectors, for simplicity (and verbosity) in the following example, instead of providing a vector using FP32 or VALUES (like in `VADD`), we will ask for elements having a vector similar to a given element already in the sorted set:
 
@@ -87,6 +89,10 @@ It is possible to specify a `COUNT` and also to get the similarity score (from 1
     6) "0.8226882219314575"
 
 The `EF` argument is the exploration factor: the higher it is, the slower the command becomes, but the better the index is explored to find nodes that are near to our query. Sensible values are from 50 to 1000.
+
+The `TRUTH` option forces the command to perform a linear scan of all the entries inside the set, without using the graph search inside the HNSW, so it returns the best matching elements (the perfect result set) that can be used in order to easily calculate the recall. Of course the linear scan is `O(N)`, so it is much slower than the `log(N)` (considering a small `COUNT`) provided by the HNSW index.
+
+The `NOTHREAD` option forces the command to execute the search on the data structure in the main thread. Normally `VSIM` spawns a thread instead. This may be useful for benchmarking purposes, or when we work with extremely small vector sets and don't want to pay the cost of spawning a thread. It is possible that in the future this option will be automatically used by Redis when we detect small vector sets. Note that this option blocks the server for all the time needed to complete the command, so it is a source of potential latency issues: if you are in doubt, never use it.
 
 For `FILTER` and `FILTER-EF` options, please check the filtered search section of this documentation.
 
@@ -210,6 +216,68 @@ are set or updated.
 The command returns the JSON attribute associated with an element, or
 null if there is no element associated, or no element at all, or no key.
 
+**VRANDMEMBER: return random members from a vector set**
+
+    VRANDMEMBER key [count]
+
+Return one or more random elements from a vector set.
+
+The semantics of this command are similar to Redis's native SRANDMEMBER command:
+
+- When called without count, returns a single random element from the set, as a single string (no array reply).
+- When called with a positive count, returns up to count distinct random elements (no duplicates).
+- When called with a negative count, returns count random elements, potentially with duplicates.
+- If the count value is larger than the set size (and positive), only the entire set is returned.
+
+If the key doesn't exist, returns a Null reply if count is not given, or an empty array if a count is provided.
+
+Examples:
+
+    > VADD vset VALUES 3 1 0 0 elem1
+    (integer) 1
+    > VADD vset VALUES 3 0 1 0 elem2
+    (integer) 1
+    > VADD vset VALUES 3 0 0 1 elem3
+    (integer) 1
+
+    # Return a single random element
+    > VRANDMEMBER vset
+    "elem2"
+
+    # Return 2 distinct random elements
+    > VRANDMEMBER vset 2
+    1) "elem1"
+    2) "elem3"
+
+    # Return 3 random elements with possible duplicates
+    > VRANDMEMBER vset -3
+    1) "elem2"
+    2) "elem2"
+    3) "elem1"
+
+    # Return more elements than in the set (returns all elements)
+    > VRANDMEMBER vset 10
+    1) "elem1"
+    2) "elem2"
+    3) "elem3"
+
+    # When key doesn't exist
+    > VRANDMEMBER nonexistent
+    (nil)
+    > VRANDMEMBER nonexistent 3
+    (empty array)
+
+This command is particularly useful for:
+
+1. Selecting random samples from a vector set for testing or training.
+2. Performance testing by retrieving random elements for subsequent similarity searches.
+
+When the user asks for unique elements (positev count) the implementation optimizes for two scenarios:
+- For small sample sizes (less than 20% of the set size), it uses a dictionary to avoid duplicates, and performs a real random walk inside the graph.
+- For large sample sizes (more than 20% of the set size), it starts from a random node and sequentially traverses the internal list, providing faster performances but not really "random" elements.
+
+The command has `O(N)` worst-case time complexity when requesting many unique elements (it uses linear scanning), or `O(M*log(N))` complexity when the users asks for `M` random elements in a sorted set of `N` elements, with `M` much smaller than `N`.
+
 # Filtered search
 
 Each element of the vector set can be associated with a set of attributes specified as a JSON blob:
@@ -221,7 +289,7 @@ Each element of the vector set can be associated with a set of attributes specif
 
 Specifying an attribute with the `SETATTR` option of `VADD` is exactly equivalent to adding an element and then setting (or updating, if already set) the attributes JSON string. Also the symmetrical `VGETATTR` command returns the attribute associated to a given element.
 
-    > VAD vset VALUES 3 0 1 0 c
+    > VADD vset VALUES 3 0 1 0 c
     (integer) 1
     > VSETATTR vset c '{"year": 1952}'
     (integer) 1
@@ -239,8 +307,6 @@ The items will be returned again in order of similarity (most similar first), bu
 The expressions are similar to what you would write inside the `if` statement of JavaScript or other familiar programming languages: you can use `and`, `or`, the obvious math operators like `+`, `-`, `/`, `>=`, `<`, ... and so forth (see the expressions section for more info). The selectors of the JSON object attributes start with a dot followed by the name of the key inside the JSON objects.
 
 Elements with invalid JSON or not having a given specified field **are considered as not matching** the expression, but will not generate any error at runtime.
-
-I'll draft the missing sections for the README following the style and format of the existing content.
 
 ## FILTER expressions capabilities
 
@@ -389,9 +455,170 @@ This time we get all the ten items, even if the last one will be quite far from 
 
 **Keep in mind** that by default, Redis Vector Sets will try to avoid a likely very useless huge scan of the HNSW graph, and will be more happy to return few or no elements at all, since this is almost always what the user actually wants in the context of retrieving *similar* items to the query.
 
+# Single Instance Scalability and Latency
+
+Vector Sets implement a threading model that allows Redis to handle many concurrent requests: by default `VSIM` is always threaded, and `VADD` is not (but can be partially threaded using the `CAS` option). This section explains how the threading and locking mechanisms work, and what to expect in terms of performance.
+
+## Threading Model
+
+- The `VSIM` command runs in a separate thread by default, allowing Redis to continue serving other commands.
+- A maximum of 32 threads can run concurrently (defined by `HNSW_MAX_THREADS`).
+- When this limit is reached, additional `VSIM` requests are queued - Redis remains responsive, no latency event is generated.
+- The `VADD` command with the `CAS` option also leverages threading for the computation-heavy candidate search phase, but the insertion itself is performed in the main thread. `VADD` always runs in a sub-millisecond time, so this is not a source of latency, but having too many hundreds of writes per second can be challenging to handle with a single instance. Please, look at the next section about multiple instances scalability.
+- Commands run within Lua scripts, MULTI/EXEC blocks, or from replication are executed in the main thread to ensure consistency.
+
+```
+> VSIM vset VALUES 3 1 1 1 FILTER '.year > 2000'  # This runs in a thread.
+> VADD vset VALUES 3 1 1 1 element CAS            # Candidate search runs in a thread.
+```
+
+## Locking Mechanism
+
+Vector Sets use a read/write locking mechanism to coordinate access:
+
+- Reads (`VSIM`, `VEMB`, etc.) acquire a read lock, allowing multiple concurrent reads.
+- Writes (`VADD`, `VREM`, etc.) acquire a write lock, temporarily blocking all reads.
+- When a write lock is requested while reads are in progress, the write operation waits for all reads to complete.
+- Once a write lock is granted, all reads are blocked until the write completes.
+- Each thread has a dedicated slot for tracking visited nodes during graph traversal, avoiding contention. This improves performances but limits the maximum number of concurrent threads, since each node has a memory cost proportional to the number of slots.
+
+## DEL latency
+
+Deleting a very large vector set (millions of elements) can cause latency spikes, as deletion rebuilds connections between nodes. This may change in the future.
+The deletion latency is most noticeable when using `DEL` on a key containing a large vector set or when the key expires.
+
+## Performance Characteristics
+
+- Search operations (`VSIM`) scale almost linearly with the number of CPU cores available, up to the thread limit. You can expect a Vector Set composed of million of items associated with components of dimension 300, with the default int8 quantization, to deliver around 50k VSIM operations per second in a single host.
+- Insertion operations (`VADD`) are more computationally expensive than searches, and can't be threaded: expect much lower throughput, in the range of a few thousands inserts per second.
+- Binary quantization offers significantly faster search performance at the cost of some recall quality, while int8 quantization, the default, seems to have very small impacts on recall quality, while it significantly improves performances and space efficiency.
+- The `EF` parameter has a major impact on both search quality and performance - higher values mean better recall but slower searches.
+- Graph traversal time scales logarithmically with the number of elements, making Vector Sets efficient even with millions of vectors
+
+## Loading / Saving performances
+
+Vector Sets are able to serialize on disk the graph structure as it is in memory, so loading back the data does not need to rebuild the HNSW graph. This means that Redis can load millions of items per minute. For instance 3 million items with 300 components vectors can be loaded back into memory into around 15 seconds.
+
+# Scaling vector sets to multiple instances
+
+The fundamental way vector sets can be scaled to very large data sets
+and to many Redis instances is that a given very large set of vectors
+can be partitioned into N different Redis keys, that can also live into
+different Redis instances.
+
+For instance, I could add my elements into `key0`, `key1`, `key2`, by hashing
+the item in some way, like doing `crc32(item)%3`, effectively splitting
+the dataset into three different parts. However once I want all the vectors
+of my dataset near to a given query vector, I could simply perform the
+`VSIM` command against all the three keys, merging the results by
+score (so the commands must be called using the `WITHSCORES` option) on
+the client side: once the union of the results are ordered by the
+similarity score, the query is equivalent to having a single key `key1+2+3`
+containing all the items.
+
+There are a few interesting facts to note about this pattern:
+
+1. It is possible to have a logical sorted set that is as big as the sum of all the Redis instances we are using.
+2. Deletion operations remain simple, we can hash the key and select the key where our item belongs.
+3. However, even if I use 10 different Redis instances, I'm not going to reach 10x the **read** operations per second, compared to using a single server: for each logical query, I need to query all the instances. Yet, smaller graphs are faster to navigate, so there is some win even from the point of view of CPU usage.
+4. Insertions, so **write** queries, will be scaled linearly: I can add N items against N instances at the same time, splitting the insertion load evenly. This is very important since vector sets, being based on HNSW data structures, are slower to add items than to query similar items, by a very big factor.
+5. While it cannot guarantee always the best results, with proper timeout management this system may be considered *highly available*, since if a subset of N instances are reachable, I'll be still be able to return similar items to my query vector.
+
+Notably, this pattern can be implemented in a way that avoids paying the sum of the round trip time with all the servers: it is possible to send the queries at the same time to all the instances, so that latency will be equal the slower reply out of of the N servers queries.
+
+# Optimizing memory usage
+
+Vector Sets, or better, HNSWs, the underlying data structure used by Vector Sets, combined with the features provided by the Vector Sets themselves (quantization, random projection, filtering, ...) form an implementation that has a non-trivial space of parameters that can be tuned. Despite to the complexity of the implementation and of vector similarity problems, here there is a list of simple ideas that can drive the user to pick the best settings:
+
+* 8 bit quantization (the default) is almost always a win. It reduces the memory usage of vectors by a factor of 4, yet the performance penality in terms of recall is minimal. It also reduces insertion and search time by around 2 times or more.
+* Binary quantization is much more extreme: it makes vector sets a lot faster, but increases the recall error in a sensible way, for instance from 95% to 80% if all the parameters remain the same. Yet, the speedup is really big, and the memory usage of vectors, compaerd to full precision vectors, 32 times smaller.
+* Vectors memory usage are not the only responsible for Vector Set high memory usage per entry: nodes contain, on average `M*2 + M*0.33` pointers, where M is by default 16 (but can be tuned in `VADD`, see the `M` option). Also each node has the string item and the optional JSON attributes: those should be as small as possible in order to avoid contributing more to the memory usage.
+* The `M` parameter should be incresed to 32 or more only when a near perfect recall is really needed.
+* It is possible to gain space (less memory usage) sacrificing time (more CPU time) by using a low `M` (the default of 16, for instance) and a high `EF` (the effort parameter of `VSIM`) in order to scan the graph more deeply.
+* When memory usage is seriosu concern, and there is the suspect the vectors we are storing don't contain as much information - at least for our use case - to justify the number of components they feature, random projection (the `REDUCE` option of `VADD`) could be tested to see if dimensionality reduction is possible with acceptable precision loss.
+
+## Random projection tradeoffs
+
+Sometimes learned vectors are not as information dense as we could guess, that
+is there are components having similar meanings in the space, and components
+having values that don't really represent features that matter in our use case.
+
+At the same time, certain vectors are very big, 1024 components or more. In this cases, it is possible to use the random projection feature of Redis Vector Sets in order to reduce both space (less RAM used) and space (more operstions per second). The feature is accessible via the `REDUCE` option of the `VADD` command. However, keep in mind that you need to test how much reduction impacts the performances of your vectors in term of recall and quality of the results you get back.
+
+## What is a random projection?
+
+The concept of Random Projection is relatively simple to grasp. For instance, a projection that turns a 100 components vector into a 10 components vector will perform a different linear transformation between the 100 components and each of the target 10 components. Please note that *each of the target components* will get some random amount of all the 100 original components. It is mathematically proved that this process results in a vector space where elements still have similar distances among them, but still some information will get lost.
+
+## Examples of projections and loss of precision
+
+To show you a bit of a extreme case, let's take Word2Vec 3 million items and compress them from 300 to 100, 50 and 25 components vectors. Then, we check the recall compared to the ground truth against each of the vector sets produced in this way (using different `REDUCE` parameters of `VADD`). This is the result, obtained asking for the top 10 elements.
+
+```
+----------------------------------------------------------------------
+Key                            Average Recall % Std Dev
+----------------------------------------------------------------------
+word_embeddings_int8           95.98           12.14
+  ^ This is the same key used for ground truth, but without TRUTH option
+word_embeddings_reduced_100    40.20           20.13
+word_embeddings_reduced_50     24.42           16.89
+word_embeddings_reduced_25     14.31           9.99
+```
+
+Here the dimensionality reduction we are using is quite extreme: from 300 to 100 means that 66.6% of the original information is lost. The recall drops from 96% to 40%, down to 24% and 14% for even more extreme dimension reduction.
+
+Reducing the dimension of vectors that are already relatively small, like the above example, of 300 components, will provide only relatively small memory savings, especially because by default Vector Sets use `int8` quantization, that will use only one byte per component:
+
+```
+> MEMORY USAGE word_embeddings_int8
+(integer) 3107002888
+> MEMORY USAGE word_embeddings_reduced_100
+(integer) 2507122888
+```
+
+Of course going, for example, from 2048 component vectors to 1024 would provide a much more sensible memory saving, even with the `int8` quantization used by Vector Sets, assuming the recall loss is acceptable. Other than the memory saving, there is also the reduction in CPU time, translating to more operations per second.
+
+Another thing to note is that, with certain embedding models, binary quantization (that offers a 8x reduction of memory usage compared to 8 bit quants, and a very big speedup in computation) performs much better than reducing the dimension of vectors of the same amount via random projections:
+
+```
+word_embeddings_bin            35.48           19.78
+```
+
+Here in the same test did above: we have a 35% recall which is not too far than the 40% obtained with a random projection from 300 to 100 components. However, while the first technique reduces the size by 3 times, the size reduced of binary quantization is by 8 times.
+
+```
+> memory usage word_embeddings_bin
+(integer) 2327002888
+```
+
+In this specific case the key uses JSON attributes and has a graph connection overhead that is much bigger than the 300 bits each vector takes, but, as already said, for big vectors (1024 components, for instance) or for lower values of `M` (see `VADD`, the `M` parameter connects the level of connectivity, so it changes the amount of pointers used per node) the memory saving is much stronger.
+
+# Vector Sets troubleshooting and understandability
+
+## Debugging poor recall or unexpected results
+
+Vector graphs and similarity queries pose many challenges mainly due to the following three problems:
+
+1. The error due to the approximated nature of Vector Sets is hard to evaluate.
+2. The error added by the quantization is often depends on the exact vector space (the embedding we are using **and** how far apart the elements we represent into such embeddings are).
+3. We live in the illusion that learned embeddings capture the best similarity possible among elements, which is obviously not always true, and highly application dependent.
+
+The only way to debug such problems, is the ability to inspect step by step what is happening inside our application, and the structure of the HNSW graph itself. To do so, we suggest to consider the following tools:
+
+1. The `TRUTH` option of the `VSIM` command is able to return the ground truth of the most similar elements, without using the HNSW graph, but doing a linear scan.
+2. The `VLINKS` command allows to explore the graph to see if the connections among nodes make sense, and to investigate why a given node may be more isolated than expected. Such command can also be used in a different way, when we want very fast "similar items" without paying the HNSW traversal time. It exploits the fact that we have a direct reference from each element in our vector set to each node in our HNSW graph.
+3. The `WITHSCORES` option, in the supported commands, return a value that is directly related to the *cosine similarity* between the query and the items vectors, the interval of the similarity is simply rescaled from the -1, 1 original range to 0, 1, otherwise the metric is identical.
+
+## Clients, latency and bandwidth usage
+
+During Vector Sets testing, we discovered that often clients introduce considerable latecy and CPU usage (in the client side, not in Redis) for two main reasons:
+
+1. Often the serialization to `VALUES ... list of floats ...` can be very slow.
+2. The vector payload of floats represented as strings is very large, resulting in high bandwidth usage and latency, compared to other Redis commands.
+
+Switching from `VALUES` to `FP32` as a method for transmitting vectors may easily provide 10-20x speedups.
+
 # Known bugs
 
-* When VADD with REDUCE is replicated, we should probably send the replicas the random matrix, in order for VEMB to read the same things. This is not critical, because the behavior of VADD / VSIM should be transparent if you don't look at the transformed vectors, but still probably worth doing.
 * Replication code is pretty much untested, and very vanilla (replicating the commands verbatim).
 
 # Implementation details

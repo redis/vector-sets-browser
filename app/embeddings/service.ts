@@ -30,7 +30,6 @@ export class EmbeddingService {
         config: EmbeddingConfig,
         isImage: boolean = false
     ): Promise<number[]> {
-        console.log("[EmbeddingService] Getting embedding for input:", input.substring(0, 10), "...")
         // For image data, ensure we're using the image provider
         if (isImage && config.provider !== PROVIDERS.IMAGE) {
             throw new Error(`Provider ${config.provider} does not support image data`)

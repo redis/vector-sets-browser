@@ -1,14 +1,10 @@
 "use client"
 
-import { ImportJobConfig, jobs } from "@/app/api/jobs"
+import { jobs } from "@/app/api/jobs"
 import EditEmbeddingConfigModal from "@/app/components/EmbeddingConfig/EditEmbeddingConfigDialog"
-import { EmbeddingConfig, isImageEmbedding, isTextEmbedding } from "@/app/embeddings/types/embeddingModels"
+import { EmbeddingConfig } from "@/app/embeddings/types/embeddingModels"
 import { vcard, vrem, vsim } from "@/app/redis-server/api"
-import {
-    VectorSetMetadata,
-    createVectorSetMetadata,
-} from "@/app/types/vectorSetMetaData"
-import { getImageEmbedding } from "@/app/utils/imageEmbedding"
+import { VectorSetMetadata, createVectorSetMetadata } from "@/app/types/vectorSetMetaData"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -24,10 +20,10 @@ import { Label } from "@/components/ui/label"
 import { Slider } from "@/components/ui/slider"
 import { AlertCircle, CheckCircle2, Edit2 } from "lucide-react"
 import { useEffect, useState } from "react"
-import { SampleDataset } from "./SampleDataSelect"
+import { Dataset } from "./types/DatasetProvider"
 
 interface SampleDataImporterProps {
-    dataset: SampleDataset
+    dataset: Dataset
     vectorSetName: string
     metadata: VectorSetMetadata | null
     onUpdateMetadata?: (metadata: VectorSetMetadata) => void
@@ -47,9 +43,9 @@ export function SampleDataImporter({
     const [importProgress, setImportProgress] = useState<{
         current: number
         total: number
+        status?: string
     } | null>(null)
     const [importCount, setImportCount] = useState<number>(5)
-    const [availableImageCount, setAvailableImageCount] = useState<number>(100)
     const [embeddingMismatch, setEmbeddingMismatch] = useState<{
         open: boolean
         currentEmbedding: VectorSetMetadata | null
@@ -66,27 +62,12 @@ export function SampleDataImporter({
         }
     }, [dataset])
 
-    // Check if the embedding is compatible with the dataset
-    const isEmbeddingCompatible = (
-        currentMetadata: VectorSetMetadata | null
-    ): boolean => {
-        if (!currentMetadata) return false
-
-        if (dataset.dataType === "text") {
-            return isTextEmbedding(currentMetadata.embedding)
-        } else if (dataset.dataType === "image") {
-            return isImageEmbedding(currentMetadata.embedding)
-        }
-
-        return false
-    }
-
     const handleStartImport = async () => {
         setError(null)
         
         // Check compatibility
         if (metadata) {
-            const isCompatible = isEmbeddingCompatible(metadata)
+            const isCompatible = dataset.validateEmbedding(metadata.embedding)
 
             if (!isCompatible) {
                 // Show mismatch dialog
@@ -107,41 +88,6 @@ export function SampleDataImporter({
             }
         }
 
-        //For image datasets, show the image count dialog first
-        if (dataset.name === "UTK Faces") {
-            try {
-                const classesResponse = await fetch(
-                    "/sample-data/UTKFace/images/_classes.csv"
-                )
-                if (!classesResponse.ok) {
-                    throw new Error(
-                        `Failed to fetch image classes: ${classesResponse.statusText}`
-                    )
-                }
-
-                const classesText = await classesResponse.text()
-                const lines = classesText
-                    .split("\n")
-                    .filter((line) => line.trim().length > 0)
-
-                // Skip header row if it exists
-                const startIdx = lines[0].startsWith("filename") ? 1 : 0
-                const count = lines.length - startIdx
-
-                // Set the available count and make sure import count doesn't exceed it
-                setAvailableImageCount(count)
-                setImportCount(Math.min(importCount, count))
-            } catch (error) {
-                console.error("Error fetching image count:", error)
-                setError(
-                    `Failed to determine available image count: ${
-                        error instanceof Error ? error.message : String(error)
-                    }`
-                )
-            }
-        }
-
-        // For non-image datasets, start import directly
         startImport()
     }
 
@@ -161,148 +107,21 @@ export function SampleDataImporter({
 
         try {
             // Check if this vectorset is a placeholder with only one record "First Record (Default)"
-            await checkAndRemovePlaceholderRecord();
+            await checkAndRemovePlaceholderRecord()
 
-            // For regular CSV datasets
-            if (dataset.dataType === "text") {
-                // Step 1: Fetch the CSV file
-                const response = await fetch(dataset.fileUrl)
-                if (!response.ok) {
-                    throw new Error(
-                        `Failed to fetch sample dataset: ${response.statusText}`
-                    )
-                }
+            // Prepare the import using the dataset provider
+            const { file, config } = await dataset.prepareImport({
+                count: dataset.dataType === "image" ? importCount : undefined,
+                onProgress: setImportProgress
+            })
 
-                // Convert the response to a Blob with CSV content type
-                const csvBlob = await response.blob()
-
-                // Create a File object from the Blob
-                const file = new File(
-                    [csvBlob],
-                    `${dataset.name.toLowerCase().replace(/\s+/g, "-")}.csv`,
-                    {
-                        type: "text/csv",
-                    }
-                )
-
-                // Step 2: Create the import job config
-                const config: ImportJobConfig = {
-                    delimiter: ",",
-                    hasHeader: true,
-                    skipRows: 0,
-                    elementColumn: dataset.columns[0],
-                    textColumn: dataset.columns[0],
-                    elementTemplate: dataset.elementTemplate,
-                    textTemplate: dataset.vectorTemplate,
-                    attributeColumns: dataset.attributeColumns,
-                    metadata: metadata || undefined,
-                    fileType: "csv",
-                }
-
-                // Step 3: Create the import job
-                await jobs.createImportJob(vectorSetName, file, config)
-            } else if (dataset.dataType === "image") {
-                // For image datasets
-                // Step 1: Get the list of images from the _classes.csv file
-                const classesResponse = await fetch(
-                    "/sample-data/UTKFace/images/_classes.csv"
-                )
-                if (!classesResponse.ok) {
-                    throw new Error(
-                        `Failed to fetch image classes: ${classesResponse.statusText}`
-                    )
-                }
-
-                const classesText = await classesResponse.text()
-                const lines = classesText
-                    .split("\n")
-                    .filter((line) => line.trim().length > 0)
-
-                // Skip header row if it exists
-                const startIdx = lines[0].startsWith("filename") ? 1 : 0
-
-                // Prepare files to import (limit by importCount)
-                const filesToImport = lines.slice(
-                    startIdx,
-                    startIdx + importCount
-                )
-                setImportProgress({ current: 0, total: filesToImport.length })
-
-                const embeddings: number[][] = []
-
-                // Process each image file
-                for (let i = 0; i < filesToImport.length; i++) {
-                    const line = filesToImport[i]
-                    const [filename] = line.split(",")
-
-                    // Fetch the image
-                    const imageUrl = `/sample-data/UTKFace/images/${filename}`
-                    const imageResponse = await fetch(imageUrl)
-                    if (!imageResponse.ok) {
-                        console.warn(`Could not fetch ${imageUrl}, skipping`)
-                        continue
-                    }
-
-                    const imageBlob = await imageResponse.blob()
-
-                    // Convert image to base64
-                    const reader = new FileReader()
-                    const imageDataPromise = new Promise<string>((resolve) => {
-                        reader.onloadend = () => {
-                            resolve(reader.result as string)
-                        }
-                    })
-                    reader.readAsDataURL(imageBlob)
-                    const imageData = await imageDataPromise
-
-                    // Generate embedding
-                    const imageConfig = { model: "mobilenet" }
-                    const embedding = await getImageEmbedding(
-                        imageData,
-                        imageConfig
-                    )
-                    embeddings.push(embedding)
-
-                    // Update progress
-                    setImportProgress({
-                        current: i + 1,
-                        total: filesToImport.length,
-                    })
-                }
-
-                // Create a sample image file for the import job
-                // We'll use the first image as the representative file
-                const sampleImageResponse = await fetch(
-                    `/sample-data/UTKFace/images/${
-                        filesToImport[0].split(",")[0]
-                    }`
-                )
-                const sampleImageBlob = await sampleImageResponse.blob()
-                const imageFile = new File(
-                    [sampleImageBlob],
-                    `UTK_Faces_${importCount}_images.jpg`,
-                    {
-                        type: "image/jpeg",
-                    }
-                )
-
-                // Create job config with all the computed vectors
-                const config: ImportJobConfig = {
-                    delimiter: ",",
-                    hasHeader: false,
-                    skipRows: 0,
-                    elementColumn: "image",
-                    textColumn: "image",
-                    elementTemplate: dataset.elementTemplate,
-                    attributeColumns: dataset.attributeColumns,
-                    metadata: metadata || undefined,
-                    fileType: "images",
-                    rawVectors: embeddings, // Include all pre-computed embeddings
-                }
-
-                // Create the import job
-                await jobs.createImportJob(vectorSetName, imageFile, config)
+            // Add metadata to config if available
+            if (metadata) {
+                config.metadata = metadata
             }
+
+            // Create the import job
+            await jobs.createImportJob(vectorSetName, file, config)
 
             setIsImporting(false)
             setImportProgress(null)
@@ -425,13 +244,13 @@ export function SampleDataImporter({
                         <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
                             <p className="text-sm mb-3">
                                 This will import the {dataset.name} dataset into your vector set.
-                                {dataset.name === "UTK Faces" ? 
+                                {dataset.dataType === "image" ? 
                                     " You can specify how many images to import." : 
                                     ""}
                             </p>
                             
-                            {/* Image count slider for UTK Faces */}
-                            {dataset.name === "UTK Faces" && (
+                            {/* Image count slider for image datasets */}
+                            {dataset.dataType === "image" && (
                                 <div className="space-y-2 mt-4">
                                     <div className="flex justify-between">
                                         <Label htmlFor="import-count">
@@ -491,6 +310,11 @@ export function SampleDataImporter({
                                     }}
                                 ></div>
                             </div>
+                            {importProgress.status && (
+                                <p className="text-sm text-gray-600 mt-2">
+                                    {importProgress.status}
+                                </p>
+                            )}
                         </div>
                     )}
                     

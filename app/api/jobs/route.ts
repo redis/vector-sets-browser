@@ -3,6 +3,7 @@ import { JobQueueService } from "@/app/lib/server/job-queue"
 import RedisClient, * as redis from "@/app/redis-server/server/commands"
 import { VectorSetMetadata } from "@/app/types/vectorSetMetaData"
 import { NextRequest, NextResponse } from "next/server"
+import { vectorSets } from "@/app/lib/server/vector-sets"
 
 // Map to store active job processors
 const activeProcessors = new Map<string, JobProcessor>()
@@ -62,8 +63,6 @@ export async function GET(req: NextRequest) {
             async (client) => {
                 const keys = await client.keys("job:*:status")
                 const jobs = []
-                console.log("[Jobs API] Found", keys.length, "jobs")
-                console.log("[Jobs API] Keys:", keys)
                 
                 for (const key of keys) {
                     const jobId = key.split(":")[1]
@@ -94,7 +93,6 @@ export async function GET(req: NextRequest) {
                     }
                 }
                 
-                console.log("[Jobs API] Found", jobs.length, "jobs")
                 return jobs
             }
         )
@@ -119,140 +117,54 @@ export async function GET(req: NextRequest) {
 // Create a new job
 export async function POST(req: NextRequest) {
     const redisUrl = await redis.getRedisUrl()
-
     if (!redisUrl) {
         return NextResponse.json({ success: false, error: "No Redis URL configured" }, { status: 400 })
     }
 
     try {
-        // Check if this is a multipart form data request
-        const contentType = req.headers.get("content-type")
-        if (!contentType?.includes("multipart/form-data")) {
+        const body = await req.json();
+        const { vectorSetName, fileContent, fileName, config } = body;
+
+        // Create a File object from the content
+        const file = new File([fileContent], fileName, {
+            type: 'application/octet-stream'
+        });
+
+        // Get metadata for the vector set
+        const metadata = await vectorSets.getMetadata(vectorSetName)
+        if (!metadata) {
             return NextResponse.json(
-                {
-                    error: "Invalid content type. Expected multipart/form-data",
-                    receivedContentType: contentType,
-                },
-                { status: 400 }
+                { error: "Vector set not found" },
+                { status: 404 }
             )
         }
 
-        // Clone the request to ensure we can read the body
-        const clonedReq = req.clone()
-        const formData = await clonedReq.formData()
-        const file = formData.get("file") as File
-        const vectorSetName = formData.get("vectorSetName") as string
+        try {
+            const jobId = await JobQueueService.createJob(redisUrl, file, vectorSetName, metadata.embedding, config)
 
-        if (!file || !vectorSetName) {
+            // Start processing the job
+            const processor = new JobProcessor(redisUrl, jobId)
+            activeProcessors.set(jobId, processor)
+
+            // Start processing in the background
+            processor.start().catch((error) => {
+                console.error("Job processing error:", error)
+                activeProcessors.delete(jobId)
+            })
+
+            return NextResponse.json({ success: true, jobId })
+        } catch (error) {
+            console.error("[Jobs API] Error creating job:", error)
             return NextResponse.json(
-                {
-                    error: "File and vector set name are required",
-                    received: {
-                        hasFile: !!file,
-                        vectorSetName: !!vectorSetName,
-                    },
-                },
-                { status: 400 }
+                { error: "Failed to create job" },
+                { status: 500 }
             )
         }
-
-        // Log form data for debugging
-        console.log(`[Jobs API] Creating job for vector set ${vectorSetName}`);
-        console.log(`[Jobs API] Form data keys:`, Array.from(formData.keys()));
-        
-        // Get element column and text column from form data
-        const elementColumn = formData.get("elementColumn") as string;
-        const textColumn = formData.get("textColumn") as string;
-        
-        // Get template fields if they exist
-        const elementTemplate = formData.get("elementTemplate") as string;
-        const textTemplate = formData.get("textTemplate") as string;
-        
-        // Get attribute columns from form data
-        const attributeColumns = formData.getAll("attributeColumns") as string[];
-        
-        // Get other configuration options
-        const delimiter = formData.get("delimiter") as string || ",";
-        const hasHeader = formData.get("hasHeader") === "true";
-        const skipRows = parseInt(formData.get("skipRows") as string || "0", 10);
-        const fileType = formData.get("fileType") as string || "csv";
-        
-        // Get raw vectors if provided
-        let rawVectors: number[][] | undefined;
-        const rawVectorsString = formData.get("rawVectors") as string;
-        if (rawVectorsString) {
-            try {
-                rawVectors = JSON.parse(rawVectorsString);
-                if (rawVectors) {
-                    console.log(`[Jobs API] Received ${rawVectors.length} raw vectors`);
-                }
-            } catch (error) {
-                console.error("[Jobs API] Error parsing raw vectors:", error);
-            }
-        }
-        
-        console.log(`[Jobs API] Element column: ${elementColumn || 'not specified'}`);
-        console.log(`[Jobs API] Text column: ${textColumn || 'not specified'}`);
-        console.log(`[Jobs API] Element template: ${elementTemplate || 'not specified'}`);
-        console.log(`[Jobs API] Text template: ${textTemplate || 'not specified'}`);
-        console.log(`[Jobs API] Attribute columns: ${attributeColumns.length ? attributeColumns.join(', ') : 'none'}`);
-        console.log(`[Jobs API] Delimiter: ${delimiter}, Has header: ${hasHeader}, Skip rows: ${skipRows}`);
-        console.log(`[Jobs API] File type: ${fileType}`);
-
-        // Get vector set metadata
-        const result = await redis.getMetadata(redisUrl, vectorSetName)
-        const metadata = result.result as VectorSetMetadata | null
-        
-        if (!metadata?.embedding) {
-            return NextResponse.json(
-                {
-                    error: "No embedding configuration found for this vector set",
-                    vectorSetName,
-                    metadata,
-                },
-                { status: 400 }
-            )
-        }
-
-        // Create and start the job
-        const jobId = await JobQueueService.createJob(
-            redisUrl,
-            file,
-            vectorSetName,
-            metadata.embedding,
-            {
-                elementColumn: elementColumn || undefined,
-                textColumn: textColumn || undefined,
-                elementTemplate: elementTemplate || undefined,
-                textTemplate: textTemplate || undefined,
-                attributeColumns: attributeColumns.length > 0 ? attributeColumns : undefined,
-                delimiter,
-                hasHeader,
-                skipRows,
-                fileType,
-                rawVectors
-            }
-        )
-
-        // Start processing the job
-        const processor = new JobProcessor(redisUrl, jobId)
-        activeProcessors.set(jobId, processor)
-
-        // Start processing in the background
-        processor.start().catch((error) => {
-            console.error("Job processing error:", error)
-            activeProcessors.delete(jobId)
-        })
-
-        return NextResponse.json({ success: true, jobId })
     } catch (error) {
-        console.error("Error creating job:", error)
+        console.error("[Jobs API] Error parsing request:", error)
         return NextResponse.json(
-            {
-                error: String(error),
-                stack: (error as Error).stack,
-            },
-            { status: 500 }
+            { error: "Invalid request format" },
+            { status: 400 }
         )
     }
 }

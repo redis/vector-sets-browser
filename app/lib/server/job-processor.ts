@@ -9,6 +9,7 @@ import RedisClient from "../../redis-server/server/commands"
 import eventBus, { AppEvents } from "@/app/utils/eventEmitter"
 import { registerCompletedJob } from "@/app/api/jobs/completed/route"
 import { broadcastEvent } from "@/app/api/sse/route"
+import { buildVectorElement, saveVectorData } from "@/app/lib/importUtils"
 
 export class JobProcessor {
     private url: string
@@ -16,6 +17,7 @@ export class JobProcessor {
     private isRunning: boolean = false
     private isPaused: boolean = false
     private metadata: CSVJobMetadata | null = null
+    private _vectorElements: ReturnType<typeof buildVectorElement>[] = []
 
     constructor(url: string, jobId: string) {
         this.url = url
@@ -31,12 +33,6 @@ export class JobProcessor {
             throw new Error("Text to embed is undefined or empty")
         }
 
-        console.log(
-            `[JobProcessor] Getting embedding for text: "${text.substring(
-                0,
-                100
-            )}..."`
-        )
         const baseUrl =
             process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"
         const response = await fetch(`${baseUrl}/api/embeddings`, {
@@ -69,9 +65,6 @@ export class JobProcessor {
             )
         }
 
-        console.log(
-            `[JobProcessor] Got embedding of length ${data.result.length}`
-        )
         return data.result
     }
 
@@ -81,7 +74,7 @@ export class JobProcessor {
         try {
             // Use the JobQueueService's implementation to update progress
             // This provides a single consistent implementation and avoids duplication
-            const updatedProgress = await JobQueueService.updateJobProgress(
+            await JobQueueService.updateJobProgress(
                 this.url,
                 this.jobId,
                 progress
@@ -105,7 +98,6 @@ export class JobProcessor {
                 // Broadcast using SSE
                 try {
                     broadcastEvent(AppEvents.JOB_STATUS_CHANGED, statusData);
-                    console.log(`Broadcast job status ${progress.status} for ${this.metadata.vectorSetName} via SSE`);
                 } catch (error) {
                     console.warn("Could not broadcast via SSE:", error);
                 }
@@ -131,10 +123,6 @@ export class JobProcessor {
         if (!this.metadata) {
             throw new Error("Job metadata not loaded")
         }
-
-        console.log(
-            `[JobProcessor] Adding vector for element "${element}" to Redis (vector length: ${embedding.length})`
-        )
 
         // Prepare the command
         const command = [
@@ -170,9 +158,6 @@ export class JobProcessor {
             )
             throw new Error(`Failed to add vector to Redis: ${result.error}`)
         }
-        console.log(
-            `[JobProcessor] Successfully added vector for element "${element}"`
-        )
     }
 
     private processTemplate(template: string, rowData: CSVRow): string {
@@ -184,13 +169,30 @@ export class JobProcessor {
         });
     }
 
+    private async processToJson(
+        elementId: string,
+        embedding: number[],
+        attributes?: Record<string, string>
+    ): Promise<void> {
+        if (!this.metadata) {
+            throw new Error("Job metadata not loaded")
+        }
+
+        const vectorElement = buildVectorElement(elementId, embedding, attributes)
+        
+        // Store the vector element in memory until we're ready to save
+        if (!this._vectorElements) {
+            this._vectorElements = []
+        }
+        this._vectorElements.push(vectorElement)
+        
+    }
+
     public async start(): Promise<void> {
         if (this.isRunning) {
-            console.log(`[JobProcessor] Job ${this.jobId} is already running`)
             return
         }
 
-        console.log(`[JobProcessor] Starting job ${this.jobId}`)
         this.isRunning = true
         this.isPaused = false
         this.metadata = await JobQueueService.getJobMetadata(
@@ -204,10 +206,6 @@ export class JobProcessor {
             )
             throw new Error("Job metadata not found")
         }
-        console.log(
-            `[JobProcessor] Loaded metadata for job ${this.jobId}:`,
-            this.metadata
-        )
 
         await this.updateProgress({
             status: "processing",
@@ -218,9 +216,6 @@ export class JobProcessor {
             while (this.isRunning) {
                 // Check if job is paused
                 if (this.isPaused) {
-                    // console.log(
-                    //     `[JobProcessor] Job ${this.jobId} is paused, waiting...`
-                    // )
 
                     // Check if job was cancelled while paused
                     const progress = await JobQueueService.getJobProgress(
@@ -228,9 +223,6 @@ export class JobProcessor {
                         this.jobId
                     )
                     if (!progress || progress.status === "cancelled") {
-                        console.log(
-                            `[JobProcessor] Job ${this.jobId} was cancelled while paused`
-                        )
                         this.isRunning = false
                         break
                     }
@@ -244,20 +236,39 @@ export class JobProcessor {
                     this.jobId
                 )
                 if (!item) {
-                    console.log(
-                        `[JobProcessor] No more items in queue for job ${this.jobId}`
-                    )
-                    await this.updateProgress({
-                        status: "completed",
-                        message: "Processing completed",
-                    })
+                    // If this was a JSON export job, save the collected vectors
+                    if (this.metadata.exportType === 'json' && this.metadata.outputFilename) {
+                        try {
+                            console.log(`[JobProcessor] Starting JSON export of ${this._vectorElements.length} vectors to ${this.metadata.outputFilename}`)
+                            const result = await saveVectorData(this.metadata.outputFilename, this._vectorElements)
+                            console.log(`[JobProcessor] Successfully saved vectors to ${result.filePath}`)
+                            
+                            // Update the progress with the file location
+                            await this.updateProgress({
+                                status: "completed",
+                                message: `Export completed. File saved to ${result.filePath}`,
+                            })
+                        } catch (error) {
+                            console.error(`[JobProcessor] Failed to save vectors to JSON:`, error)
+                            await this.updateProgress({
+                                status: "failed",
+                                error: error instanceof Error ? error.message : String(error),
+                                message: `Failed to save vectors to JSON: ${error instanceof Error ? error.message : String(error)}`,
+                            })
+                            throw error
+                        }
+                    } else {
+                        await this.updateProgress({
+                            status: "completed",
+                            message: "Processing completed",
+                        })
+                    }
 
                     // Create an import log entry before cleaning up the job
                     await this.createImportLogEntry()
                     
                     // Notify about the import completing
                     if (this.metadata?.vectorSetName) {
-                        console.log(`[JobProcessor] Emitting VECTORS_IMPORTED event for ${this.metadata.vectorSetName}`)
                         
                         const importData = {
                             vectorSetName: this.metadata.vectorSetName,
@@ -274,7 +285,6 @@ export class JobProcessor {
                         // Broadcast through SSE
                         try {
                             broadcastEvent(AppEvents.VECTORS_IMPORTED, importData);
-                            console.log(`Broadcast VECTORS_IMPORTED for ${this.metadata.vectorSetName} via SSE`);
                         } catch (error) {
                             console.warn("Could not broadcast via SSE:", error);
                         }
@@ -299,9 +309,6 @@ export class JobProcessor {
                 )
 
                 if (!statusExists) {
-                    console.log(
-                        `[JobProcessor] Job ${this.jobId} status no longer exists, stopping processing`
-                    )
                     this.isRunning = false
                     break
                 }
@@ -334,48 +341,28 @@ export class JobProcessor {
                     this.jobId
                 )
                 if (!progress) {
-                    console.log(
-                        `[JobProcessor] Job ${this.jobId} progress no longer exists, stopping processing`
-                    )
                     this.isRunning = false
                     break
                 }
 
                 if (progress.status === "cancelled") {
-                    console.log(
-                        `[JobProcessor] Job ${this.jobId} was cancelled`
-                    )
                     this.isRunning = false
                     break
                 } else if (progress.status === "paused") {
-                    console.log(`[JobProcessor] Job ${this.jobId} was paused`)
                     this.isPaused = true
                     continue
                 }
 
                 try {
-                    console.log(
-                        `[JobProcessor] Processing item ${item.index + 1}`
-                    )
-                    // console.log(
-                    //     `[JobProcessor] Raw row data:`,
-                    //     JSON.stringify(item.rowData, null, 2)
-                    // )
-
                     let elementId: string
                     let textToEmbed: string
                     let embedding: number[] | undefined
 
-                    // Handle image file type with pre-computed vector
-                    if (this.metadata.fileType === 'image' || this.metadata.fileType === 'images') {
-                        console.log(`[JobProcessor] Processing image file type`)
-                        
+                    // Handle pre-computed vectors from JSON or image files
+                    if (this.metadata.fileType === 'json' || this.metadata.fileType === 'image' || this.metadata.fileType === 'images') {
                         // Check if we have a pre-computed vector
                         if ((item.rowData as any)._vector) {
-                            console.log(`[JobProcessor] Using pre-computed vector for image`)
                             embedding = (item.rowData as any)._vector
-                        } else {
-                            console.log(`[JobProcessor] No pre-computed vector found for image, will try to compute one`)
                         }
                     }
 
@@ -385,19 +372,11 @@ export class JobProcessor {
                             this.metadata.elementTemplate,
                             item.rowData
                         )
-                        console.log(
-                            `[JobProcessor] Element identifier from template:`,
-                            elementId
-                        )
                     } else {
                         // Get the element identifier from the configured column
                         const elementColumn =
-                            this.metadata.elementColumn || "title"
+                            this.metadata.elementColumn || "id" // Default to "id" for JSON files
                         elementId = item.rowData[elementColumn]
-                        console.log(
-                            `[JobProcessor] Element identifier from column '${elementColumn}':`,
-                            elementId
-                        )
                     }
 
                     if (!elementId) {
@@ -415,7 +394,7 @@ export class JobProcessor {
                         continue
                     }
 
-                    // For non-image files or image files without pre-computed vectors
+                    // For files without pre-computed vectors
                     if (!embedding) {
                         // Get the text to embed - either from template or column
                         if (this.metadata.textTemplate) {
@@ -423,23 +402,11 @@ export class JobProcessor {
                                 this.metadata.textTemplate,
                                 item.rowData
                             )
-                            console.log(
-                                `[JobProcessor] Text to embed from template (first 100 chars):`,
-                                textToEmbed
-                                    ? textToEmbed.substring(0, 100) + "..."
-                                    : "undefined"
-                            )
                         } else {
                             // Get the text to embed from the configured column
                             const textColumn =
-                                this.metadata.textColumn || "plot_synopsis"
+                                this.metadata.textColumn || "text" // Default to "text" for JSON files
                             textToEmbed = item.rowData[textColumn]
-                            console.log(
-                                `[JobProcessor] Text to embed from column '${textColumn}' (first 100 chars):`,
-                                textToEmbed
-                                    ? textToEmbed.substring(0, 100) + "..."
-                                    : "undefined"
-                            )
                         }
 
                         if (!textToEmbed) {
@@ -457,13 +424,7 @@ export class JobProcessor {
                             continue
                         }
 
-                        console.log(
-                            `[JobProcessor] About to get embedding for text of length ${textToEmbed.length}`
-                        )
                         embedding = await this.getEmbedding(textToEmbed)
-                        console.log(
-                            `[JobProcessor] Successfully got embedding of length ${embedding.length}`
-                        )
                     }
 
                     // Extract attributes if attribute columns are configured
@@ -483,13 +444,14 @@ export class JobProcessor {
                         )
                     }
 
-                    await this.addToRedis(
-                        elementId,
-                        embedding,
-                        Object.keys(attributes).length > 0
-                            ? attributes
-                            : undefined
-                    )
+                    // Choose between Redis and JSON export
+                    if (this.metadata.exportType === 'json') {
+                        console.log(`[JobProcessor] Exporting to JSON: ${elementId}`)
+                        await this.processToJson(elementId, embedding, Object.keys(attributes).length > 0 ? attributes : undefined)
+                    } else {
+                        console.log(`[JobProcessor] Adding to Redis: ${elementId}`)
+                        await this.addToRedis(elementId, embedding, Object.keys(attributes).length > 0 ? attributes : undefined)
+                    }
 
                     // Update progress
                     await this.updateProgress({
@@ -525,6 +487,8 @@ export class JobProcessor {
                 message: `Job failed: ${errorMessage}`,
             })
         } finally {
+            // Clear the vector elements array
+            this._vectorElements = []
             console.log(`[JobProcessor] Job ${this.jobId} finished`)
             this.isRunning = false
         }
@@ -607,9 +571,6 @@ export class JobProcessor {
                 await client.lTrim("global:importlog", -500, -1)
             })
 
-            console.log(
-                `[JobProcessor] Import log entry created for job ${this.jobId}`
-            )
         } catch (error) {
             console.error(
                 `[JobProcessor] Error creating import log entry:`,

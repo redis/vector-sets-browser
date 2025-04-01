@@ -46,6 +46,8 @@ export default function ImportFromCSV({
     const [isImporting, setIsImporting] = useState(false)
     const [importStarted, setImportStarted] = useState(false)
     const [showSuccessDialog, setShowSuccessDialog] = useState(false)
+    const [exportToJson, setExportToJson] = useState(false)
+    const [jsonFilename, setJsonFilename] = useState("")
     const [csvPreview, setCsvPreview] = useState<{
         totalRecords: number
         headers: string[]
@@ -210,90 +212,125 @@ export default function ImportFromCSV({
             setShowPreview(false)
             setActiveTab("ai")
 
-            // Read file for preview
             const text = await file.text()
 
-            // Parse CSV with proper quote handling
-            const parseCSVLine = (line: string): string[] => {
-                const fields: string[] = []
-                let field = ""
-                let inQuotes = false
-                let i = 0
-
-                while (i < line.length) {
-                    const char = line[i]
-
-                    if (char === '"') {
-                        if (
-                            inQuotes &&
-                            i + 1 < line.length &&
-                            line[i + 1] === '"'
-                        ) {
-                            // Handle escaped quotes
-                            field += '"'
-                            i++
-                        } else {
-                            // Toggle quote mode
-                            inQuotes = !inQuotes
-                        }
-                    } else if (char === "," && !inQuotes) {
-                        // End of field
-                        fields.push(field.trim())
-                        field = ""
-                    } else {
-                        field += char
+            if (file.name.endsWith('.json')) {
+                // Handle JSON file
+                try {
+                    const jsonData = JSON.parse(text)
+                    if (!Array.isArray(jsonData)) {
+                        throw new Error('JSON file must contain an array of objects')
                     }
-                    i++
+                    if (jsonData.length === 0) {
+                        throw new Error('JSON file is empty')
+                    }
+
+                    // Extract headers from the first object's keys
+                    const headers = Object.keys(jsonData[0])
+                    
+                    // Get sample rows (up to first 3)
+                    const sampleRows = jsonData.slice(0, 3).map(row => {
+                        // Ensure all headers exist in each row
+                        return headers.reduce((obj, header) => {
+                            obj[header] = row[header] ?? ""
+                            return obj
+                        }, {} as Record<string, string | number>)
+                    })
+
+                    setCsvPreview({
+                        totalRecords: jsonData.length,
+                        headers,
+                        sampleRows,
+                        fileName: file.name,
+                    })
+                } catch (error) {
+                    console.error("Error parsing JSON:", error)
+                    setError(`Error parsing JSON file: ${error instanceof Error ? error.message : 'Invalid JSON format'}`)
+                    return
+                }
+            } else {
+                // Parse CSV with proper quote handling
+                const parseCSVLine = (line: string): string[] => {
+                    const fields: string[] = []
+                    let field = ""
+                    let inQuotes = false
+                    let i = 0
+
+                    while (i < line.length) {
+                        const char = line[i]
+
+                        if (char === '"') {
+                            if (
+                                inQuotes &&
+                                i + 1 < line.length &&
+                                line[i + 1] === '"'
+                            ) {
+                                // Handle escaped quotes
+                                field += '"'
+                                i++
+                            } else {
+                                // Toggle quote mode
+                                inQuotes = !inQuotes
+                            }
+                        } else if (char === "," && !inQuotes) {
+                            // End of field
+                            fields.push(field.trim())
+                            field = ""
+                        } else {
+                            field += char
+                        }
+                        i++
+                    }
+
+                    // Add the last field
+                    fields.push(field.trim())
+                    return fields
                 }
 
-                // Add the last field
-                fields.push(field.trim())
-                return fields
+                // Parse numeric values and handle comma-separated numbers
+                const processValue = (value: string): string | number => {
+                    // Remove commas from numbers (e.g., "1,234.56" or "123,100,000" → numeric value)
+                    if (/^-?[\d,]+(\.\d+)?$/.test(value)) {
+                        const numberWithoutCommas = value.replace(/,/g, '')
+                        const parsedNumber = parseFloat(numberWithoutCommas)
+                        return isNaN(parsedNumber) ? value : parsedNumber
+                    }
+                    
+                    // Extract numbers from text with units (e.g., "160 min" → 160)
+                    const numberWithUnitsMatch = value.match(/^-?(\d+(?:,\d+)*(?:\.\d+)?)\s+\w+/)
+                    if (numberWithUnitsMatch) {
+                        const numberPart = numberWithUnitsMatch[1].replace(/,/g, '')
+                        const parsedNumber = parseFloat(numberPart)
+                        return isNaN(parsedNumber) ? value : parsedNumber
+                    }
+                    
+                    return value
+                }
+
+                const lines = text
+                    .split("\n")
+                    .map((l) => l.trim())
+                    .filter(Boolean)
+
+                const headers = parseCSVLine(lines[0])
+
+                // Parse first few rows for preview
+                const sampleRows = lines.slice(1, 4).map((line) => {
+                    const values = parseCSVLine(line)
+                    return headers.reduce((obj, header, i) => {
+                        // Process the value to handle numeric data correctly
+                        obj[header] = values[i] ? processValue(values[i]) : ""
+                        return obj
+                    }, {} as Record<string, string | number>)
+                })
+
+                setCsvPreview({
+                    totalRecords: lines.length - 1,
+                    headers,
+                    sampleRows,
+                    fileName: file.name,
+                })
             }
-
-            // Parse numeric values and handle comma-separated numbers
-            const processValue = (value: string): string | number => {
-                // Remove commas from numbers (e.g., "1,234.56" or "123,100,000" → numeric value)
-                if (/^-?[\d,]+(\.\d+)?$/.test(value)) {
-                    const numberWithoutCommas = value.replace(/,/g, '')
-                    const parsedNumber = parseFloat(numberWithoutCommas)
-                    return isNaN(parsedNumber) ? value : parsedNumber
-                }
-                
-                // Extract numbers from text with units (e.g., "160 min" → 160)
-                const numberWithUnitsMatch = value.match(/^-?(\d+(?:,\d+)*(?:\.\d+)?)\s+\w+/)
-                if (numberWithUnitsMatch) {
-                    const numberPart = numberWithUnitsMatch[1].replace(/,/g, '')
-                    const parsedNumber = parseFloat(numberPart)
-                    return isNaN(parsedNumber) ? value : parsedNumber
-                }
-                
-                return value
-            }
-
-            const lines = text
-                .split("\n")
-                .map((l) => l.trim())
-                .filter(Boolean)
-
-            const headers = parseCSVLine(lines[0])
-
-            // Parse first few rows for preview
-            const sampleRows = lines.slice(1, 4).map((line) => {
-                const values = parseCSVLine(line)
-                return headers.reduce((obj, header, i) => {
-                    // Process the value to handle numeric data correctly
-                    obj[header] = values[i] ? processValue(values[i]) : ""
-                    return obj
-                }, {} as Record<string, string | number>)
-            })
-
-            setCsvPreview({
-                totalRecords: lines.length - 1,
-                headers,
-                sampleRows,
-                fileName: file.name,
-            })
 
             // Validate dimensions
             if (!metadata?.embedding) {
@@ -304,13 +341,11 @@ export default function ImportFromCSV({
             }
 
             // Validate file size
-            if (lines.length > 10000) {
-                setError(
-                    "Warning: Large file detected. Import may take several minutes."
-                )
+            const recordCount = csvPreview?.totalRecords || 0
+            if (recordCount > 10000) {
+                setError("Warning: Large file detected. Import may take several minutes.")
             }
 
-            // Clear any previous errors
             setError(null)
         } catch (error) {
             console.error("Error reading file:", error)
@@ -427,6 +462,11 @@ export default function ImportFromCSV({
             }
         }
 
+        if (exportToJson && !jsonFilename) {
+            setError("Please provide a filename for the JSON export")
+            return
+        }
+
         setIsImporting(true)
 
         const config: ImportJobConfig = {
@@ -447,11 +487,14 @@ export default function ImportFromCSV({
                 selectedAttributeColumns.length > 0
                     ? selectedAttributeColumns
                     : undefined,
-            preserveNumericValues: true,
             metadata: metadata || undefined,
+            exportType: exportToJson ? 'json' : 'redis',
+            outputFilename: exportToJson ? jsonFilename : undefined
         }
 
         try {
+            console.log("[ImportTab] Creating import job")
+            console.log("[ImportTab] Config: ", config)
             await jobs.createImportJob(vectorSetName, selectedFile, config)
             setImportStarted(true)
             setShowSuccessDialog(true)
@@ -587,8 +630,9 @@ export default function ImportFromCSV({
                     <div className="text-lg font-medium">Import from CSV</div>
 
                     <p className="text-sm text-muted-foreground mt-2">
-                        Import a CSV file to create a new vector set. The first
-                        row of the CSV file should contain the column headers.
+                        Import a CSV or JSON file to create a new vector set. For CSV files, the first
+                        row should contain column headers. For JSON files, provide an array of objects
+                        with consistent properties.
                     </p>
                     <p className="text-sm text-muted-foreground mt-2">
                         Each item will be embedded using the embedding engine
@@ -600,7 +644,7 @@ export default function ImportFromCSV({
                             type="file"
                             ref={fileInputRef}
                             onChange={handleFileChange}
-                            accept=".csv"
+                            accept=".csv,.json"
                             className="hidden"
                         />
                         <Button
@@ -609,11 +653,9 @@ export default function ImportFromCSV({
                             className="w-full"
                             disabled={isImporting}
                         >
-                            Select CSV File
+                            Select CSV or JSON File
                         </Button>
                     </div>
-
-
 
                     {!metadata?.embedding && (
                         <Alert variant="destructive" className="mt-4">
@@ -1141,6 +1183,44 @@ export default function ImportFromCSV({
                                     </div>
                                 )}
                             </div>
+
+                            {/* Add the developer options section */}
+                            <div className="space-y-4 border-t pt-4 mt-4">
+                                <div className="text-lg font-medium">Developer Options</div>
+                                
+                                <div className="space-y-2">
+                                    <div className="flex items-center space-x-2">
+                                        <Checkbox
+                                            id="export-to-json"
+                                            checked={exportToJson}
+                                            onCheckedChange={(checked) => {
+                                                setExportToJson(checked as boolean)
+                                                if (!checked) {
+                                                    setJsonFilename("")
+                                                }
+                                            }}
+                                        />
+                                        <Label htmlFor="export-to-json">
+                                            Export to JSON instead of adding to Redis
+                                        </Label>
+                                    </div>
+
+                                    {exportToJson && (
+                                        <div className="pl-6 space-y-2">
+                                            <Label htmlFor="json-filename">Output Filename</Label>
+                                            <Input
+                                                id="json-filename"
+                                                value={jsonFilename}
+                                                onChange={(e) => setJsonFilename(e.target.value)}
+                                                placeholder="vectors.json"
+                                            />
+                                            <p className="text-xs text-muted-foreground">
+                                                The file will be saved with this name in the public directory
+                                            </p>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
                         </div>
                     )}
                 </div>
@@ -1179,17 +1259,20 @@ export default function ImportFromCSV({
                             onClick={handleImport}
                             disabled={
                                 isImporting ||
-                                !metadata?.embedding ||
+                                (!exportToJson && !metadata?.embedding) ||
                                 (activeTab === "manual" &&
                                     (!selectedElementColumn ||
                                         !selectedVectorColumn)) ||
                                 (activeTab === "ai" &&
-                                    (!elementTemplate || !vectorTemplate))
+                                    (!elementTemplate || !vectorTemplate)) ||
+                                (exportToJson && !jsonFilename)
                             }
                         >
                             {isImporting
                                 ? "Starting Import..."
-                                : "Start Import"}
+                                : exportToJson 
+                                    ? "Export to JSON" 
+                                    : "Start Import"}
                         </Button>
                     )}
                 </div>
@@ -1208,12 +1291,10 @@ export default function ImportFromCSV({
                     <DialogHeader>
                         <DialogTitle>Import Started Successfully</DialogTitle>
                         <DialogDescription>
-                            <p className="p-4">
-                                Your data import has started. For large files
-                                this may take a long time. You can see the
-                                import status and pause/cancel on the vectorset
-                                list.
-                            </p>
+                            Your data import has started. For large files
+                            this may take a long time. You can see the
+                            import status and pause/cancel on the vectorset
+                            list.
                         </DialogDescription>
                     </DialogHeader>
                     <div className="mt-4 flex justify-end">

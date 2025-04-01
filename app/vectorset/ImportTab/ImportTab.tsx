@@ -1,7 +1,8 @@
-import { apiClient } from "@/app/api/client"
-import { jobs, type ImportLogEntry, type Job } from "@/app/api/jobs"
-import { VectorSetMetadata, getModelName } from "@/app/embeddings/types/embeddingModels"
-import { Alert, AlertDescription } from "@/components/ui/alert"
+import { ImportJobConfig, jobs, type ImportLogEntry, type Job } from "@/app/api/jobs"
+import { vectorSets } from "@/app/api/vector-sets"
+import { getModelName } from "@/app/embeddings/types/embeddingModels"
+import { VectorSetMetadata } from "@/app/types/vectorSetMetaData"
+import { importVectorData } from '@/app/lib/importUtils'
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
@@ -11,31 +12,18 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@/components/ui/dialog"
-import { Progress } from "@/components/ui/progress"
 import {
     ArrowLeft,
     CheckCircle2,
     Database,
-    FileSpreadsheet,
-    XCircle,
+    FileJson,
+    FileSpreadsheet
 } from "lucide-react"
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useState, useRef } from "react"
+import ActiveJobs from "./ActiveJobs"
 import ImportFromCSV from "./ImportFromCSV"
+import ImportHistory from "./ImportHistory"
 import { SampleDataDialog } from "./SampleDataDialog"
-import { vectorSets } from "@/app/api/vector-sets"
-
-// Helper function to format dates nicely
-const formatDate = (dateString: string): string => {
-    const date = new Date(dateString)
-    return date.toLocaleString(undefined, {
-        year: "numeric",
-        month: "short",
-        day: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-    })
-}
 
 interface ImportTabProps {
     vectorSetName: string
@@ -62,6 +50,7 @@ export default function ImportTab({
     const [importLogs, setImportLogs] = useState<ImportLogEntry[]>([])
     const [successJob, setSuccessJob] = useState<Job | null>(null)
     const [showSuccessDialog, setShowSuccessDialog] = useState(false)
+    const jsonFileInputRef = useRef<HTMLInputElement>(null)
 
     // Effect to open the sample data dialog when initialShowSampleData changes
     useEffect(() => {
@@ -212,6 +201,45 @@ export default function ImportTab({
             setError("Failed to force clean job")
         }
     }
+
+    const handleJsonImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        if (!metadata || !event.target.files || event.target.files.length === 0) return;
+        
+        const file = event.target.files[0];
+        try {
+            // Read and parse the JSON to validate it and extract vectors
+            const jsonContent = await file.text();
+            const jsonData = JSON.parse(jsonContent);
+            
+            // Create an import job with the JSON file
+            const importJobConfig: ImportJobConfig = {
+                fileType: 'json',
+                exportType: 'redis', // We want to import to Redis
+                metadata: metadata,
+                // Let the server determine the appropriate columns and attributes
+                // based on the JSON structure
+            };
+            
+            await jobs.createImportJob(vectorSetName, file, importJobConfig);
+
+            // Clear the file input for future imports
+            if (jsonFileInputRef.current) {
+                jsonFileInputRef.current.value = '';
+            }
+
+            // Fetch jobs to update the UI
+            await fetchJobs();
+            
+        } catch (error) {
+            console.error("Failed to import JSON data:", error);
+            setError(error instanceof Error ? error.message : "Failed to import JSON file");
+            // Clear the file input so the user can try again
+            if (jsonFileInputRef.current) {
+                jsonFileInputRef.current.value = '';
+            }
+        }
+    };
+
     useEffect(() => {
         fetchJobs()
         fetchImportLogs()
@@ -287,36 +315,27 @@ export default function ImportTab({
                                             vectorSetName={vectorSetName}
                                             metadata={metadata}
                                             onImportComplete={(success) => {
-                                                // This will be called after the dialog is closed
-                                                // Refresh job list to show newly created import job
                                                 console.log("onImportComplete called with success:", success);
                                                 fetchJobs();
                                                 
-                                                // If import was successful, show the success dialog
                                                 if (success) {
                                                     console.log("Import was successful, showing success dialog soon");
-                                                    // Find the most recent job for this vector set
                                                     setTimeout(async () => {
                                                         try {
                                                             const latestJobs = await jobs.getJobsByVectorSet(vectorSetName);
                                                             console.log("Latest jobs:", latestJobs);
                                                             if (latestJobs && latestJobs.length > 0) {
-                                                                // Sort jobs by timestamp to get most recent one
                                                                 const sortedJobs = [...latestJobs].sort((a, b) => {
-                                                                    // Use creation time from the job's timestamp property if available
-                                                                    // If not available, fallback to using status object creation time
                                                                     const timeA = a.status?.timestamp || new Date(a.status?.createdAt || 0).getTime();
                                                                     const timeB = b.status?.timestamp || new Date(b.status?.createdAt || 0).getTime();
                                                                     return timeB - timeA;
                                                                 });
                                                                 
-                                                                // Find recent completed jobs or use the most recent job
                                                                 const completedJob = sortedJobs.find(j => j.status.status === "completed") || sortedJobs[0];
                                                                 console.log("Found job to display:", completedJob);
                                                                 
                                                                 if (completedJob) {
                                                                     setSuccessJob(completedJob);
-                                                                    // Use a direct state update to ensure the dialog opens
                                                                     setTimeout(() => {
                                                                         setShowSuccessDialog(true);
                                                                         console.log("Success dialog should now be visible");
@@ -326,7 +345,7 @@ export default function ImportTab({
                                                         } catch (error) {
                                                             console.error("Error fetching latest job:", error);
                                                         }
-                                                    }, 1000); // Increased delay to ensure job is registered
+                                                    }, 1000);
                                                 }
                                             }}
                                             onUpdateMetadata={async (
@@ -337,20 +356,16 @@ export default function ImportTab({
                                                     newMetadata
                                                 )
                                                 try {
-                                                    // Update the metadata on the server
                                                     await vectorSets.setMetadata({
                                                         name: vectorSetName,
                                                         metadata: newMetadata
                                                     })
-
-                                                    // Refresh the page to load updated metadata
                                                     window.location.reload()
                                                 } catch (error) {
                                                     console.error(
                                                         "Failed to update metadata:",
                                                         error
                                                     )
-                                                    // Could show an error message here
                                                 }
                                             }}
                                         />
@@ -378,7 +393,7 @@ export default function ImportTab({
                                             . You can change the embedding
                                             engine on the Information tab.
                                         </p>
-                                        <div className="grid grid-cols-2 gap-4">
+                                        <div className="grid grid-cols-3 gap-4">
                                             <Card
                                                 className="p-6 cursor-pointer hover:shadow-md transition-shadow"
                                                 onClick={() =>
@@ -413,215 +428,40 @@ export default function ImportTab({
                                                     </p>
                                                 </div>
                                             </Card>
+                                            <Card
+                                                className="p-6 cursor-pointer hover:shadow-md transition-shadow"
+                                                onClick={() => jsonFileInputRef.current?.click()}
+                                            >
+                                                <div className="flex flex-col items-center space-y-3">
+                                                    <FileJson className="h-8 w-8 text-purple-500" />
+                                                    <h3 className="font-medium">
+                                                        Import JSON
+                                                    </h3>
+                                                    <p className="text-sm text-gray-500 text-center">
+                                                        Import test data from JSON
+                                                    </p>
+                                                </div>
+                                            </Card>
                                         </div>
                                     </div>
                                 )}
                             </div>
                         ) : (
-                            jobList.map((job) => (
-                                <Card key={job.jobId} className="p-4">
-                                    <div className="space-y-2">
-                                        <div className="flex justify-between items-center">
-                                            <div>
-                                                <p className="text-sm text-muted-foreground">
-                                                    {job.metadata.filename}
-                                                </p>
-                                            </div>
-                                            <div className="space-x-2">
-                                                {job.status.status ===
-                                                    "processing" && (
-                                                    <Button
-                                                        variant="outline"
-                                                        size="sm"
-                                                        onClick={() =>
-                                                            pauseJob(job.jobId)
-                                                        }
-                                                    >
-                                                        Pause
-                                                    </Button>
-                                                )}
-                                                {job.status.status ===
-                                                    "paused" && (
-                                                    <>
-                                                        <Button
-                                                            variant="outline"
-                                                            size="sm"
-                                                            onClick={() =>
-                                                                resumeJob(
-                                                                    job.jobId
-                                                                )
-                                                            }
-                                                        >
-                                                            Resume
-                                                        </Button>
-                                                        <Button
-                                                            variant="outline"
-                                                            size="sm"
-                                                            onClick={() =>
-                                                                forceCleanupJob(
-                                                                    job.jobId
-                                                                )
-                                                            }
-                                                        >
-                                                            Force Cleanup
-                                                        </Button>
-                                                    </>
-                                                )}
-                                                {(job.status.status ===
-                                                    "processing" ||
-                                                    job.status.status ===
-                                                        "paused" ||
-                                                    job.status.status ===
-                                                        "pending") && (
-                                                    <Button
-                                                        variant="destructive"
-                                                        size="sm"
-                                                        onClick={() =>
-                                                            cancelJob(job.jobId)
-                                                        }
-                                                    >
-                                                        Cancel
-                                                    </Button>
-                                                )}
-                                            </div>
-                                        </div>
-
-                                        <div className="space-y-2">
-                                            <div className="flex justify-between items-center">
-                                                <div className="text-sm">
-                                                    {job.status.message ||
-                                                        job.status.status}
-                                                </div>
-                                                <div className="text-sm text-muted-foreground">
-                                                    {job.status.current} of{" "}
-                                                    {job.status.total} records
-                                                </div>
-                                            </div>
-                                            <Progress
-                                                value={
-                                                    (job.status.current /
-                                                        job.status.total) *
-                                                    100
-                                                }
-                                                className="w-full"
-                                            />
-                                        </div>
-
-                                        {job.status.status === "completed" && (
-                                            <Alert
-                                                variant="default"
-                                                className="mt-2"
-                                            >
-                                                <CheckCircle2 className="h-4 w-4" />
-                                                <AlertDescription className="flex justify-between items-center">
-                                                    <span>
-                                                        Import completed
-                                                        successfully!
-                                                    </span>
-                                                    <Button
-                                                        variant="outline"
-                                                        size="sm"
-                                                        onClick={() =>
-                                                            forceCleanupJob(
-                                                                job.jobId
-                                                            )
-                                                        }
-                                                    >
-                                                        Dismiss
-                                                    </Button>
-                                                </AlertDescription>
-                                            </Alert>
-                                        )}
-
-                                        {job.status.status === "failed" && (
-                                            <Alert
-                                                variant="destructive"
-                                                className="mt-2"
-                                            >
-                                                <XCircle className="h-4 w-4" />
-                                                <AlertDescription className="flex justify-between items-center">
-                                                    <span>
-                                                        {job.status.error ||
-                                                            "Import failed"}
-                                                    </span>
-                                                    <Button
-                                                        variant="outline"
-                                                        size="sm"
-                                                        onClick={() =>
-                                                            removeJob(job.jobId)
-                                                        }
-                                                    >
-                                                        Dismiss
-                                                    </Button>
-                                                </AlertDescription>
-                                            </Alert>
-                                        )}
-
-                                        {job.status.status === "cancelled" && (
-                                            <Alert
-                                                variant="default"
-                                                className="mt-2"
-                                            >
-                                                <XCircle className="h-4 w-4" />
-                                                <AlertDescription className="flex justify-between items-center">
-                                                    <span>
-                                                        Import cancelled by user
-                                                    </span>
-                                                    <Button
-                                                        variant="outline"
-                                                        size="sm"
-                                                        onClick={() =>
-                                                            removeJob(job.jobId)
-                                                        }
-                                                    >
-                                                        Dismiss
-                                                    </Button>
-                                                </AlertDescription>
-                                            </Alert>
-                                        )}
-                                    </div>
-                                </Card>
-                            ))
+                            <ActiveJobs
+                                jobs={jobList}
+                                onPauseJob={pauseJob}
+                                onResumeJob={resumeJob}
+                                onCancelJob={cancelJob}
+                                onForceCleanupJob={forceCleanupJob}
+                                onRemoveJob={removeJob}
+                            />
                         )}
                     </div>
                 </CardContent>
             </Card>
 
-            {/* Import History Card - Always visible */}
-            <Card>
-                <CardHeader>
-                    <CardTitle>Import History</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    {importLogs.length === 0 ? (
-                        <p className="text-sm text-muted-foreground">
-                            No import history available.
-                        </p>
-                    ) : (
-                        <div className="space-y-2">
-                            {importLogs.map((log) => (
-                                <Card key={log.jobId} className="p-3">
-                                    <div className="flex justify-between items-center">
-                                        <div>
-                                            <p className="font-medium">
-                                                {log.filename}
-                                            </p>
-                                            <p className="text-sm text-muted-foreground">
-                                                {formatDate(log.timestamp)}
-                                            </p>
-                                        </div>
-                                        <div className="text-sm text-muted-foreground">
-                                            {log.recordsProcessed} records
-                                        </div>
-                                    </div>
-                                </Card>
-                            ))}
-                        </div>
-                    )}
-                </CardContent>
-            </Card>
+            <ImportHistory importLogs={importLogs} />
 
-            {/* Success Dialog */}
             <Dialog
                 open={showSuccessDialog}
                 onOpenChange={(open) => setShowSuccessDialog(open)}
@@ -629,23 +469,19 @@ export default function ImportTab({
                 <DialogContent className="sm:max-w-[425px]">
                     <DialogHeader>
                         <DialogTitle>Import Completed Successfully</DialogTitle>
-                        <DialogDescription>
-                            {successJob && (
-                                <div className="space-y-4 p-4">
-                                    <div className="flex items-center gap-2">
-                                        <CheckCircle2 className="h-6 w-6 text-green-500" />
-                                        <p className="font-medium">
-                                            {successJob.metadata.filename}
-                                        </p>
-                                    </div>
-                                    <p>
-                                        Your data has been successfully
-                                        imported.
-                                        {successJob.status.total} records have
-                                        been processed.
-                                    </p>
+                        <DialogDescription asChild>
+                            <div className="space-y-4 p-4">
+                                <div className="flex items-center gap-2">
+                                    <CheckCircle2 className="h-6 w-6 text-green-500" />
+                                    <span className="font-medium">
+                                        {successJob?.metadata.filename}
+                                    </span>
                                 </div>
-                            )}
+                                <div className="text-sm text-muted-foreground">
+                                    Your data has been successfully imported.
+                                    {successJob?.status.total} records have been processed.
+                                </div>
+                            </div>
                         </DialogDescription>
                     </DialogHeader>
                     <div className="mt-4 flex justify-end">
@@ -655,6 +491,13 @@ export default function ImportTab({
                     </div>
                 </DialogContent>
             </Dialog>
+            <input
+                type="file"
+                ref={jsonFileInputRef}
+                onChange={handleJsonImport}
+                accept=".json"
+                className="hidden"
+            />
         </div>
     )
 }

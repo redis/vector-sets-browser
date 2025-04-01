@@ -13,12 +13,11 @@ import { v4 as uuidv4 } from "uuid"
 import RedisClient from "../../redis-server/server/commands"
 
 export class JobQueueService {
-    private static async updateJobProgress(
+    public static async updateJobProgress(
         url: string,
         jobId: string,
         progress: Partial<JobProgress>
     ): Promise<JobProgress> {
-        console.log(`[JobQueue] Updating progress for job ${jobId}:`, progress)
         const result = await RedisClient.withConnection(url, async (client) => {
             const statusKey = getJobStatusKey(jobId)
             let currentProgress: JobProgress = {
@@ -67,7 +66,6 @@ export class JobQueueService {
             throw new Error(result.error)
         }
         
-        console.log(`[JobQueue] Progress updated successfully for job ${jobId}`)
         return result.result;
     }
 
@@ -87,13 +85,11 @@ export class JobQueueService {
             skipRows?: number
             fileType?: string
             rawVectors?: number[][]
+            exportType?: 'redis' | 'json'
+            outputFilename?: string
         }
     ): Promise<string> {
         const jobId = uuidv4()
-        console.log(
-            `[JobQueue] Creating new job ${jobId} for vector set ${vectorSetName}`
-        )
-        console.log(`[JobQueue] Options:`, options)
 
         // Set default options
         const delimiter = options?.delimiter || ","
@@ -101,13 +97,18 @@ export class JobQueueService {
             options?.hasHeader !== undefined ? options.hasHeader : true
         const skipRows = options?.skipRows || 0
         const fileType = options?.fileType || "csv"
+        const exportType = options?.exportType || "redis"
 
-        let records: CSVRow[] = [];
-        let availableColumns: string[] = [];
+        // Validate output filename for JSON export
+        if (exportType === "json" && !options?.outputFilename) {
+            throw new Error("Output filename is required for JSON export")
+        }
+
+        let records: CSVRow[] = []
+        let availableColumns: string[] = []
         
         // Handle different file types
         if (fileType === "csv") {
-            console.log(`[JobQueue] Reading CSV file ${file.name}`)
             const text = await file.text()
             records = parse(text, {
                 columns: hasHeader,
@@ -115,17 +116,50 @@ export class JobQueueService {
                 delimiter,
                 from_line: Math.max(1, skipRows + (hasHeader ? 1 : 0)),
             }) as CSVRow[]
-            console.log(`[JobQueue] Parsed ${records.length} records from CSV`)
             
             // Determine column names from the first record
             availableColumns = records.length > 0 ? Object.keys(records[0]) : []
         } 
+        else if (fileType === "json") {
+            // Parse JSON file
+            const text = await file.text()
+            const jsonData = JSON.parse(text)
+            
+            // Handle both array and object formats
+            const dataArray = Array.isArray(jsonData) ? jsonData : [jsonData]
+            
+            // Convert JSON objects to records
+            records = dataArray.map((item, index) => {
+                // If the item has a vector property, store it for later use
+                const vector = item.vector || item.embedding
+                const record: CSVRow = {
+                    id: item.id || String(index),
+                    text: item.text || '',
+                    ...item // Include all other properties as attributes
+                }
+                
+                if (vector) {
+                    // Store the vector directly in the record for later use
+                    ;(record as any)._vector = vector
+                }
+                
+                return record
+            })
+            
+            // Get all unique keys from the first record for columns
+            availableColumns = records.length > 0 ? Object.keys(records[0]) : []
+            
+            // Update attribute columns to include all fields except id, text, and vector
+            if (!options.attributeColumns || options.attributeColumns.length === 0) {
+                options.attributeColumns = availableColumns.filter(col => 
+                    col !== 'id' && col !== 'text' && col !== 'vector' && col !== 'embedding' && !col.startsWith('_')
+                )
+            }
+        }
         else if (fileType === "image" || fileType === "images") {
-            console.log(`[JobQueue] Processing image file: ${file.name}`)
             
             // For image types, we create a single record with the image information
             if (options?.rawVectors && options.rawVectors.length > 0) {
-                console.log(`[JobQueue] Using ${options.rawVectors.length} pre-computed vectors for images`)
                 
                 // Create a record for each image with pre-computed vector
                 records = options.rawVectors.map((vector, index) => {
@@ -162,8 +196,6 @@ export class JobQueueService {
             }
         }
         
-        console.log(`[JobQueue] Available columns:`, availableColumns)
-
         // Select appropriate columns based on options or defaults
         const elementColumn =
             options?.elementColumn ||
@@ -178,16 +210,6 @@ export class JobQueueService {
                 : availableColumns.length > 1
                 ? availableColumns[1]
                 : "plot_synopsis")
-
-        console.log(`[JobQueue] Selected element column: ${elementColumn}`)
-        console.log(`[JobQueue] Selected text column: ${textColumn}`)
-
-        if (options?.attributeColumns) {
-            console.log(
-                `[JobQueue] Selected attribute columns:`,
-                options.attributeColumns
-            )
-        }
 
         const result = await RedisClient.withConnection(url, async (client) => {
             // Create job metadata
@@ -206,11 +228,9 @@ export class JobQueueService {
                 hasHeader,
                 skipRows,
                 fileType,
+                exportType,
+                outputFilename: options?.outputFilename,
             }
-            console.log(
-                `[JobQueue] Setting metadata for job ${jobId}:`,
-                metadata
-            )
             await client.hSet(getJobMetadataKey(jobId), {
                 data: JSON.stringify(metadata),
             })
@@ -222,19 +242,12 @@ export class JobQueueService {
                 status: "pending",
                 message: "Job created",
             }
-            console.log(
-                `[JobQueue] Setting initial progress for job ${jobId}:`,
-                initialProgress
-            )
             await client.hSet(getJobStatusKey(jobId), {
                 data: JSON.stringify(initialProgress),
             })
 
             // Add records to job queue
             const queueKey = getJobQueueKey(jobId)
-            console.log(
-                `[JobQueue] Adding ${records.length} records to queue ${queueKey}`
-            )
             for (let i = 0; i < records.length; i++) {
                 const item: JobQueueItem = {
                     jobId,
@@ -254,7 +267,6 @@ export class JobQueueService {
             )
             throw new Error(result.error)
         }
-        console.log(`[JobQueue] Successfully created job ${jobId}`)
         return result.result
     }
 
@@ -340,7 +352,6 @@ export class JobQueueService {
         url: string,
         jobId: string
     ): Promise<JobQueueItem | null> {
-        console.log(`[JobQueue] Getting next queue item for job ${jobId}`)
         const result = await RedisClient.withConnection(url, async (client) => {
             const queueKey = getJobQueueKey(jobId)
             const item = await client.lPop(queueKey)
@@ -353,12 +364,10 @@ export class JobQueueService {
             )
             throw new Error(result.error)
         }
-        console.log(`[JobQueue] Next queue item for job ${jobId}`)
         return result.result
     }
 
     public static async cleanupJob(url: string, jobId: string): Promise<void> {
-        console.log(`[JobQueue] Cleaning up job ${jobId}`)
         const result = await RedisClient.withConnection(url, async (client) => {
             const keys = [
                 getJobQueueKey(jobId),
@@ -375,6 +384,5 @@ export class JobQueueService {
             )
             throw new Error(result.error)
         }
-        console.log(`[JobQueue] Successfully cleaned up job ${jobId}`)
     }
 }

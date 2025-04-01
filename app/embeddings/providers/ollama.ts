@@ -8,15 +8,13 @@ export class OllamaProvider implements EmbeddingProvider {
         }
 
         const prompt = config.ollama.promptTemplate?.replace("{text}", input) || input
-        console.log("[OllamaProvider] config: ", config.ollama)
-        console.log("[OllamaProvider] prompt: ", prompt)
 
         const response = await fetch(`${config.ollama.apiUrl}/api/embed`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
                 model: config.ollama.modelName,
-                prompt,
+                input: prompt,
             }),
         })
 
@@ -26,12 +24,12 @@ export class OllamaProvider implements EmbeddingProvider {
         }
 
         const data = await response.json()
-        const embedding = data.embedding
-        
+        const embedding = data.embeddings[0]
+
         // Validate embedding dimensions
         const modelData = getModelData(config)
         const expectedDim = modelData?.dimensions
-        if (expectedDim && embedding.length !== expectedDim) {
+        if (expectedDim && embedding && embedding.length !== expectedDim) {
             throw new Error(
                 `Unexpected embedding dimension: got ${embedding.length}, expected ${expectedDim}`
             )

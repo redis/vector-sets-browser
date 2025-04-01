@@ -32,6 +32,8 @@ export interface CSVJobMetadata {
     hasHeader?: boolean
     skipRows?: number
     fileType?: string
+    exportType?: 'redis' | 'json'
+    outputFilename?: string
 }
 
 export interface CSVRow {

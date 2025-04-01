@@ -104,7 +104,7 @@ export interface VaddMultiRequestBody {
     keyName: string;
     elements: string[];
     vectors: number[][];
-    attributes?: Record<string, string>[];
+    attributes?: Record<string, string | boolean | number>[];
     reduceDimensions?: number;
     useCAS?: boolean;
     ef?: number;

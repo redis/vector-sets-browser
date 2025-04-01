@@ -1,6 +1,6 @@
 import { EmbeddingService } from "@/app/embeddings/service"
 import { getExpectedDimensions } from "@/app/embeddings/types/embeddingModels"
-import { VaddRequestBody } from "@/app/redis-server/api"
+import { VaddRequestBody, VaddMultiRequestBody } from "@/app/redis-server/api"
 import {
     VectorSetMetadata,
 } from "@/app/types/vectorSetMetaData"
@@ -136,9 +136,6 @@ export class RedisClient {
             if (connection) {
                 try {
                     await connection.client.quit()
-                    console.log(
-                        `[RedisClient] Closed idle connection for ${url}`
-                    )
                 } catch (error) {
                     console.error(
                         `[RedisClient] Error closing idle connection for ${url}:`,
@@ -197,9 +194,6 @@ export class RedisClient {
                 async ([url, connection]) => {
                     try {
                         await connection.client.quit()
-                        console.log(
-                            `[RedisClient] Closed connection for ${url}`
-                        )
                     } catch (error) {
                         console.error(
                             `[RedisClient] Error closing connection for ${url}:`,
@@ -248,7 +242,6 @@ export async function vadd(redisUrl: string, request: VaddRequestBody) : Promise
     
     return RedisClient.withConnection(redisUrl, async (client) => {
 
-        console.log("VADD request:", request)
         // Ensure vector is an array of numbers
         if (!Array.isArray(request.vector)) {
             return {
@@ -1083,6 +1076,58 @@ export async function vinfo(
                     error instanceof Error ? error.message : String(error)
                 }`
             )
+        }
+    })
+}
+
+export async function vadd_multi(
+    url: string,
+    request: VaddMultiRequestBody
+): Promise<VectorOperationResult> {
+    return RedisClient.withConnection(url, async (client) => {
+        try {
+            const multi = client.multi()
+            
+            for (let i = 0; i < request.elements.length; i++) {
+                const command = ["VADD", request.keyName]
+                
+                if (request.reduceDimensions) {
+                    command.push("REDUCE", request.reduceDimensions.toString())
+                }
+                
+                command.push(
+                    "VALUES",
+                    request.vectors[i].length.toString(),
+                    ...request.vectors[i].map(v => v.toString()),
+                    request.elements[i]
+                )
+                
+                if (request.attributes && request.attributes[i]) {
+                    command.push("SETATTR", JSON.stringify(request.attributes[i]))
+                }
+                
+                if (request.useCAS) {
+                    command.push("CAS")
+                }
+                
+                if (request.ef) {
+                    command.push("EF", request.ef.toString())
+                }
+                
+                multi.addCommand(command)
+            }
+            
+            const results = await multi.exec()
+            return {
+                success: true,
+                result: results
+            }
+        } catch (error) {
+            console.error("Error in VADD_MULTI operation:", error)
+            return {
+                success: false,
+                error: error instanceof Error ? error.message : String(error)
+            }
         }
     })
 }

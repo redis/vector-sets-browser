@@ -1,19 +1,9 @@
-import { NextResponse } from "next/server"
-import { getRedisUrl, vadd_multi } from "@/app/redis-server/server/commands"
 import { VaddMultiRequestBody } from "@/app/redis-server/api"
+import * as redis from "@/app/redis-server/server/commands"
+import { NextResponse } from "next/server"
 
 export async function POST(request: Request) {
     try {
-        // Get Redis URL from cookies
-        const redisUrl = await getRedisUrl()
-        if (!redisUrl) {
-            return NextResponse.json(
-                { success: false, error: "Redis URL not found in cookies" },
-                { status: 401 }
-            )
-        }
-
-        // Parse the request body
         const body = await request.json() as VaddMultiRequestBody
         
         // Validate input
@@ -45,23 +35,21 @@ export async function POST(request: Request) {
             )
         }
 
-        // Execute VADD_MULTI command
-        const result = await vadd_multi(
-            redisUrl,
-            body.keyName,
-            body.elements,
-            body.vectors,
-            body.attributes,
-            body.useCAS,
-            body.reduceDimensions
-        )
+        const redisUrl = await redis.getRedisUrl()
+        if (!redisUrl) {
+            return NextResponse.json(
+                { success: false, error: "No Redis connection available" },
+                { status: 401 }
+            )
+        }
 
-        // If the operation failed, return the error with an appropriate status code
+        const result = await redis.vadd_multi(redisUrl, body)
+
         if (!result.success) {
-            return NextResponse.json({
-                success: false,
-                error: result.error || "Failed to add vectors in bulk"
-            }, { status: 400 })
+            return NextResponse.json(
+                { success: false, error: result.error },
+                { status: 500 }
+            )
         }
 
         return NextResponse.json({
