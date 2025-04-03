@@ -325,21 +325,23 @@ export default function ImportTab({
                                                             const latestJobs = await jobs.getJobsByVectorSet(vectorSetName);
                                                             console.log("Latest jobs:", latestJobs);
                                                             if (latestJobs && latestJobs.length > 0) {
+                                                                // Sort by most recent first using message timestamp if available
                                                                 const sortedJobs = [...latestJobs].sort((a, b) => {
-                                                                    const timeA = a.status?.timestamp || new Date(a.status?.createdAt || 0).getTime();
-                                                                    const timeB = b.status?.timestamp || new Date(b.status?.createdAt || 0).getTime();
-                                                                    return timeB - timeA;
+                                                                    // Try to extract timestamp from message if available
+                                                                    const getTimestamp = (job: Job) => {
+                                                                        const timestampMatch = job.status.message?.match(/at (\d+)/);
+                                                                        return timestampMatch ? parseInt(timestampMatch[1], 10) : 0;
+                                                                    };
+                                                                    return getTimestamp(b) - getTimestamp(a);
                                                                 });
                                                                 
-                                                                const completedJob = sortedJobs.find(j => j.status.status === "completed") || sortedJobs[0];
-                                                                console.log("Found job to display:", completedJob);
+                                                                const completedJob = sortedJobs.find(j => j.status.status === "completed");
+                                                                console.log("Found completed job:", completedJob);
                                                                 
                                                                 if (completedJob) {
                                                                     setSuccessJob(completedJob);
-                                                                    setTimeout(() => {
-                                                                        setShowSuccessDialog(true);
-                                                                        console.log("Success dialog should now be visible");
-                                                                    }, 100);
+                                                                    setShowSuccessDialog(true);
+                                                                    console.log("Success dialog should now be visible");
                                                                 }
                                                             }
                                                         } catch (error) {

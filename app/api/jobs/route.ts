@@ -1,9 +1,7 @@
 import { JobProcessor } from "@/app/lib/server/job-processor"
 import { JobQueueService } from "@/app/lib/server/job-queue"
 import RedisClient, * as redis from "@/app/redis-server/server/commands"
-import { VectorSetMetadata } from "@/app/types/vectorSetMetaData"
 import { NextRequest, NextResponse } from "next/server"
-import { vectorSets } from "@/app/lib/server/vector-sets"
 
 // Map to store active job processors
 const activeProcessors = new Map<string, JobProcessor>()
@@ -130,15 +128,17 @@ export async function POST(req: NextRequest) {
             type: 'application/octet-stream'
         });
 
-        // Get metadata for the vector set
-        const metadata = await vectorSets.getMetadata(vectorSetName)
-        if (!metadata) {
+        const result = await redis.getMetadata(redisUrl, vectorSetName)
+        
+        if (!result || !result.success) {
             return NextResponse.json(
                 { error: "Vector set not found" },
                 { status: 404 }
             )
         }
 
+        const metadata = result.result 
+        
         try {
             const jobId = await JobQueueService.createJob(redisUrl, file, vectorSetName, metadata.embedding, config)
 

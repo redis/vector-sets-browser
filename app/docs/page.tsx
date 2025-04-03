@@ -12,9 +12,12 @@ export default function DocsPage() {
                     associated to a vector instead of a score. The fundamental
                     goal of Vector Sets is to make possible adding items, and
                     later get a subset of the added items that are the most
-                    similar to a specified vector (often a learned embedding) of
+                    similar to a specified vector (often a learned embedding) or
                     the most similar to the vector of an element that is already
                     part of the Vector Set.
+                </p>
+                <p className="text-gray-700 mb-4">
+                    Moreover, Vector sets implement optional filtered search capabilities: it is possible to associate attributes to all or to a subset of elements in the set, and then, using the <code>FILTER</code> option of the <code>VSIM</code> command, to ask for items similar to a given vector but also passing a filter specified as a simple mathematical expression (Like <code>&quot;.year &gt; 1950&quot;</code> or similar). This means that <strong>you can have vector similarity and scalar filters at the same time</strong>.
                 </p>
             </section>
 
@@ -38,8 +41,7 @@ export default function DocsPage() {
                     To run tests, it is suggested to use:
                 </p>
                 <pre className="bg-gray-100 p-4 rounded-lg mb-4 font-mono">
-                    ./redis-server --save &ldquo;&rdquo; --enable-debug-command
-                    yes
+                    ./redis-server --save &ldquo;&rdquo; --enable-debug-command yes
                 </pre>
 
                 <p className="text-gray-700 mb-4">
@@ -60,59 +62,9 @@ export default function DocsPage() {
                         <h3 className="text-xl font-medium mb-2">
                             VADD: Add Items into a Vector Set
                         </h3>
-
-                        <div id="cas-option" className="pt-4">
-                            <h4 className="text-lg font-medium mb-2">CAS Option</h4>
-                            <p className="text-gray-700 mb-4">
-                                The CAS (Check-and-Set) option enables high-performance multi-threading for vector additions.
-                                When enabled, the neighbor candidates collection is performed in the background while the
-                                command executes in the main thread. This can significantly speed up vector additions,
-                                especially for large datasets.
-                            </p>
-                        </div>
-
-                        <div id="exploration-factor" className="pt-4">
-                            <h4 className="text-lg font-medium mb-2">Exploration Factor (EF)</h4>
-                            <p className="text-gray-700 mb-4">
-                                The Exploration Factor controls the effort made to find good candidates when connecting
-                                new nodes to the existing HNSW graph. The default value is 200. Using a larger value
-                                may help achieve better recall at the cost of increased processing time. Values typically
-                                range from 100 to 1000, with higher values providing better accuracy but slower performance.
-                            </p>
-                        </div>
-
-                        <div id="vector-quantization" className="pt-4">
-                            <h4 className="text-lg font-medium mb-2">Vector Quantization</h4>
-                            <p className="text-gray-700 mb-4">
-                                Vector quantization reduces memory usage by compressing vector representations:
-                            </p>
-                            <ul className="list-disc pl-6 space-y-2 text-gray-700">
-                                <li><strong>NOQUANT:</strong> No quantization, uses full precision (32-bit floats)</li>
-                                <li><strong>Q8:</strong> 8-bit quantization, good balance of precision and memory usage</li>
-                                <li><strong>BIN:</strong> Binary quantization, fastest and lowest memory usage but reduced accuracy</li>
-                            </ul>
-                            <p className="text-gray-700 mt-4">
-                                Note: Quantization cannot be changed after the first vector is added to the set.
-                            </p>
-                        </div>
-
-                        <div id="dimension-reduction" className="pt-4">
-                            <h4 className="text-lg font-medium mb-2">Dimension Reduction</h4>
-                            <p className="text-gray-700 mb-4">
-                                Dimension reduction uses random projection to reduce the dimensionality of vectors,
-                                resulting in faster searches and lower memory usage. However, this comes at the cost
-                                of reduced precision. The reduction matrix is saved with the vector set and used
-                                consistently for all operations.
-                            </p>
-                            <p className="text-gray-700 mb-4">
-                                Note: Dimension reduction cannot be changed after the first vector is added to the set.
-                            </p>
-                        </div>
-
                         <pre className="bg-gray-100 p-4 rounded-lg mb-4 font-mono">
-                            VADD key [REDUCE dim] FP32|VALUES vector element
-                            [CAS] [NOQUANT] [BIN] [Q8] [EF
-                            build-exploration-factor]
+                            VADD key [REDUCE dim] FP32|VALUES vector element [CAS] [NOQUANT | Q8 | BIN]
+                            [EF build-exploration-factor] [SETATTR &lt;attributes&gt;] [M &lt;numlinks&gt;]
                         </pre>
                         <p className="text-gray-700 mb-4">
                             Add a new element into the vector set specified by
@@ -125,27 +77,28 @@ export default function DocsPage() {
                         </pre>
                         <ul className="list-disc pl-6 space-y-2 text-gray-700">
                             <li>
-                                <strong>REDUCE:</strong> Implements random
-                                projection to reduce vector dimensionality
+                                <strong>REDUCE:</strong> Implements random projection to reduce vector dimensionality. Must be passed immediately before the vector.
                             </li>
                             <li>
-                                <strong>CAS:</strong> Performs operation
-                                partially using threads
+                                <strong>CAS:</strong> Performs operation partially using threads in a check-and-set style.
                             </li>
                             <li>
-                                <strong>NOQUANT:</strong> Forces vector creation
-                                without integer 8 quantization
+                                <strong>NOQUANT:</strong> Forces vector creation without integer 8 quantization
                             </li>
                             <li>
-                                <strong>BIN:</strong> Forces binary quantization
+                                <strong>BIN:</strong> Forces binary quantization for faster processing and less memory
                             </li>
                             <li>
-                                <strong>Q8:</strong> Forces signed 8 bit
-                                quantization (default)
+                                <strong>Q8:</strong> Forces signed 8 bit quantization (default)
                             </li>
                             <li>
-                                <strong>EF:</strong> Controls build exploration
-                                factor (default: 200)
+                                <strong>EF:</strong> Controls build exploration factor (default: 200)
+                            </li>
+                            <li>
+                                <strong>SETATTR:</strong> Associates attributes to the newly created entry or updates existing attributes
+                            </li>
+                            <li>
+                                <strong>M:</strong> Maximum number of connections per node (default: 16)
                             </li>
                         </ul>
                     </div>
@@ -155,17 +108,36 @@ export default function DocsPage() {
                             VSIM: Return Elements by Vector Similarity
                         </h3>
                         <pre className="bg-gray-100 p-4 rounded-lg mb-4 font-mono">
-                            VSIM key [ELE|FP32|VALUES] &lt;vector or element&gt;
-                            [WITHSCORES] [COUNT num] [EF
-                            search-exploration-factor]
+                            VSIM key [ELE|FP32|VALUES] &lt;vector or element&gt; [WITHSCORES] [COUNT num] 
+                            [EF search-exploration-factor] [FILTER expression] [FILTER-EF max-filtering-effort] 
+                            [TRUTH] [NOTHREAD]
                         </pre>
                         <p className="text-gray-700 mb-4">
-                            Returns similar vectors. Example using element
-                            comparison:
+                            Returns similar vectors. Example using element comparison:
                         </p>
                         <pre className="bg-gray-100 p-4 rounded-lg mb-4 font-mono">
                             VSIM word_embeddings ELE apple WITHSCORES COUNT 3
+                            1) "apple"
+                            2) "0.9998867657923256"
+                            3) "apples"
+                            4) "0.8598527610301971"
+                            5) "pear"
+                            6) "0.8226882219314575"
                         </pre>
+                        <ul className="list-disc pl-6 space-y-2 text-gray-700">
+                            <li>
+                                <strong>EF:</strong> Exploration factor for better search results (50-1000)
+                            </li>
+                            <li>
+                                <strong>TRUTH:</strong> Forces linear scan for perfect results
+                            </li>
+                            <li>
+                                <strong>NOTHREAD:</strong> Executes search in main thread
+                            </li>
+                            <li>
+                                <strong>FILTER:</strong> Applies scalar filters to results
+                            </li>
+                        </ul>
                     </div>
 
                     <div>
@@ -174,28 +146,31 @@ export default function DocsPage() {
                         </h3>
                         <ul className="list-disc pl-6 space-y-2 text-gray-700">
                             <li>
-                                <strong>VDIM:</strong> Returns the dimension of
-                                vectors inside the vector set
+                                <strong>VDIM:</strong> Returns the dimension of vectors inside the vector set
                             </li>
                             <li>
-                                <strong>VCARD:</strong> Returns the number of
-                                elements in a vector set
+                                <strong>VCARD:</strong> Returns the number of elements in a vector set
                             </li>
                             <li>
-                                <strong>VREM:</strong> Removes elements from
-                                vector set
+                                <strong>VREM:</strong> Removes elements from vector set with memory reclamation
                             </li>
                             <li>
-                                <strong>VEMB:</strong> Returns the approximated
-                                vector of an element
+                                <strong>VEMB:</strong> Returns the approximated vector of an element (with RAW option for internal representation)
                             </li>
                             <li>
-                                <strong>VLINKS:</strong> Shows neighbors for a
-                                node
+                                <strong>VLINKS:</strong> Shows neighbors for a node at each level
                             </li>
                             <li>
-                                <strong>VINFO:</strong> Shows information about
-                                a vector set
+                                <strong>VINFO:</strong> Shows information about a vector set
+                            </li>
+                            <li>
+                                <strong>VSETATTR:</strong> Associates or removes JSON attributes of elements
+                            </li>
+                            <li>
+                                <strong>VGETATTR:</strong> Retrieves the JSON attributes of elements
+                            </li>
+                            <li>
+                                <strong>VRANDMEMBER:</strong> Returns random members from a vector set
                             </li>
                         </ul>
                     </div>
@@ -203,33 +178,18 @@ export default function DocsPage() {
             </section>
 
             <section className="mb-8">
-                <h2 className="text-2xl font-semibold mb-4">Known Bugs</h2>
-                <ul className="list-disc pl-6 space-y-2 text-gray-700">
-                    <li>
-                        When VADD with REDUCE is replicated, random matrix
-                        should probably be sent to replicas for VEMB consistency
-                    </li>
-                    <li>
-                        Replication code is largely untested and very vanilla
-                        (replicating commands verbatim)
-                    </li>
-                </ul>
-            </section>
-
-            <section className="mb-8">
-                <h2 className="text-2xl font-semibold mb-4">
-                    Implementation Details
-                </h2>
+                <h2 className="text-2xl font-semibold mb-4">Implementation Details</h2>
                 <p className="text-gray-700 mb-4">
-                    Vector sets are based on the &ldquo;hnsw.c&rdquo;
-                    implementation of the HNSW data structure with extensions
-                    for speed and functionality.
+                    Vector sets are based on the HNSW (Hierarchical Navigable Small World) data structure implementation with extensions for speed and functionality.
                 </p>
-                <p className="text-gray-700">Main features:</p>
+                <p className="text-gray-700">Key features:</p>
                 <ul className="list-disc pl-6 space-y-2 text-gray-700">
                     <li>Proper nodes deletion with relinking</li>
-                    <li>8 bits quantization</li>
-                    <li>Threaded queries</li>
+                    <li>Multiple quantization options (8-bit, binary)</li>
+                    <li>Threaded queries with optional main thread execution</li>
+                    <li>Filtered search capabilities</li>
+                    <li>Attribute support for elements</li>
+                    <li>Dimension reduction through random projection</li>
                 </ul>
             </section>
         </div>

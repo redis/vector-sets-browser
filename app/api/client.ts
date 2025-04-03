@@ -23,7 +23,12 @@ export const apiClient = {
         const { method = 'GET', data, headers = {} } = options ?? {};
         
         try {
-            const response = await fetch(url, {
+            // Handle URL resolution differently for server and client side
+            const resolvedUrl = typeof window !== 'undefined' 
+                ? new URL(url, window.location.origin)
+                : new URL(url, 'http://localhost:3000'); // Default for server-side
+            
+            const response = await fetch(resolvedUrl.toString(), {
                 method,
                 headers: {
                     ...(!(data instanceof FormData) && { 'Content-Type': 'application/json' }),

@@ -55,6 +55,7 @@
     "react-markdown": "^10.1.0",
     "react-syntax-highlighter": "^15.6.1",
     "redis": "^4.7.0",
+    "remark-gfm": "^4.0.1",
     "sonner": "^2.0.1",
     "tailwind-merge": "^3.0.2",
     "tailwindcss": "^4.0.14",
@@ -67,6 +68,7 @@
   "devDependencies": {
     "@shadcn/ui": "^0.0.4",
     "@tailwindcss/postcss": "^4.0.14",
+    "@tailwindcss/typography": "^0.5.16",
     "@tailwindcss/upgrade": "^4.0.14",
     "@types/lodash": "^4.17.16",
     "@types/node": "^22",
