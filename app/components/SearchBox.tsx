@@ -240,7 +240,6 @@ export default function SearchBox({
 
     // Compute the placeholder text based on current searchType
     const searchBoxPlaceholder = useMemo(() => {
-        console.log("searchType", searchType)
         switch (searchType) {
             case "Element":
                 return "Enter Element"
@@ -284,14 +283,6 @@ export default function SearchBox({
         setSearchType,
         supportsEmbeddings,
     ])
-
-    // Debug logging for results
-    useEffect(() => {
-        if (results && results.length > 0) {
-            console.log(`SearchBox received ${results.length} results`)
-            console.log("First result sample:", results[0])
-        }
-    }, [results])
 
     // Save settings when they change
     useEffect(() => {

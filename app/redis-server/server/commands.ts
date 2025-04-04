@@ -392,9 +392,6 @@ export async function vsim(
                     throw new Error("Vector contains invalid values (NaN or Infinity)")
                 }
 
-                console.log("VSIM vector dimensions:", params.searchVector.length)
-                console.log("VSIM vector values:", params.searchVector)
-
                 baseCommand.push(
                     "VALUES",
                     String(params.searchVector.length),
@@ -1066,7 +1063,6 @@ export async function vinfo(
                     }
                 }
             }
-            console.log("VINFO result:", info)
 
             return info
         } catch (error) {

@@ -59,7 +59,9 @@ export async function GET(req: NextRequest) {
         const result = await RedisClient.withConnection(
             redisUrl,
             async (client) => {
+                console.log("Listing jobs from Redis")
                 const keys = await client.keys("job:*:status")
+                console.log("Found job status keys:", keys)
                 const jobs = []
                 
                 for (const key of keys) {

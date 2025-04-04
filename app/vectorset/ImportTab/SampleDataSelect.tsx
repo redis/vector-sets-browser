@@ -133,7 +133,7 @@ function DatasetCard({ dataset, isSelected, onSelect }: DatasetCardProps) {
             <div className="p-4 grow">
                 <div className="flex items-center mb-4">
                     <div className="mr-3 bg-gray-50 p-2 rounded-full">
-                        {dataset.icon}
+                        <dataset.icon />
                     </div>
                     <h3 className="text-lg font-medium">{dataset.name}</h3>
                     <Badge variant="outline" className="ml-2">

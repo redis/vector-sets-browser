@@ -1,16 +1,14 @@
 import { ApiError } from "@/app/api/client"
-import { jobs } from "@/app/api/jobs"
 import { vectorSets } from "@/app/api/vector-sets"
-import { vcard, vdim } from "@/app/redis-server/api"
+import { vinfo } from "@/app/redis-server/api"
 import { VectorSetMetadata } from "@/app/types/vectorSetMetaData"
-import { AppEvents } from "@/app/utils/eventEmitter"
+import eventBus,{ AppEvents } from "@/app/utils/eventEmitter"
 import {
     estimateVectorSetMemoryUsage,
     formatBytes,
 } from "@/app/utils/vectorSetMemory"
 import { Button } from "@/components/ui/button"
 import { Sidebar, SidebarContent, SidebarHeader } from "@/components/ui/sidebar"
-import { closeSocket, subscribe } from "@/lib/websocket"
 import { debounce } from "lodash"
 import { useCallback, useEffect, useRef, useState } from "react"
 import EditEmbeddingConfigModal from "../components/EmbeddingConfig/EditEmbeddingConfigDialog"
@@ -34,7 +32,6 @@ interface VectorSetInfo {
     memoryBytes: number
     dimensions: number
     vectorCount: number
-    activeJobs: number
     metadata?: VectorSetMetadata
 }
 
@@ -106,70 +103,31 @@ export default function VectorSetNav({
                 retryCount = 0
             ): Promise<void> => {
                 try {
-                    const [dimensions, vectorCount] = await Promise.all([
-                        vdim({ keyName: set }).catch((err) => {
-                            console.error(
-                                `Error fetching dimensions for ${set}:`,
-                                err
-                            )
-                            return 0
-                        }),
-                        vcard({ keyName: set }).catch((err) => {
-                            console.error(
-                                `Error fetching vector count for ${set}:`,
-                                err
-                            )
-                            return 0
-                        }),
-                    ])
+                    const vinfoData = await vinfo({ keyName: set }).catch((err) => {
+                        console.error(
+                            `Error fetching vector info for ${set}:`,
+                            err
+                        )
+                        return null
+                    })
+
+                    if (!vinfoData) {
+                        throw new Error(`Failed to fetch vector info for ${set}`)
+                    }
+
+                    const dimensions = Number(vinfoData["vector-dim"])
+                    const vectorCount = Number(vinfoData["size"])
 
                     const memoryBytes = estimateVectorSetMemoryUsage(
                         dimensions,
                         vectorCount
                     )
 
-                    let activeJobs = 0
-                    try {
-                        const jobsPromise = jobs.getJobsByVectorSet(set)
-                        const timeoutPromise = new Promise((_, reject) =>
-                            setTimeout(
-                                () => reject(new Error("Jobs API timeout")),
-                                3000
-                            )
-                        )
-
-                        const jobsList = await Promise.race([
-                            jobsPromise,
-                            timeoutPromise,
-                        ]).catch((error) => {
-                            console.warn(
-                                `Could not fetch jobs for ${set}:`,
-                                error
-                            )
-                            return []
-                        })
-
-                        if (Array.isArray(jobsList)) {
-                            activeJobs = jobsList.filter(
-                                (job) =>
-                                    job.status?.status === "processing" ||
-                                    job.status?.status === "paused" ||
-                                    job.status?.status === "pending"
-                            ).length
-                        }
-                    } catch (jobError) {
-                        console.warn(
-                            `Warning: Could not fetch jobs for vector set ${set}:`,
-                            jobError
-                        )
-                    }
-
                     info[set] = {
                         name: set,
                         memoryBytes,
                         dimensions,
                         vectorCount,
-                        activeJobs,
                     }
                 } catch (error) {
                     console.error(
@@ -187,7 +145,6 @@ export default function VectorSetNav({
                         memoryBytes: 0,
                         dimensions: 0,
                         vectorCount: 0,
-                        activeJobs: 0,
                     }
                 }
             }
@@ -262,51 +219,18 @@ export default function VectorSetNav({
 
         const handleVectorsImported = (data: {
             vectorSetName: string
-            jobId: string
         }) => {
             console.log(`Vectors imported to ${data.vectorSetName}`, data)
             debouncedRefresh()
-        }
-
-        const handleJobStatusChange = async (data: {
-            vectorSetName: string
-            status: string
-            jobId: string
-        }) => {
-            console.log(`Job status changed for ${data.vectorSetName}:`, data)
-
-            if (
-                data.status === "completed" ||
-                data.status === "failed" ||
-                data.status === "aborted"
-            ) {
-                debouncedRefresh()
-            } else if (
-                data.status === "processing" ||
-                data.status === "paused" ||
-                data.status === "pending"
-            ) {
-                if (vectorSetInfo[data.vectorSetName]) {
-                    setVectorSetInfo((prev) => ({
-                        ...prev,
-                        [data.vectorSetName]: {
-                            ...prev[data.vectorSetName],
-                            activeJobs:
-                                (prev[data.vectorSetName]?.activeJobs || 0) + 1,
-                        },
-                    }))
-                }
-            }
         }
 
         let unsubscribes: Array<() => void> = []
 
         if (isConnected) {
             unsubscribes = [
-                subscribe(AppEvents.VECTOR_ADDED, handleVectorAdded),
-                subscribe(AppEvents.VECTOR_DELETED, handleVectorDeleted),
-                subscribe(AppEvents.VECTORS_IMPORTED, handleVectorsImported),
-                subscribe(AppEvents.JOB_STATUS_CHANGED, handleJobStatusChange),
+                eventBus.on(AppEvents.VECTOR_ADDED, handleVectorAdded),
+                eventBus.on(AppEvents.VECTOR_DELETED, handleVectorDeleted),
+                eventBus.on(AppEvents.VECTORS_IMPORTED, handleVectorsImported),
             ]
 
             if (!refreshingRef.current) {
@@ -321,13 +245,6 @@ export default function VectorSetNav({
     }, [isConnected, vectorSetInfo])
 
     useEffect(() => {
-        return () => {
-            closeSocket()
-        }
-    }, [])
-
-    useEffect(() => {
-        console.log("redisUrl", redisUrl)
         if (isConnected && redisUrl) {
             const timer = setTimeout(() => {
                 loadVectorSets()
@@ -389,7 +306,7 @@ export default function VectorSetNav({
     const handleDeleteVectorSet = async (name: string) => {
         try {
             await vectorSets.delete(name)
-            setStatusMessage(`Deleted vector set ${name}`)
+            //setStatusMessage(`Deleted vector set ${name}`)
             if (selectedVectorSet === name) {
                 onVectorSetSelect(null)
             }
@@ -552,11 +469,6 @@ export default function VectorSetNav({
                                         >
                                             {setName}
                                         </span>
-                                        {info?.activeJobs > 0 && (
-                                            <span className="inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white bg-blue-600 rounded">
-                                                Importing...
-                                            </span>
-                                        )}
                                     </div>
 
                                     <div className="flex w-full justify-between text-xs">

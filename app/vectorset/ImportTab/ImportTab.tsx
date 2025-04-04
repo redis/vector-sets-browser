@@ -2,7 +2,6 @@ import { ImportJobConfig, jobs, type ImportLogEntry, type Job } from "@/app/api/
 import { vectorSets } from "@/app/api/vector-sets"
 import { getModelName } from "@/app/embeddings/types/embeddingModels"
 import { VectorSetMetadata } from "@/app/types/vectorSetMetaData"
-import { importVectorData } from '@/app/lib/importUtils'
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
@@ -14,7 +13,6 @@ import {
 } from "@/components/ui/dialog"
 import {
     ArrowLeft,
-    CheckCircle2,
     Database,
     FileJson,
     FileSpreadsheet
@@ -37,40 +35,16 @@ export default function ImportTab({
     initialShowSampleData = false,
 }: ImportTabProps) {
     const [jobList, setJobList] = useState<Job[]>([])
-    // Keep error state for potential future use but mark it as intentionally unused
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const [error, setError] = useState<string | null>(null)
     const [showImportCSV, setShowImportCSV] = useState(false)
-    const [showImportSample, setShowImportSample] = useState(
-        initialShowSampleData
-    )
-    const [dismissedJobIds, setDismissedJobIds] = useState<Set<string>>(
-        new Set()
-    )
+    const [showImportSample, setShowImportSample] = useState(initialShowSampleData)
+    const [showImportSuccessDialog, setShowImportSuccessDialog] = useState(false)
+    const [dismissedJobIds, setDismissedJobIds] = useState<Set<string>>(new Set())
     const [importLogs, setImportLogs] = useState<ImportLogEntry[]>([])
     const [successJob, setSuccessJob] = useState<Job | null>(null)
-    const [showSuccessDialog, setShowSuccessDialog] = useState(false)
     const jsonFileInputRef = useRef<HTMLInputElement>(null)
 
-    // Effect to open the sample data dialog when initialShowSampleData changes
-    useEffect(() => {
-        if (initialShowSampleData) {
-            setShowImportSample(true)
-        }
-    }, [initialShowSampleData])
-
-    // Keep this for potential future use but mark it as intentionally unused
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const hasActiveJobs =
-        jobList &&
-        jobList.length > 0 &&
-        jobList.some(
-            (job) =>
-                job.status.status === "processing" ||
-                job.status.status === "paused" ||
-                job.status.status === "pending"
-        )
-
+    // Fetch jobs periodically to show current state
     const fetchJobs = useCallback(async () => {
         try {
             const data = await jobs.getJobsByVectorSet(vectorSetName)
@@ -78,64 +52,48 @@ export default function ImportTab({
                 const filteredJobs = data.filter(
                     (job) => !dismissedJobIds.has(job.jobId)
                 )
-
-                // Check for recently completed jobs
-                const previousJobs = jobList || []
-                for (const job of filteredJobs) {
-                    // Find if this job was previously in progress but now is completed
-                    const prevJob = previousJobs.find(
-                        (j) => j.jobId === job.jobId
-                    )
-                    if (
-                        prevJob &&
-                        prevJob.status.status !== "completed" &&
-                        job.status.status === "completed"
-                    ) {
-                        // This job just completed, show success dialog
-                        setSuccessJob(job)
-                        setShowSuccessDialog(true)
-                    }
-                }
-
-                // Check for stuck jobs (paused for more than 5 minutes)
-                const now = new Date().getTime()
-                filteredJobs.forEach((job) => {
-                    if (job.status.status === "paused") {
-                        // If we have a timestamp in the message, check if it's been paused for too long
-                        const pausedTime =
-                            job.status.message?.match(/paused at (\d+)/)?.[1]
-                        if (pausedTime) {
-                            const pausedTimestamp = parseInt(pausedTime, 10)
-                            const elapsedMinutes =
-                                (now - pausedTimestamp) / (1000 * 60)
-
-                            // If paused for more than 5 minutes, mark it for cleanup
-                            if (elapsedMinutes > 5) {
-                                console.log(
-                                    `Job ${
-                                        job.jobId
-                                    } has been paused for ${elapsedMinutes.toFixed(
-                                        1
-                                    )} minutes, marking for cleanup`
-                                )
-                                dismissedJobIds.add(job.jobId)
-                            }
-                        }
-                    }
-                })
-
-                // Apply the updated dismissedJobIds filter
-                setJobList(
-                    filteredJobs.filter(
-                        (job) => !dismissedJobIds.has(job.jobId)
-                    )
-                )
+                setJobList(filteredJobs)
             }
         } catch (error) {
             console.error("Error fetching jobs:", error)
             setError("Failed to fetch jobs")
         }
-    }, [vectorSetName, metadata, dismissedJobIds, jobList])
+    }, [vectorSetName, dismissedJobIds])
+
+    // Listen for job status changes
+    useEffect(() => {
+        const handleJobStatusChange = async (data: {
+            vectorSetName: string
+            status: string
+            jobId: string
+        }) => {
+            // Only handle events for our vector set
+            if (data.vectorSetName !== vectorSetName) return
+
+            console.log(`Job status changed:`, data)
+            
+            // Show success dialog when a job completes
+            if (data.status === "completed") {
+                try {
+                    // Fetch the completed job details
+                    const jobDetails = await jobs.getJob(data.jobId)
+                    setSuccessJob(jobDetails)
+                    setShowImportSuccessDialog(true)
+                    // Refresh import logs when a job completes
+                    fetchImportLogs()
+                } catch (error) {
+                    console.error("Error fetching completed job details:", error)
+                }
+            }
+            
+            // Refresh job list to show current state
+            fetchJobs()
+        }
+
+        // Initial fetch
+        fetchJobs()
+
+    }, [vectorSetName, fetchJobs])
 
     const fetchImportLogs = useCallback(async () => {
         try {
@@ -241,21 +199,29 @@ export default function ImportTab({
     };
 
     useEffect(() => {
-        fetchJobs()
-        fetchImportLogs()
-    }, [vectorSetName])
+        const pollInterval = setInterval(fetchJobs, 1000);
+        fetchJobs(); // Initial fetch
+        
+        return () => clearInterval(pollInterval);
+    }, [fetchJobs]);
 
+    // Add effect to fetch import logs periodically
     useEffect(() => {
-        //fetchJobs()
-        //fetchImportLogs()
-        // Poll for updates every 2 seconds
-        const interval = setInterval(() => {
-            // TODO DEBUG
-            fetchJobs()
-            fetchImportLogs()
-        }, 2000)
-        return () => clearInterval(interval)
-    }, [fetchJobs, fetchImportLogs])
+        const pollLogsInterval = setInterval(fetchImportLogs, 5000);
+        fetchImportLogs(); // Initial fetch
+        
+        return () => clearInterval(pollLogsInterval);
+    }, [fetchImportLogs]);
+
+    // Handle dialog state changes
+    const handleImportSuccess = () => {
+        setShowImportSuccessDialog(true)
+    }
+
+    const handleSuccessDialogClose = () => {
+        setShowImportSuccessDialog(false)
+        setShowImportCSV(false)  // Close the import dialog when success dialog is closed
+    }
 
     return (
         <div className="space-y-6">
@@ -285,9 +251,8 @@ export default function ImportTab({
                                             </Button>
                                         </div>
                                         <ImportFromCSV
-                                            onClose={() =>
-                                                setShowImportCSV(false)
-                                            }
+                                            onClose={() => setShowImportCSV(false)}
+                                            onImportSuccess={handleImportSuccess}
                                             metadata={metadata}
                                             vectorSetName={vectorSetName}
                                         />
@@ -340,7 +305,7 @@ export default function ImportTab({
                                                                 
                                                                 if (completedJob) {
                                                                     setSuccessJob(completedJob);
-                                                                    setShowSuccessDialog(true);
+                                                                    setShowImportSuccessDialog(true);
                                                                     console.log("Success dialog should now be visible");
                                                                 }
                                                             }
@@ -465,29 +430,22 @@ export default function ImportTab({
             <ImportHistory importLogs={importLogs} />
 
             <Dialog
-                open={showSuccessDialog}
-                onOpenChange={(open) => setShowSuccessDialog(open)}
+                open={showImportSuccessDialog}
+                onOpenChange={handleSuccessDialogClose}
             >
                 <DialogContent className="sm:max-w-[425px]">
                     <DialogHeader>
-                        <DialogTitle>Import Completed Successfully</DialogTitle>
-                        <DialogDescription asChild>
-                            <div className="space-y-4 p-4">
-                                <div className="flex items-center gap-2">
-                                    <CheckCircle2 className="h-6 w-6 text-green-500" />
-                                    <span className="font-medium">
-                                        {successJob?.metadata.filename}
-                                    </span>
-                                </div>
-                                <div className="text-sm text-muted-foreground">
-                                    Your data has been successfully imported.
-                                    {successJob?.status.total} records have been processed.
-                                </div>
-                            </div>
+                        <DialogTitle>Import Started Successfully</DialogTitle>
+                        <DialogDescription>
+                            Your data import has started. For large files this may take a long time. 
+                            You can see the import status and pause/cancel on the vectorset list.
                         </DialogDescription>
                     </DialogHeader>
                     <div className="mt-4 flex justify-end">
-                        <Button onClick={() => setShowSuccessDialog(false)}>
+                        <Button
+                            variant="secondary"
+                            onClick={handleSuccessDialogClose}
+                        >
                             Close
                         </Button>
                     </div>

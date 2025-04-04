@@ -142,7 +142,6 @@ export default function SmartFilterInput({
             })
 
             const attributesArray = Array.from(attributes)
-            console.log("Attributes: " + attributesArray)
             setAvailableAttributes(attributesArray)
             setDebugInfo(
                 (prev) =>

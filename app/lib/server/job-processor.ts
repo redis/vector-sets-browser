@@ -6,9 +6,7 @@ import {
 } from "@/app/types/job-queue"
 import { JobQueueService } from "./job-queue"
 import RedisClient from "../../redis-server/server/commands"
-import eventBus, { AppEvents } from "@/app/utils/eventEmitter"
 import { registerCompletedJob } from "@/app/api/jobs/completed/route"
-import { broadcastEvent } from "@/app/api/sse/route"
 import { buildVectorElement, saveVectorData } from "@/app/lib/importUtils"
 
 export class JobProcessor {
@@ -87,21 +85,7 @@ export class JobProcessor {
                     status: progress.status,
                     jobId: this.jobId
                 };
-
-                // Try to emit an event (works client-side)
-                try {
-                    eventBus.emit(AppEvents.JOB_STATUS_CHANGED, statusData)
-                } catch (error) {
-                    console.warn("Could not emit job status change event directly (expected in server context)", error)
-                }
-                
-                // Broadcast using SSE
-                try {
-                    broadcastEvent(AppEvents.JOB_STATUS_CHANGED, statusData);
-                } catch (error) {
-                    console.warn("Could not broadcast via SSE:", error);
-                }
-                
+                                
                 // Register status change for client notification via completed jobs API
                 if (progress.status === "completed" || progress.status === "failed" || progress.status === "cancelled") {
                     registerCompletedJob(this.jobId, this.metadata.vectorSetName)
@@ -274,20 +258,6 @@ export class JobProcessor {
                             vectorSetName: this.metadata.vectorSetName,
                             jobId: this.jobId
                         };
-                        
-                        // Try to emit an event, which only works client-side
-                        try {
-                            eventBus.emit(AppEvents.VECTORS_IMPORTED, importData)
-                        } catch (error) {
-                            console.warn("Could not emit event directly (expected in server context)", error)
-                        }
-                        
-                        // Broadcast through SSE
-                        try {
-                            broadcastEvent(AppEvents.VECTORS_IMPORTED, importData);
-                        } catch (error) {
-                            console.warn("Could not broadcast via SSE:", error);
-                        }
                         
                         // Register the completed job for client polling
                         registerCompletedJob(this.jobId, this.metadata.vectorSetName)
@@ -559,15 +529,10 @@ export class JobProcessor {
             }
 
             await RedisClient.withConnection(this.url, async (client) => {
-                // Store the log entry in a list for this vector set
-                const logKey = `vectorset:${this.metadata?.vectorSetName}:importlog`
-                await client.rPush(logKey, JSON.stringify(logEntry))
-
-                // Also store in a global import log
+                // Only store in the global import log
                 await client.rPush("global:importlog", JSON.stringify(logEntry))
 
-                // Trim logs to keep only the most recent 100 entries
-                await client.lTrim(logKey, -100, -1)
+                // Trim logs to keep only the most recent 500 entries
                 await client.lTrim("global:importlog", -500, -1)
             })
 

@@ -15,17 +15,19 @@ export async function GET(req: NextRequest) {
 
     try {
         const result = await RedisClient.withConnection(redisUrl, async (client) => {
-            // If vectorSetName is provided, get logs for that specific vector set
-            // Otherwise, get global logs
-            const logKey = vectorSetName 
-                ? `vectorset:${vectorSetName}:importlog` 
-                : 'global:importlog';
-            
-            // Get the most recent logs (up to the limit)
-            const logs = await client.lRange(logKey, -limit, -1);
+            // Always get from global import log
+            const logs = await client.lRange('global:importlog', -500, -1);
             
             // Parse the JSON strings into objects
-            return logs.map(log => JSON.parse(log)).reverse();
+            const parsedLogs = logs.map(log => JSON.parse(log)).reverse();
+            
+            // Filter by vector set name if provided
+            const filteredLogs = vectorSetName 
+                ? parsedLogs.filter(log => log.vectorSetName === vectorSetName)
+                : parsedLogs;
+            
+            // Return only up to the limit
+            return filteredLogs.slice(0, limit);
         });
         
         if (!result.success) {

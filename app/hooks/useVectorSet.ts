@@ -60,7 +60,6 @@ export function useVectorSet(): UseVectorSetReturn {
 
     // Load metadata when vector set changes
     const loadMetadata = async () => {
-        console.log("[loadMetadata] Loading metadata", vectorSetName)
         if (!vectorSetName) return null
 
         // Check if metadata is already cached
@@ -111,7 +110,6 @@ export function useVectorSet(): UseVectorSetReturn {
 
             // Always load fresh metadata when loadVectorSet is called
             const metadataValue = await loadMetadata()
-            console.log("[loadVectorSet] Loading metadata", metadataValue)
 
             // Update the cache with fresh data
             vectorSetCacheRef.current[vectorSetName] = {
