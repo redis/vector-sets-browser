@@ -730,19 +730,19 @@ export default function AddVectorModal({
                                             config={metadata?.embedding || { provider: "image", image: { model: "mobilenet" }}}
                                             allowMultiple={true}
                                         />
-                                        {imageEmbedding && uploadImages.length <= 1 && (
+                                        {/* {imageEmbedding && uploadImages.length <= 1 && (
                                             <div className="mt-2 text-sm text-green-600">
                                                 ✓ Embedding generated ({imageEmbedding.length} dimensions)
                                             </div>
-                                        )}
-                                        {uploadImages.length > 1 && (
+                                        )} */}
+                                        {/* {uploadImages.length > 1 && (
                                             <div className="mt-2 text-sm text-blue-600">
                                                 <p>
                                                     <span className="font-medium">{uploadImages.length}</span> images selected. 
                                                     Each image will be added as a separate vector using the image filename as its element ID.
                                                 </p>
                                             </div>
-                                        )}
+                                        )} */}
                                     </div>
                                 </TabsContent>
                             </Tabs>
@@ -773,11 +773,11 @@ export default function AddVectorModal({
                             </div>
                         )}
 
-                        {status && !error && (
+                        {/* {status && !error && (
                             <div className="mb-4 p-2 bg-blue-100 border border-blue-400 text-blue-700 rounded">
                                 {status}
                             </div>
-                        )}
+                        )} */}
 
                         {attemptedSubmit && !isFormValid && !error && (
                             <div className="mb-4 p-2 bg-yellow-50 border border-yellow-200 text-yellow-700 rounded text-sm">

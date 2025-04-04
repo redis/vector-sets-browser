@@ -1,18 +1,18 @@
 "use client"
 
 import SearchBox from "@/app/components/SearchBox"
-import { VectorSetMetadata } from "@/app/embeddings/types/embeddingModels"
 import {
     useVectorSearch,
     VectorSetSearchState,
 } from "@/app/hooks/useVectorSearch"
 import { VectorTuple, vlinks } from "@/app/redis-server/api"
-import { useCallback, useState, useEffect } from "react"
-import { toast } from "sonner"
-import VectorResults from "./VectorResults"
+import { VectorSetMetadata } from "@/app/types/vectorSetMetaData"
 import { userSettings } from "@/app/utils/userSettings"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import VectorViz3D from "../VisualizationTab/VectorViz3D"
+import { useCallback, useState } from "react"
+import { toast } from "sonner"
+import VectorResults from "./VectorResults"
+// import VectorViz3D from "../VisualizationTab/VectorViz3D"
 import HNSWVizPure from "../VisualizationTab/vizualizer/HNSWVizPure"
 
 interface VectorSearchTabProps {
@@ -64,8 +64,7 @@ export default function VectorSearchTab({
         [setResults]
     )
 
-    const handleStatusChange = useCallback((status: string) => {
-    }, [])
+    const handleStatusChange = useCallback((status: string) => {}, [])
 
     const handleSearchStateChange = useCallback(
         (newState: Partial<VectorSetSearchState>) => {
@@ -78,7 +77,9 @@ export default function VectorSearchTab({
     )
 
     const handleError = useCallback((error: string | null) => {
-        console.log("Search error:", error)
+        if (error == null) return
+
+        console.error("Search error: ", error)
     }, [])
 
     const {
@@ -154,7 +155,7 @@ export default function VectorSearchTab({
         element: string,
         count: number,
         withEmbeddings?: boolean
-    ) => {
+    ): Promise<{ element: string; similarity: number; vector: number[] }[]> => {
         try {
             const data = await vlinks({
                 keyName: vectorSetName,
@@ -162,7 +163,9 @@ export default function VectorSearchTab({
                 count,
                 withEmbeddings: true, // Always fetch embeddings
             })
-
+            console.log("vlink DATA", data)
+            if (!data) return []
+            
             // data is an array of arrays
             // each inner array contains [element, similarity, vector]
             const response = data.flat().map((item) => ({
@@ -207,9 +210,13 @@ export default function VectorSearchTab({
                     className="w-full"
                 >
                     <TabsList className="mb-4 w-full">
-                        <TabsTrigger value="table" className="w-full">Results Table</TabsTrigger>
-                        <TabsTrigger value="2d" className="w-full">2D Visualization</TabsTrigger>
-                        <TabsTrigger value="3d" className="w-full">3D Visualization</TabsTrigger>
+                        <TabsTrigger value="table" className="w-full">
+                            Results Table
+                        </TabsTrigger>
+                        <TabsTrigger value="2d" className="w-full">
+                            2D Visualization
+                        </TabsTrigger>
+                        {/* <TabsTrigger value="3d" className="w-full">3D Visualization</TabsTrigger> */}
                     </TabsList>
 
                     <TabsContent value="table">
@@ -232,7 +239,12 @@ export default function VectorSearchTab({
                     </TabsContent>
 
                     <TabsContent value="2d">
-                        <div style={{ height: "calc(100vh - 400px)", minHeight: "400px" }}>
+                        <div
+                            style={{
+                                height: "calc(100vh - 400px)",
+                                minHeight: "400px",
+                            }}
+                        >
                             {results[0] && (
                                 <HNSWVizPure
                                     key={`${results[0][0]}-${searchCount}`}
@@ -249,7 +261,7 @@ export default function VectorSearchTab({
                         </div>
                     </TabsContent>
 
-                    <TabsContent value="3d">
+                    {/* <TabsContent value="3d">
                         <div style={{ height: "calc(100vh - 400px)", minHeight: "400px" }}>
                             {results.length > 0 && (
                                 <VectorViz3D
@@ -261,7 +273,7 @@ export default function VectorSearchTab({
                                 />
                             )}
                         </div>
-                    </TabsContent>
+                    </TabsContent> */}
                 </Tabs>
             </div>
         </section>

@@ -1,6 +1,6 @@
 import { EmbeddingService } from "@/app/embeddings/service"
 import { getExpectedDimensions } from "@/app/embeddings/types/embeddingModels"
-import { VaddRequestBody, VaddMultiRequestBody } from "@/app/redis-server/api"
+import { VaddMultiRequestBody, VaddRequestBody } from "@/app/redis-server/api"
 import {
     VectorSetMetadata,
 } from "@/app/types/vectorSetMetaData"
@@ -218,23 +218,33 @@ export async function scanVectorSets(
     url: string
 ): Promise<VectorOperationResult> {
     return RedisClient.withConnection(url, async (client) => {
-        let cursor = "0"
-        const vectorSets = new Set<string>()
+        try {
+            let cursor = "0"
+            const vectorSets = new Set<string>()
 
-        do {
-            const [nextCursor, keys] = (await client.sendCommand([
-                "SCAN",
-                cursor,
-                "TYPE",
-                "vectorset",
-            ])) as [string, string[]]
+            do {
+                const [nextCursor, keys] = (await client.sendCommand([
+                    "SCAN",
+                    cursor,
+                    "TYPE",
+                    "vectorset",
+                ])) as [string, string[]]
 
-            keys.forEach((key) => vectorSets.add(key))
-            cursor = nextCursor
-        } while (cursor !== "0")
+                keys.forEach((key) => vectorSets.add(key))
+                cursor = nextCursor
+            } while (cursor !== "0")
 
-        const result = Array.from(vectorSets)
-        return result
+            const result = Array.from(vectorSets)
+            return {
+                success: true,
+                result: result,
+            }
+        } catch (error) {
+            return {
+                success: false,
+                error: error instanceof Error ? error.message : String(error)
+            }
+        }
     })
 }
 
@@ -417,11 +427,10 @@ export async function vsim(
             const result = (await client.sendCommand(baseCommand)) as string[]
             const endTime = performance.now()
             const executionTimeMs = endTime - startTime
-
+            
             if (!result || !Array.isArray(result)) {
                 throw new Error("Invalid response from Redis VSIM command")
             }
-
             // Convert the flat array into tuples of [element, score]
             const elements: string[] = []
             const tuples: [string, number, number[]][] = []
@@ -471,10 +480,20 @@ export async function vsim(
                 executedCommand: baseCommand.join(" "),
             }
         } catch (error) {
-            console.error("VSIM operation error:", error)
-            return {
-                success: false,
-                error: error instanceof Error ? error.message : String(error),
+            const err = error instanceof Error ? error.message : String(error)
+            
+            // special case - element not found should not be an "Error"
+            if (err.includes("element not found")) {
+                return {
+                    success: true,
+                    result: [],
+                }
+            } else {
+                console.error("VSIM operation error:", error)
+                return {
+                    success: false,
+                    error: error instanceof Error ? error.message : String(error),
+                }
             }
         }
     })
@@ -484,8 +503,40 @@ export async function vdim(
     url: string,
     keyName: string
 ): Promise<VectorOperationResult> {
+    if (!keyName) {
+        console.error("Invalid VDIM parameters:", { keyName })
+        return {
+            success: false,
+            error: `Invalid parameters: keyName=${keyName}`,
+        }
+    }
+
     return RedisClient.withConnection(url, async (client) => {
-        return client.sendCommand(["VDIM", keyName])
+        try {
+            const result = await client.sendCommand(["VDIM", keyName])
+            
+            if (result === null || result === undefined) {
+                throw new Error(`Failed to get dimensions for key ${keyName}`)
+            }
+
+            // Convert to number if it's not already
+            const dim = typeof result === "number" ? result : Number(result)
+
+            if (isNaN(dim)) {
+                throw new Error(`Invalid dimension result for key ${keyName}`)
+            }
+
+            return {
+                success: true,
+                result: dim
+            }
+        } catch (error) {
+            console.error("VDIM operation error:", error)
+            return {
+                success: false,
+                error: error instanceof Error ? error.message : String(error)
+            }
+        }
     })
 }
 
@@ -677,29 +728,8 @@ export async function getMetadata(
     return RedisClient.withConnection(url, async (client) => {
         const configKey = "vector-set-browser:config"
         const hashKey = `vset:${keyName}:metadata`
-        const oldMetadataKey = `${keyName}_metadata`
 
-        // First try to get data from the new location
         let storedData = await client.hGet(configKey, hashKey)
-
-        // If no data in new location, check old location
-        if (!storedData) {
-            const oldData = await client.hGetAll(oldMetadataKey)
-            if (oldData && oldData.data) {
-                console.log(
-                    `Migrating metadata for ${keyName} from old key structure`
-                )
-                storedData = oldData.data
-
-                // Migrate the data to new location
-                await client.hSet(configKey, {
-                    [hashKey]: storedData,
-                })
-
-                // Delete the old key
-                await client.del(oldMetadataKey)
-            }
-        }
 
         try {
             // Parse the stored data
@@ -718,8 +748,10 @@ export async function getMetadata(
                     [hashKey]: JSON.stringify(validatedMetadata),
                 })
             }
-
-            return validatedMetadata
+            return { 
+                success: true,
+                result: validatedMetadata
+            }
         } catch (error) {
             console.error(`Error processing metadata for ${keyName}:`, error)
             // Return a default metadata object in case of error
@@ -1006,8 +1038,8 @@ export async function vlinks(
 
                 processedResult.push(levelTuples)
             }
-
             return processedResult
+
         } catch (error) {
             console.error("VLINKS operation error:", error)
             throw new Error(
@@ -1033,7 +1065,6 @@ export async function vinfo(
         try {
             // Ensure arguments are strings for Redis command
             const args = ["VINFO", String(keyName)]
-            console.log("VINFO command args:", args)
             const result = await client.sendCommand(args)
 
             if (!result) {
@@ -1064,14 +1095,16 @@ export async function vinfo(
                 }
             }
 
-            return info
+            return {
+                success: true,
+                result: info
+            }
         } catch (error) {
             console.error("VINFO operation error:", error)
-            throw new Error(
-                `Failed to get vector info for key ${keyName}: ${
-                    error instanceof Error ? error.message : String(error)
-                }`
-            )
+            return {
+                success: false,
+                error: error instanceof Error ? error.message : String(error),
+            }
         }
     })
 }

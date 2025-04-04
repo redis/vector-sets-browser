@@ -32,6 +32,13 @@ export interface ImportLogEntry {
     status: "completed"
 }
 
+export interface CreateImportJobRequestBody {
+    vectorSetName: string
+    fileContent: string
+    fileName: string
+    config: ImportJobConfig
+}
+
 export interface ImportJobConfig {
     delimiter?: string
     hasHeader?: boolean
@@ -49,18 +56,20 @@ export interface ImportJobConfig {
 }
 
 export const jobs = {
-    async getJob(jobId: string): Promise<Job> {
-        return apiClient.get(`/api/jobs?jobId=${encodeURIComponent(jobId)}`)
+    async getJob(jobId: string): Promise<Job | null> {
+        const response = await apiClient.get<Job>(`/api/jobs?jobId=${encodeURIComponent(jobId)}`)
+        return response.result || null
     },
 
     async getJobsByVectorSet(vectorSetName: string): Promise<Job[]> {
-        return apiClient.get(
+        const response = await apiClient.get<Job[]>(
             `/api/jobs?vectorSetName=${encodeURIComponent(vectorSetName)}`
         )
+        return response.result || []
     },
 
     async pauseJob(jobId: string): Promise<void> {
-        return apiClient.request(
+        await apiClient.request(
             `/api/jobs?jobId=${encodeURIComponent(jobId)}&action=pause`,
             {
                 method: "PATCH",
@@ -69,7 +78,7 @@ export const jobs = {
     },
 
     async resumeJob(jobId: string): Promise<void> {
-        return apiClient.request(
+        await apiClient.request(
             `/api/jobs?jobId=${encodeURIComponent(jobId)}&action=resume`,
             {
                 method: "PATCH",
@@ -78,7 +87,7 @@ export const jobs = {
     },
 
     async cancelJob(jobId: string): Promise<void> {
-        return apiClient.delete(`/api/jobs?jobId=${encodeURIComponent(jobId)}`)
+        await apiClient.delete(`/api/jobs?jobId=${encodeURIComponent(jobId)}`)
     },
 
     async getImportLogs(
@@ -89,7 +98,8 @@ export const jobs = {
         if (vectorSetName) {
             url += `&vectorSetName=${encodeURIComponent(vectorSetName)}`
         }
-        return apiClient.get(url)
+        const response = await apiClient.get<ImportLogEntry[]>(url)
+        return response.result || []
     },
 
     async createImportJob(
@@ -101,17 +111,17 @@ export const jobs = {
         const fileContent = await file.text();
         
         // Create the request body
-        const requestBody = {
+        const requestBody: CreateImportJobRequestBody = {
             vectorSetName,
             fileContent,
             fileName: file.name,
-            config: {
-                ...config,
-                // Ensure we have the filename in the config
-                fileName: file.name
-            }
-        };
+            config,
+        }
 
-        return apiClient.post(`/api/jobs`, requestBody);
+        const response = await apiClient.post<
+            { jobId: string },
+            CreateImportJobRequestBody
+        >(`/api/jobs`, requestBody)
+        return response.result || { jobId: "" }
     },
 }

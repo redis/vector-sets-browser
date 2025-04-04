@@ -424,10 +424,10 @@ export default function EditAttributesDialog({
                         ) : (
                             <div className="">
                                 <div className="p-4">
-                                    <p className="font-bold pb-4">
+                                    <p className="">
                                         Add attributes to this vector.
                                     </p>
-                                    <p>
+                                    <p className="text-sm">
                                         Attributes allow you to use the FILTER
                                         command to narrow down your vector
                                         search.

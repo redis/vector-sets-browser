@@ -1,4 +1,6 @@
+import { ImportJobConfig } from "@/app/api/jobs"
 import { EmbeddingConfig } from "@/app/embeddings/types/embeddingModels"
+import RedisClient from "@/app/redis-server/server/commands"
 import {
     CSVJobMetadata,
     CSVRow,
@@ -10,7 +12,6 @@ import {
 } from "@/app/types/job-queue"
 import { parse } from "csv-parse/sync"
 import { v4 as uuidv4 } from "uuid"
-import RedisClient from "../../redis-server/server/commands"
 
 export class JobQueueService {
     public static async updateJobProgress(
@@ -74,20 +75,7 @@ export class JobQueueService {
         file: File,
         vectorSetName: string,
         embeddingConfig: EmbeddingConfig,
-        options?: {
-            elementColumn?: string
-            textColumn?: string
-            elementTemplate?: string
-            textTemplate?: string
-            attributeColumns?: string[]
-            delimiter?: string
-            hasHeader?: boolean
-            skipRows?: number
-            fileType?: string
-            rawVectors?: number[][]
-            exportType?: 'redis' | 'json'
-            outputFilename?: string
-        }
+        options: ImportJobConfig
     ): Promise<string> {
         const jobId = uuidv4()
 

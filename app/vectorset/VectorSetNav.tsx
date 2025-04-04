@@ -77,24 +77,10 @@ export default function VectorSetNav({
         setLoading(true)
         setError(null)
         try {
-            const sets = await vectorSets.list()
+            const sets = await vectorSets.list() || []
+            console.log("sets", sets)
 
-            let vectorSetsArray: string[] = []
-
-            if (sets && Array.isArray(sets)) {
-                vectorSetsArray = sets
-            } else if (sets && sets.result && Array.isArray(sets.result)) {
-                vectorSetsArray = sets.result
-            } else {
-                console.error(
-                    "Invalid response structure from vector sets API:",
-                    sets
-                )
-                setVectorSetList([])
-                throw new Error("Invalid API response structure")
-            }
-
-            setVectorSetList(vectorSetsArray)
+            setVectorSetList(sets)
 
             const info: Record<string, VectorSetInfo> = {}
 
@@ -150,7 +136,7 @@ export default function VectorSetNav({
             }
 
             await Promise.all(
-                vectorSetsArray.map((set) => fetchVectorSetInfo(set))
+                sets.map((set) => fetchVectorSetInfo(set))
             )
 
             setVectorSetInfo(info)
@@ -306,7 +292,6 @@ export default function VectorSetNav({
     const handleDeleteVectorSet = async (name: string) => {
         try {
             await vectorSets.delete(name)
-            //setStatusMessage(`Deleted vector set ${name}`)
             if (selectedVectorSet === name) {
                 onVectorSetSelect(null)
             }
@@ -378,7 +363,7 @@ export default function VectorSetNav({
                                 d="M10 19l-7-7m0 0l7-7m-7 7h18"
                             />
                         </svg>
-                        <span className="text-lg">{redisName}</span>
+                        <span className="">{redisName}</span>
                         <span className="text-sm text-gray-500">
                             ({redisUrl})
                         </span>

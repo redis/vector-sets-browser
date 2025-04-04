@@ -59,7 +59,7 @@ export function useVectorSearch({
 }: UseVectorSearchProps): UseVectorSearchReturn {
     const [isSearching, setIsSearching] = useState(false)
     const [error, setError] = useState<string | null>(null) // Add error state
-    const searchTimeoutRef = useRef<NodeJS.Timeout>()
+    const searchTimeoutRef = useRef<NodeJS.Timeout>(/* TODO FIXs */)
     const initialSearchDone = useRef(false)
     const lastSearchRef = useRef<{
         query: string
@@ -119,7 +119,6 @@ export function useVectorSearch({
                 // Clear any previous errors when starting a new search
                 clearError()
 
-                // Get dimension from Redis
                 const dim = await vdim({ keyName: vectorSetName! })
                 const zeroVector = Array(dim).fill(0)
 
@@ -143,7 +142,7 @@ export function useVectorSearch({
 
                 onStatusChange("")
                 // Process results
-                onSearchResults(vsimResponse.result)
+                onSearchResults(vsimResponse.result || [])
 
                 if (vsimResponse.executedCommand) {
                     updateSearchState({ executedCommand: vsimResponse.executedCommand })
@@ -261,7 +260,9 @@ export function useVectorSearch({
 
     // Debounced search effect
     useEffect(() => {
-        if (!vectorSetName || !metadata) return
+        if (!vectorSetName || !metadata) {
+            return
+        }
 
         if (searchTimeoutRef.current) {
             clearTimeout(searchTimeoutRef.current)
@@ -353,7 +354,7 @@ export function useVectorSearch({
     const handleVectorSearch = useCallback(
         async (count: number) => {
             if (!vectorSetName) return
-
+            console.log("handleVectorSearch")
             // Clear any previous errors when starting a new search
             clearError()
 
@@ -397,7 +398,7 @@ export function useVectorSearch({
                 filter: internalSearchState.searchFilter,
                 expansionFactor: internalSearchState.expansionFactor
             })
-
+            
             // Use the execution time from the server response
             if (vsimResponse.executionTimeMs) {
                 const durationInSeconds = (
@@ -410,7 +411,7 @@ export function useVectorSearch({
             updateSearchState({ resultsTitle: searchString })
 
             // Process results
-            onSearchResults(vsimResponse.result)
+            onSearchResults(vsimResponse.result || [])
 
             onStatusChange(searchString)
 
@@ -465,7 +466,7 @@ export function useVectorSearch({
             })
 
             // Process results
-            onSearchResults(vsimResponse.result)
+            onSearchResults(vsimResponse.result || [])
 
             if (vsimResponse.executedCommand) {
                 updateSearchState({ executedCommand: vsimResponse.executedCommand })
@@ -501,12 +502,12 @@ export function useVectorSearch({
                 
                 // Check if we have valid vector data
                 if (vectorData.some(isNaN)) {
-                    handleError("Invalid image embedding data")
+                    //handleError("Invalid image embedding data")
                     return
                 }
                 
                 // Check if the vector dimensions match the expected dimensions
-                const expectedDim = await vdim({ keyName: vectorSetName! })
+                const expectedDim = await vdim({ keyName: vectorSetName! }) || 0
                 
                 // Log dimensions for debugging
                 console.log(`Image embedding dimensions: ${vectorData.length}, Required: ${expectedDim}`)
@@ -546,7 +547,8 @@ export function useVectorSearch({
                 })
 
                 // Process results
-                onSearchResults(vsimResponse.result)
+
+                onSearchResults(vsimResponse.result || [])
                 onStatusChange("Image search complete")
 
                 if (vsimResponse.executedCommand) {
@@ -574,6 +576,7 @@ export function useVectorSearch({
 
     // Main search function
     const performSearch = useCallback(async () => {
+        console.log("Perform Search")
         // Skip if no vector set or if nothing has changed since last search
         if (
             !vectorSetName ||

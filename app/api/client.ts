@@ -1,4 +1,14 @@
-import { ApiResponse } from './types';
+/* 
+ * Wrappers for calling our local REST APIs 
+ */
+
+export interface ApiResponse<T = unknown> {
+    success: boolean
+    result?: T
+    error?: string
+    executionTimeMs?: number
+    executedCommand?: string
+}
 
 export class ApiError extends Error {
     constructor(
@@ -19,7 +29,7 @@ export const apiClient = {
             data?: TRequest;
             headers?: Record<string, string>;
         }
-    ): Promise<TResponse> {
+    ): Promise<ApiResponse<TResponse>> {
         const { method = 'GET', data, headers = {} } = options ?? {};
         
         try {

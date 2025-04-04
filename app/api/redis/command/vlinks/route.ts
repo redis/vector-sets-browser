@@ -16,6 +16,7 @@ export async function POST(request: Request) {
         }
 
         const redisUrl = await getRedisUrl()
+        
         if (!redisUrl) {
             return NextResponse.json(
                 { success: false, error: "No Redis connection available" },
@@ -23,17 +24,17 @@ export async function POST(request: Request) {
             )
         }
 
-        const result = await redis.vlinks(redisUrl, keyName, element, count)
+        const response = await redis.vlinks(redisUrl, keyName, element, count)
 
-        if (!result.success) {
+        if (!response.success) {
             return NextResponse.json(
-                { success: false, error: result.error },
+                { success: false, error: response.error },
                 { status: 500 }
             )
         }
 
-        let links = result.result || []
-
+        console.log("vlinks response", response)
+        let links = response.result || []
         if (withEmbeddings) {
             // Collect all unique IDs across all levels
             const allIds = Array.from(new Set(
@@ -108,16 +109,16 @@ export async function GET(request: Request) {
             )
         }
         
-        const result = await redis.vlinks(redisUrl, keyName, element, count)
+        const response = await redis.vlinks(redisUrl, keyName, element, count)
         
-        if (!result.success) {
+        if (!response.success) {
             return NextResponse.json(
-                { success: false, error: result.error },
+                { success: false, error: response.error },
                 { status: 500 }
             )
         }
 
-        let links = result.result || []
+        let links = response.result || []
 
         if (withEmbeddings) {
             // Collect all unique IDs across all levels

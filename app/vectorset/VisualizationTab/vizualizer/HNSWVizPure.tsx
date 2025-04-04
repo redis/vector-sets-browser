@@ -208,58 +208,6 @@ const HNSWVizPure: React.FC<HNSWVizPureProps> = ({
     // Function to create a label for a node
     const createLabel = (text: string, mesh: THREE.Mesh) => {
         return null
-
-        const canvas = document.createElement("canvas")
-        const context = canvas.getContext("2d")
-        if (!context) return null
-
-        // Set font size and measure text
-        const fontSize = 32 // Base font size
-        context.font = `${fontSize}px Arial`
-        const textMetrics = context.measureText(text)
-        const textHeight = fontSize
-        const padding = fontSize / 2
-
-        // Set canvas size based on text measurements
-        canvas.width = textMetrics.width + padding * 2
-        canvas.height = textHeight + padding * 2
-
-        // Need to reset font after canvas resize
-        context.font = `${fontSize}px Arial`
-        context.textAlign = "left" // Left align the text
-        context.textBaseline = "middle"
-        context.fillStyle = isDarkMode ? "#ffffff" : "#000000"
-
-        // Draw text with left padding
-        context.fillText(text, padding, canvas.height / 2)
-
-        // Create sprite
-        const texture = new THREE.CanvasTexture(canvas)
-        const spriteMaterial = new THREE.SpriteMaterial({
-            map: texture,
-            transparent: true,
-        })
-        const sprite = new THREE.Sprite(spriteMaterial)
-
-        // Set initial scale based on canvas dimensions
-        const aspectRatio = canvas.width / canvas.height
-        sprite.userData.baseScale = new THREE.Vector3(
-            aspectRatio * (fontSize / 32), // Scale width by aspect ratio and relative to base font size
-            1 * (fontSize / 32), // Scale height relative to base font size
-            1
-        )
-        sprite.scale.copy(sprite.userData.baseScale)
-
-        // Position sprite centered under the node
-        sprite.position.copy(mesh.position)
-        const nodeRadius = 0.5 // This matches the sphere geometry radius
-        const labelOffset = 0.8 // Offset below the node
-        sprite.position.y -= nodeRadius + labelOffset
-
-        // Center the sprite horizontally
-        sprite.center.set(0.5, 1) // This makes (0.5,1) the top-center point of the sprite
-
-        return sprite
     }
 
     // Function to update hover label
@@ -376,7 +324,7 @@ const HNSWVizPure: React.FC<HNSWVizPureProps> = ({
 
         // Fetch and add neighbor nodes
         const response = await fetchNeighbors(mesh.userData.element)
-
+        console.log("fetchNeighbors response", response)
         if (!response.success || !scene) return
 
         // If maxNeighborCount is provided, we're in the initial expansion mode
@@ -804,7 +752,7 @@ const HNSWVizPure: React.FC<HNSWVizPureProps> = ({
             // If we haven't fetched neighbors yet, get them
             if (!node.userData.expanded) {
                 const response = await fetchNeighbors(node.userData.element)
-
+                console.log("neighbors response", response)
                 // Count current total nodes and calculate how many more we can add
                 const currentNodeCount = nodesRef.current.length
                 // Use maxNodes instead of initialNodes to allow expansion beyond the initial limit

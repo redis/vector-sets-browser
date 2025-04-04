@@ -103,7 +103,7 @@ export default function VectorSetVisualization({
                 element,
                 count,
                 withEmbeddings: true, // Always fetch embeddings
-            })
+            }) || []
 
             // data is an array of arrays
             // each inner array contains [element, similarity, vector]

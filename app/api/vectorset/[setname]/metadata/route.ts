@@ -29,18 +29,18 @@ export async function GET(
             )
         }
         
-        const result = await redis.getMetadata(redisUrl, keyName)
-        
-        if (!result.success) {
+        const response = await redis.getMetadata(redisUrl, keyName)
+        console.log("getMetadata returned", response)
+        if (!response.success) {
             return NextResponse.json(
-                { success: false, error: result.error },
+                { success: false, error: response.error },
                 { status: 500 }
             )
         }
         
         return NextResponse.json({
             success: true,
-            result: result.result
+            result: response.result
         })
     } catch (error) {
         console.error("Error in getMetadata API (GET):", error)

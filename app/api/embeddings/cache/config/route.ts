@@ -3,6 +3,8 @@ import { NextResponse } from "next/server"
 import { EmbeddingConfig } from "@/app/embeddings/types/embeddingModels"
 
 // Redis key for storing cache configuration
+const CONFIG_KEY = "vector-set-browser:config"
+
 const EMBEDDING_CACHE_CONFIG_KEY = "embedding_cache_config"
 
 // Default cache configuration
@@ -39,8 +41,10 @@ export async function GET() {
         const result = await RedisClient.withConnection(
             redisUrl,
             async (client) => {
-                // Get the cache configuration
-                const configJson = await client.get(EMBEDDING_CACHE_CONFIG_KEY)
+                const configJson = await client.hGet(
+                    CONFIG_KEY,
+                    EMBEDDING_CACHE_CONFIG_KEY
+                )
                 
                 // If no configuration exists, return the default
                 if (!configJson) {
@@ -114,7 +118,8 @@ export async function POST(request: Request) {
             redisUrl,
             async (client) => {
                 // Store the configuration as JSON
-                await client.set(
+                await client.hSet(
+                    CONFIG_KEY,
                     EMBEDDING_CACHE_CONFIG_KEY,
                     JSON.stringify(config)
                 )
