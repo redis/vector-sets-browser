@@ -77,8 +77,7 @@ export default function VectorSetNav({
         setLoading(true)
         setError(null)
         try {
-            const sets = await vectorSets.list() || []
-            console.log("sets", sets)
+            const sets = await vectorSets.list() || []            
 
             setVectorSetList(sets)
 

@@ -165,8 +165,7 @@ export class RedisClient {
             if (
                 result &&
                 typeof result === "object" &&
-                "success" in result &&
-                result.success === false
+                "success" in result
             ) {
                 // Pass through the error result without wrapping it
                 return result as VectorOperationResult
@@ -235,10 +234,7 @@ export async function scanVectorSets(
             } while (cursor !== "0")
 
             const result = Array.from(vectorSets)
-            return {
-                success: true,
-                result: result,
-            }
+            return result
         } catch (error) {
             return {
                 success: false,
@@ -391,7 +387,7 @@ export async function vsim(
         }
     }
 
-    return RedisClient.withConnection(url, async (client) => {
+    return await RedisClient.withConnection(url, async (client) => {
         try {
             const baseCommand = ["VSIM", keyName]
 
@@ -526,10 +522,7 @@ export async function vdim(
                 throw new Error(`Invalid dimension result for key ${keyName}`)
             }
 
-            return {
-                success: true,
-                result: dim
-            }
+            return dim;
         } catch (error) {
             console.error("VDIM operation error:", error)
             return {
@@ -748,10 +741,7 @@ export async function getMetadata(
                     [hashKey]: JSON.stringify(validatedMetadata),
                 })
             }
-            return { 
-                success: true,
-                result: validatedMetadata
-            }
+            return validatedMetadata
         } catch (error) {
             console.error(`Error processing metadata for ${keyName}:`, error)
             // Return a default metadata object in case of error
@@ -1095,10 +1085,7 @@ export async function vinfo(
                 }
             }
 
-            return {
-                success: true,
-                result: info
-            }
+            return info;
         } catch (error) {
             console.error("VINFO operation error:", error)
             return {

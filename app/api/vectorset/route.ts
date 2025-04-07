@@ -21,11 +21,7 @@ export async function GET() {
                 { status: 500 }
             )
         }
-        
-        return NextResponse.json({
-            success: true,
-            result: result.result
-        })
+        return NextResponse.json(result)
     } catch (error) {
         console.error("Error in scanVectorSets API (GET):", error)
         return NextResponse.json(

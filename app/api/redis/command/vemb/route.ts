@@ -14,7 +14,7 @@ export async function POST(request: Request) {
             )
         }
 
-        const redisUrl = redis.getRedisUrl()
+        const redisUrl = await redis.getRedisUrl()
         if (!redisUrl) {
             return NextResponse.json(
                 { success: false, error: "No Redis connection available" },
@@ -25,7 +25,7 @@ export async function POST(request: Request) {
         // Handle single element case
         if (element) {
             const result = await redis.vemb(redisUrl, keyName, element)
-            return NextResponse.json({ success: true, result: result })
+            return NextResponse.json(result)
         }
 
         // Handle multiple elements case

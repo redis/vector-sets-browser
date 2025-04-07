@@ -38,10 +38,7 @@ export async function GET(
             )
         }
         
-        return NextResponse.json({
-            success: true,
-            result: response.result
-        })
+        return NextResponse.json(response)
     } catch (error) {
         console.error("Error in getMetadata API (GET):", error)
         return NextResponse.json(
@@ -100,10 +97,7 @@ export async function PUT(
             )
         }
 
-        return NextResponse.json({
-            success: true,
-            result: result.result
-        })
+        return NextResponse.json(result)
     } catch (error) {
         console.error("Error in setMetadata API (PUT):", error)
         return NextResponse.json(

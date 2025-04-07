@@ -92,8 +92,7 @@ export async function GET(req: NextRequest) {
                             metadata 
                         })
                     }
-                }
-                
+                }                
                 return jobs
             }
         )
@@ -140,10 +139,10 @@ export async function POST(req: NextRequest) {
             )
         }
 
-        const metadata = response.result 
+        const metadata = response.result
         
         try {
-            const jobId = await JobQueueService.createJob(redisUrl, file, vectorSetName, metadata.embedding, config)
+            const jobId = await JobQueueService.createJob(redisUrl, file, vectorSetName, config.metadata?.embedding || metadata.embedding, config)
 
             // Start processing the job
             const processor = new JobProcessor(redisUrl, jobId)
@@ -155,7 +154,7 @@ export async function POST(req: NextRequest) {
                 activeProcessors.delete(jobId)
             })
 
-            return NextResponse.json({ success: true, jobId })
+            return NextResponse.json({ success: true, result: { jobId } })
         } catch (error) {
             console.error("[Jobs API] Error creating job:", error)
             return NextResponse.json(

@@ -48,10 +48,10 @@ export async function POST(request: Request) {
             )
         }
         // Validate the result format
-        if (!Array.isArray(response.result.result)) {
+        if (!Array.isArray(response.result)) {
             console.error(
                 "Expected array result from Redis, got:",
-                typeof response.result.result
+                typeof response.result
             )
             return NextResponse.json(
                 {
@@ -63,7 +63,7 @@ export async function POST(request: Request) {
         }
 
         // Type assertion for the result array
-        let validResults = response.result.result as [
+        let validResults = response.result as [
             string,
             number,
             number[]
@@ -81,8 +81,8 @@ export async function POST(request: Request) {
         return NextResponse.json({
             success: true,
             result: validResults,
-            executionTimeMs: response.result.executionTimeMs,
-            executedCommand: response.result.executedCommand,
+            executionTimeMs: response.executionTimeMs,
+            executedCommand: response.executedCommand,
         })
     } catch (error) {
         console.error("Error in VSIM route:", error)

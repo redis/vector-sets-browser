@@ -30,10 +30,7 @@ export async function POST(request: Request) {
                 { status: 500 }
             )
         }
-        return NextResponse.json({
-            success: true,
-            result: result.result
-        })
+        return NextResponse.json(result)
     } catch (error) {
         console.error("Error in VDIM API:", error)
         return NextResponse.json(

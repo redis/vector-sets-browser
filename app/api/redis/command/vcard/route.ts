@@ -30,10 +30,7 @@ export async function POST(request: Request) {
             )
         }
         
-        return NextResponse.json({
-            success: true,
-            result: result.result,
-        })
+        return NextResponse.json(result)
     } catch (error) {
         console.error("Error in VCARD API:", error)
         return NextResponse.json(

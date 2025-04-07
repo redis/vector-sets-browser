@@ -78,10 +78,7 @@ export async function GET(request: Request) {
             )
         }
 
-        return NextResponse.json({
-            success: true,
-            result: result.result,
-        })
+        return NextResponse.json(result)
     } catch (error) {
         console.error("Error in VINFO API (GET):", error)
         return NextResponse.json(

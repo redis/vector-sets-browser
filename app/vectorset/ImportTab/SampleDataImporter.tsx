@@ -118,6 +118,7 @@ export function SampleDataImporter({
             // Add metadata to config if available
             if (metadata) {
                 config.metadata = metadata
+                config.metadata.embedding = currentEmbeddingConfig
             }
 
             // Create the import job
@@ -535,4 +536,4 @@ export function SampleDataImporter({
             </Dialog>
         </div>
     )
-} 
+}
