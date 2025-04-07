@@ -108,8 +108,8 @@ export default function DocsPage() {
                             VSIM: Return Elements by Vector Similarity
                         </h3>
                         <pre className="bg-gray-100 p-4 rounded-lg mb-4 font-mono">
-                            VSIM key [ELE|FP32|VALUES] &lt;vector or element&gt; [WITHSCORES] [COUNT num] 
-                            [EF search-exploration-factor] [FILTER expression] [FILTER-EF max-filtering-effort] 
+                            VSIM key [ELE|FP32|VALUES] &lt;vector or element&gt; [WITHSCORES] [COUNT num]
+                            [EF search-exploration-factor] [FILTER expression] [FILTER-EF max-filtering-effort]
                             [TRUTH] [NOTHREAD]
                         </pre>
                         <p className="text-gray-700 mb-4">
@@ -117,12 +117,12 @@ export default function DocsPage() {
                         </p>
                         <pre className="bg-gray-100 p-4 rounded-lg mb-4 font-mono">
                             VSIM word_embeddings ELE apple WITHSCORES COUNT 3
-                            1) "apple"
-                            2) "0.9998867657923256"
-                            3) "apples"
-                            4) "0.8598527610301971"
-                            5) "pear"
-                            6) "0.8226882219314575"
+                            1) {'"'}apple{'"'}
+                            2) {'"'}0.9998867657923256{'"'}
+                            3) {'"'}apples{'"'}
+                            4) {'"'}0.8598527610301971{'"'}
+                            5) {'"'}pear{'"'}
+                            6) {'"'}0.8226882219314575{'"'}
                         </pre>
                         <ul className="list-disc pl-6 space-y-2 text-gray-700">
                             <li>

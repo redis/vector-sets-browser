@@ -1,6 +1,6 @@
 import { userSettings } from "@/app/utils/userSettings"
 import { PCA } from "ml-pca"
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState, useMemo } from "react"
 import { toast } from "sonner"
 import * as THREE from "three"
 import { UMAP } from "umap-js"
@@ -10,6 +10,14 @@ import {
     LayoutAlgorithm,
     LayoutAlgorithmType,
 } from "../types"
+
+// Fix type annotations for window properties
+interface CustomWindow extends Window {
+    lastLayoutChange?: number;
+    [key: string]: unknown;
+}
+
+declare let window: CustomWindow;
 
 export function useLayoutManager(
     nodesRef: React.MutableRefObject<ForceNode[]>,
@@ -23,7 +31,6 @@ export function useLayoutManager(
     // Get stored layout or default to "pca"
     const [currentLayout, setCurrentLayout] =
         useState<LayoutAlgorithmType>("pca")
-    const animationFrameId = useRef<number>()
     const forceSimulationActive = useRef<boolean>(true)
     const [isProjectionRunning, setIsProjectionRunning] =
         useState<boolean>(false)
@@ -100,214 +107,212 @@ export function useLayoutManager(
         [canvasRef]
     )
 
-    // Force-directed layout
-    const forceLayout: LayoutAlgorithm = {
-        name: "Force-Directed",
-        description: "Physics-based layout that simulates forces between nodes",
-        apply: () => {
-            forceSimulationActive.current = true
-        },
-        animate: true,
-    }
-
-    // UMAP layout
-    const umapLayout: LayoutAlgorithm = {
-        name: "UMAP",
-        description:
-            "Uniform Manifold Approximation and Projection - preserves both local and global structure of high-dimensional data. Good for visualizing clusters.",
-        apply: async (nodes) => {
-            forceSimulationActive.current = false
-
-            if (nodes.length === 0) return
-            if (isProjectionRunning) return
-
-            // UMAP requires at least 2 nodes to work properly
-            if (nodes.length < 2) {
-                return
-            }
-
-            setIsProjectionRunning(true)
-
-            try {
-                // Prepare data for UMAP
-                const nodeOrder: ForceNode[] = []
-                const vectors: number[][] = []
-                nodes.forEach((node) => {
-                    const vector = node.vector
-                    if (vector) {
-                        vectors.push(vector)
-                        nodeOrder.push(node)
-                    }
-                })
-
-                if (vectors.length < 2) {
-                    toast.error(
-                        "Not enough valid vectors for UMAP projection (need at least 2)"
-                    )
-                    setIsProjectionRunning(false)
-                    return
-                }
-
-                // Configure and run UMAP
-                const umap = new UMAP({
-                    nComponents: 2,
-                    nEpochs: 200,
-                    nNeighbors: Math.min(15, vectors.length - 1),
-                    minDist: 0.1,
-                })
-
-                // Fit and transform the data
-                const embedding = umap.fit(vectors)
-
-                // Normalize and scale the projection
-                const normalizedEmbedding =
-                    normalizeAndScaleProjection(embedding)
-
-                // Apply the projection to node positions
-                nodeOrder.forEach((node, i) => {
-                    if (i < normalizedEmbedding.length) {
-                        const [x, y] = normalizedEmbedding[i]
-                        node.mesh.position.set(x, y, node.mesh.position.z)
-                    }
-                })
-
-                // Update edge geometries
-                edgesRef.current.forEach((edge) => {
-                    const points = [
-                        edge.source.mesh.position.clone(),
-                        edge.target.mesh.position.clone(),
-                    ]
-                    const geometry = new THREE.BufferGeometry().setFromPoints(
-                        points
-                    )
-                    edge.line.geometry.dispose()
-                    edge.line.geometry = geometry
-                })
-
-                // Ensure camera fits all nodes after projection
-                setTimeout(() => {
-                    fitCameraToNodes()
-                }, 100)
-            } catch (error) {
-                console.error("Error in UMAP projection:", error)
-                toast.error(
-                    `Error in UMAP projection: ${
-                        error instanceof Error ? error.message : "Unknown error"
-                    }`
-                )
-            } finally {
-                setIsProjectionRunning(false)
-            }
-        },
-        animate: false,
-    }
-
-    // PCA layout
-    const pcaLayout: LayoutAlgorithm = {
-        name: "PCA",
-        description:
-            "Principal Component Analysis - linear projection that preserves global variance. Fast but may not capture complex relationships between points.",
-        apply: async (nodes) => {
-            forceSimulationActive.current = false
-
-            if (nodes.length === 0) return
-            if (isProjectionRunning) return
-
-            // PCA requires at least 2 nodes to work properly
-            if (nodes.length < 2) {
-                return
-            }
-
-            setIsProjectionRunning(true)
-
-            try {
-                // Prepare data for PCA
-                const vectors: number[][] = []
-                const nodeOrder: ForceNode[] = []
-
-                nodes.forEach((node) => {
-                    if (node.vector) {
-                        vectors.push(node.vector)
-                        nodeOrder.push(node)
-                    } 
-                })
-                if (vectors.length === 0) {
-                    toast.error("No valid vectors for PCA projection")
-                    setIsProjectionRunning(false)
-                    return
-                }
-                // Run PCA
-                const pca = new PCA(vectors)
-                const embedding = pca.predict(vectors, { nComponents: 2 })
-
-                // Convert to array of arrays format
-                const pcaEmbedding: number[][] = []
-                for (let i = 0; i < embedding.rows; i++) {
-                    pcaEmbedding.push([
-                        embedding.getRow(i)[0],
-                        embedding.getRow(i)[1],
-                    ])
-                }
-
-                // Normalize and scale the projection
-                const normalizedEmbedding =
-                    normalizeAndScaleProjection(pcaEmbedding)
-
-                // Apply the projection to node positions
-                nodeOrder.forEach((node, i) => {
-                    if (i < normalizedEmbedding.length) {
-                        const [x, y] = normalizedEmbedding[i]
-                        node.mesh.position.set(x, y, node.mesh.position.z)
-                    }
-                })
-
-                // Update edge geometries
-                edgesRef.current.forEach((edge) => {
-                    const points = [
-                        edge.source.mesh.position.clone(),
-                        edge.target.mesh.position.clone(),
-                    ]
-                    const geometry = new THREE.BufferGeometry().setFromPoints(
-                        points
-                    )
-                    edge.line.geometry.dispose()
-                    edge.line.geometry = geometry
-                })
-
-                // Ensure camera fits all nodes after projection
-                setTimeout(() => {
-                    fitCameraToNodes()
-                }, 100)
-            } catch (error) {
-                console.error("Error in PCA projection:", error)
-                toast.error("Error in PCA projection")
-            } finally {
-                setIsProjectionRunning(false)
-            }
-        },
-        animate: false,
-    }
-
     // Map of available layouts
-    const layouts: Record<LayoutAlgorithmType, LayoutAlgorithm> = {
-        force: forceLayout,
-        umap: umapLayout,
-        pca: pcaLayout,
-    }
+    const layouts = useMemo(() => {
+        const forceLayout: LayoutAlgorithm = {
+            name: "Force-Directed",
+            description: "Physics-based layout that simulates forces between nodes",
+            apply: () => {
+                forceSimulationActive.current = true
+            },
+            animate: true,
+        }
+
+        const umapLayout: LayoutAlgorithm = {
+            name: "UMAP",
+            description:
+                "Uniform Manifold Approximation and Projection - preserves both local and global structure of high-dimensional data. Good for visualizing clusters.",
+            apply: async (nodes) => {
+                forceSimulationActive.current = false
+
+                if (nodes.length === 0) return
+                if (isProjectionRunning) return
+
+                // UMAP requires at least 2 nodes to work properly
+                if (nodes.length < 2) {
+                    return
+                }
+
+                setIsProjectionRunning(true)
+
+                try {
+                    // Prepare data for UMAP
+                    const nodeOrder: ForceNode[] = []
+                    const vectors: number[][] = []
+                    nodes.forEach((node) => {
+                        const vector = node.vector
+                        if (vector) {
+                            vectors.push(vector)
+                            nodeOrder.push(node)
+                        }
+                    })
+
+                    if (vectors.length < 2) {
+                        toast.error(
+                            "Not enough valid vectors for UMAP projection (need at least 2)"
+                        )
+                        setIsProjectionRunning(false)
+                        return
+                    }
+
+                    // Configure and run UMAP
+                    const umap = new UMAP({
+                        nComponents: 2,
+                        nEpochs: 200,
+                        nNeighbors: Math.min(15, vectors.length - 1),
+                        minDist: 0.1,
+                    })
+
+                    // Fit and transform the data
+                    const embedding = umap.fit(vectors)
+
+                    // Normalize and scale the projection
+                    const normalizedEmbedding =
+                        normalizeAndScaleProjection(embedding)
+
+                    // Apply the projection to node positions
+                    nodeOrder.forEach((node, i) => {
+                        if (i < normalizedEmbedding.length) {
+                            const [x, y] = normalizedEmbedding[i]
+                            node.mesh.position.set(x, y, node.mesh.position.z)
+                        }
+                    })
+
+                    // Update edge geometries
+                    edgesRef.current.forEach((edge) => {
+                        const points = [
+                            edge.source.mesh.position.clone(),
+                            edge.target.mesh.position.clone(),
+                        ]
+                        const geometry = new THREE.BufferGeometry().setFromPoints(
+                            points
+                        )
+                        edge.line.geometry.dispose()
+                        edge.line.geometry = geometry
+                    })
+
+                    // Ensure camera fits all nodes after projection
+                    setTimeout(() => {
+                        fitCameraToNodes()
+                    }, 100)
+                } catch (error) {
+                    console.error("Error in UMAP projection:", error)
+                    toast.error(
+                        `Error in UMAP projection: ${error instanceof Error ? error.message : "Unknown error"
+                        }`
+                    )
+                } finally {
+                    setIsProjectionRunning(false)
+                }
+            },
+            animate: false,
+        }
+
+        const pcaLayout: LayoutAlgorithm = {
+            name: "PCA",
+            description:
+                "Principal Component Analysis - linear projection that preserves global variance. Fast but may not capture complex relationships between points.",
+            apply: async (nodes) => {
+                forceSimulationActive.current = false
+
+                if (nodes.length === 0) return
+                if (isProjectionRunning) return
+
+                // PCA requires at least 2 nodes to work properly
+                if (nodes.length < 2) {
+                    return
+                }
+
+                setIsProjectionRunning(true)
+
+                try {
+                    // Prepare data for PCA
+                    const vectors: number[][] = []
+                    const nodeOrder: ForceNode[] = []
+
+                    nodes.forEach((node) => {
+                        if (node.vector) {
+                            vectors.push(node.vector)
+                            nodeOrder.push(node)
+                        }
+                    })
+                    if (vectors.length === 0) {
+                        toast.error("No valid vectors for PCA projection")
+                        setIsProjectionRunning(false)
+                        return
+                    }
+                    // Run PCA
+                    const pca = new PCA(vectors)
+                    const embedding = pca.predict(vectors, { nComponents: 2 })
+
+                    // Convert to array of arrays format
+                    const pcaEmbedding: number[][] = []
+                    for (let i = 0; i < embedding.rows; i++) {
+                        pcaEmbedding.push([
+                            embedding.getRow(i)[0],
+                            embedding.getRow(i)[1],
+                        ])
+                    }
+
+                    // Normalize and scale the projection
+                    const normalizedEmbedding =
+                        normalizeAndScaleProjection(pcaEmbedding)
+
+                    // Apply the projection to node positions
+                    nodeOrder.forEach((node, i) => {
+                        if (i < normalizedEmbedding.length) {
+                            const [x, y] = normalizedEmbedding[i]
+                            node.mesh.position.set(x, y, node.mesh.position.z)
+                        }
+                    })
+
+                    // Update edge geometries
+                    edgesRef.current.forEach((edge) => {
+                        const points = [
+                            edge.source.mesh.position.clone(),
+                            edge.target.mesh.position.clone(),
+                        ]
+                        const geometry = new THREE.BufferGeometry().setFromPoints(
+                            points
+                        )
+                        edge.line.geometry.dispose()
+                        edge.line.geometry = geometry
+                    })
+
+                    // Ensure camera fits all nodes after projection
+                    setTimeout(() => {
+                        fitCameraToNodes()
+                    }, 100)
+                } catch (error) {
+                    console.error("Error in PCA projection:", error)
+                    toast.error("Error in PCA projection")
+                } finally {
+                    setIsProjectionRunning(false)
+                }
+            },
+            animate: false,
+        }
+
+        return {
+            force: forceLayout,
+            umap: umapLayout,
+            pca: pcaLayout,
+        } as Record<LayoutAlgorithmType, LayoutAlgorithm>
+    }, [isProjectionRunning, edgesRef, fitCameraToNodes, normalizeAndScaleProjection])
 
     // Apply the current layout
     const applyLayout = useCallback(
         (layoutType: LayoutAlgorithmType, rootNode?: ForceNode) => {
             // Prevent rapid switching between layouts
             const now = Date.now()
-            const lastLayoutChange = (window as any).lastLayoutChange || 0
+            const lastLayoutChange = window.lastLayoutChange || 0
 
             if (now - lastLayoutChange < 500) {
                 // Ignore rapid layout changes (debounce)
                 return
             }
 
-            ;(window as any).lastLayoutChange = now
+            window.lastLayoutChange = now
 
             // Only update layout type if it's different
             if (currentLayout !== layoutType) {
@@ -321,7 +326,7 @@ export function useLayoutManager(
                 // Clear any previous attempt flags for this layout if we're explicitly selecting it
                 const layoutKey = `${layoutType}_${nodesRef.current.length}`
                 const attemptedKey = `attempted_${layoutKey}`
-                ;(window as any)[attemptedKey] = false
+                window[attemptedKey as keyof Window] = false
             }
 
             // Get the selected layout algorithm
@@ -347,9 +352,9 @@ export function useLayoutManager(
             const attemptedKey = `attempted_${layoutKey}`
 
             // Check if we've already attempted this exact layout with this number of nodes
-            if (!(window as any)[attemptedKey]) {
+            if (!(window as CustomWindow)[attemptedKey]) {
                 // Mark as attempted to prevent repeated calls
-                ;(window as any)[attemptedKey] = true
+                (window as CustomWindow)[attemptedKey] = true
 
                 // Apply the layout with error handling
                 try {

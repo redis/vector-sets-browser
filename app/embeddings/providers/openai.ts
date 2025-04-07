@@ -1,4 +1,4 @@
-import { EmbeddingConfig, OpenAIConfig, getModelData } from "../types/embeddingModels"
+import { EmbeddingConfig, getModelData } from "../types/embeddingModels"
 import { EmbeddingProvider } from "./base"
 import { getOpenAIKey } from "@/app/api/openai/helpers"
 
@@ -34,7 +34,7 @@ export class OpenAIProvider implements EmbeddingProvider {
 
         const data = await response.json()
         const embedding = data.data[0].embedding
-        
+
         // Validate embedding dimensions
         const modelData = getModelData(config)
         const expectedDim = modelData?.dimensions
@@ -43,7 +43,7 @@ export class OpenAIProvider implements EmbeddingProvider {
                 `Unexpected embedding dimension: got ${embedding.length}, expected ${expectedDim}`
             )
         }
-        
+
         return embedding
     }
 
@@ -89,7 +89,7 @@ export class OpenAIProvider implements EmbeddingProvider {
 
             const data = await response.json()
             const batchEmbeddings = data.data.map((item: any) => item.embedding)
-            
+
             // Validate embedding dimensions
             const modelData = getModelData(config)
             const expectedDim = modelData?.dimensions
@@ -103,7 +103,7 @@ export class OpenAIProvider implements EmbeddingProvider {
                     }
                 }
             }
-            
+
             embeddings.push(...batchEmbeddings)
         }
 

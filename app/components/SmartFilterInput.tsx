@@ -31,7 +31,6 @@ interface SmartFilterInputProps {
     placeholder?: string
     className?: string
     error?: boolean
-    onHelp?: () => void
     vectorSetName?: string
 }
 
@@ -42,7 +41,6 @@ export default function SmartFilterInput({
     placeholder = "Enter a search filter (e.g. .year < 1982)",
     className,
     error: propError,
-    onHelp,
     vectorSetName,
 }: SmartFilterInputProps) {
     const [inputValue, setInputValue] = useState(value)
@@ -50,7 +48,6 @@ export default function SmartFilterInput({
     const [availableAttributes, setAvailableAttributes] = useState<string[]>([])
     const [currentInput, setCurrentInput] = useState("")
     const [showDropdown, setShowDropdown] = useState(false)
-    const [debugInfo, setDebugInfo] = useState<string>("")
     const [isLoadingAttributes, setIsLoadingAttributes] = useState(false)
     const inputRef = useRef<HTMLInputElement>(null)
     const dropdownRef = useRef<HTMLDivElement>(null)
@@ -67,21 +64,15 @@ export default function SmartFilterInput({
     useEffect(() => {
         const fetchAttributes = async () => {
             if (!results || results.length === 0 || !vectorSetName) {
-                setDebugInfo("No results or vector set name available")
                 return
             }
 
             setIsLoadingAttributes(true)
-            setDebugInfo(`Results received: ${results.length} items`)
             const attributes = new Set<string>()
 
             try {
                 // Extract elements from results
                 const elements = results.map((result) => result[0])
-                setDebugInfo(
-                    (prev) =>
-                        `${prev}\nFetching attributes for ${elements.length} elements`
-                )
 
                 // Fetch attributes using vgetattr_multi
                 const attributesResults = await vgetattr_multi({
@@ -90,17 +81,10 @@ export default function SmartFilterInput({
                 })
                 if (attributesResults && attributesResults.length > 0) {
                     // Process each attribute JSON string
-                    attributesResults.forEach((attributeJson, index) => {
+                    attributesResults.forEach((attributeJson) => {
                         if (attributeJson) {
                             try {
                                 const attributeObj = JSON.parse(attributeJson)
-
-                                if (index === 0) {
-                                    setDebugInfo(
-                                        (prev) =>
-                                            `${prev}\nSample attribute: ${attributeJson}`
-                                    )
-                                }
 
                                 if (
                                     attributeObj &&
@@ -115,20 +99,12 @@ export default function SmartFilterInput({
                                     "Error parsing attribute JSON:",
                                     error
                                 )
-                                setDebugInfo(
-                                    (prev) =>
-                                        `${prev}\nError parsing: ${attributeJson}`
-                                )
                             }
                         }
                     })
                 }
             } catch (error) {
                 console.error("Error fetching attributes:", error)
-                setDebugInfo(
-                    (prev) => `${prev}\nError fetching attributes: ${error}`
-                )
-
                 // Fallback: try to extract from the results directly
                 extractAttributesFromResults(results, attributes)
             }
@@ -143,12 +119,6 @@ export default function SmartFilterInput({
 
             const attributesArray = Array.from(attributes)
             setAvailableAttributes(attributesArray)
-            setDebugInfo(
-                (prev) =>
-                    `${prev}\nExtracted attributes: ${attributesArray.join(
-                        ", "
-                    )}`
-            )
             setIsLoadingAttributes(false)
         }
 
@@ -264,7 +234,6 @@ export default function SmartFilterInput({
             if (match) {
                 setCurrentInput(match[1])
                 setShowDropdown(true)
-                setDebugInfo((prev) => `${prev}\nMatched input: .${match[1]}`)
             } else {
                 setCurrentInput("")
                 setShowDropdown(false)
@@ -485,12 +454,12 @@ export default function SmartFilterInput({
                                                     &lt; 1990
                                                 </p>
                                                 <p className="font-mono text-[10px]">
-                                                    .genre == "action" and
+                                                    .genre == {'"'}action{'"'} and
                                                     .rating &gt; 8.0
                                                 </p>
                                                 <p className="font-mono text-[10px]">
-                                                    .director in ["Spielberg",
-                                                    "Nolan"]
+                                                    .director in [{'"'}Spielberg{'"'},
+                                                    {'"'}Nolan{'"'}]
                                                 </p>
                                             </div>
                                         </div>
@@ -517,13 +486,11 @@ export default function SmartFilterInput({
                                 ? placeholder
                                 : "Describe what you want to filter in plain English..."
                         }
-                        className={`${
-                            propError || error ? "border-red-500" : ""
-                        } ${className || ""} ${
-                            activeTab === "natural" && inputValue
+                        className={`${propError || error ? "border-red-500" : ""
+                            } ${className || ""} ${activeTab === "natural" && inputValue
                                 ? "pr-20"
                                 : "pr-12"
-                        }`}
+                            }`}
                         disabled={isProcessingNL}
                     />
 
@@ -616,11 +583,10 @@ export default function SmartFilterInput({
                                         ? selectedItemRef
                                         : null
                                 }
-                                className={`block w-full px-4 py-2 text-left text-sm ${
-                                    index === selectedIndex
-                                        ? "bg-gray-100"
-                                        : "hover:bg-gray-100"
-                                } focus:outline-hidden`}
+                                className={`block w-full px-4 py-2 text-left text-sm ${index === selectedIndex
+                                    ? "bg-gray-100"
+                                    : "hover:bg-gray-100"
+                                    } focus:outline-hidden`}
                                 onClick={() => handleSelect(attr)}
                             >
                                 {attr}

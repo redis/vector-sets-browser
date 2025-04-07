@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server"
-import RedisClient, * as redis from "@/app/redis-server/server/commands"
 
 // Store last completed job IDs in memory with timestamp
 interface CompletedJob {
@@ -18,7 +17,7 @@ const RETENTION_PERIOD = 60 * 1000 // 60 seconds
 function cleanupOldJobs() {
     const now = Date.now()
     const cutoff = now - RETENTION_PERIOD
-    
+
     // Remove jobs older than the retention period
     while (recentlyCompletedJobs.length > 0 && recentlyCompletedJobs[0].timestamp < cutoff) {
         recentlyCompletedJobs.shift()
@@ -29,7 +28,7 @@ function cleanupOldJobs() {
 export function registerCompletedJob(jobId: string, vectorSetName: string) {
     // Clean up old jobs first
     cleanupOldJobs()
-    
+
     // Add the new job
     recentlyCompletedJobs.push({
         jobId,
@@ -43,27 +42,27 @@ export async function GET(req: NextRequest) {
     let url;
     let since = 0;
     let vectorSetName = null;
-    
+
     try {
         url = new URL(req.url);
         since = parseInt(url.searchParams.get("since") || "0", 10);
         vectorSetName = url.searchParams.get("vectorSetName");
     } catch (error) {
         console.error("Error parsing URL:", error, "URL:", req.url);
-        return NextResponse.json({ 
-            success: false, 
-            error: `Invalid URL format: ${error instanceof Error ? error.message : String(error)}` 
+        return NextResponse.json({
+            success: false,
+            error: `Invalid URL format: ${error instanceof Error ? error.message : String(error)}`
         }, { status: 400 });
     }
-    
+
     // Clean up old jobs first
     cleanupOldJobs()
-    
+
     // Filter jobs by time and optional vector set name
     const jobs = recentlyCompletedJobs
         .filter(job => job.timestamp > since)
         .filter(job => !vectorSetName || job.vectorSetName === vectorSetName)
-    
+
     return NextResponse.json({
         success: true,
         result: jobs,

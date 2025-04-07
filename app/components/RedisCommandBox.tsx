@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button"
-import { Copy, X } from "lucide-react"
+import { Copy } from "lucide-react"
 import { useEffect } from "react"
 
 interface RedisCommandBoxProps {
@@ -9,7 +9,6 @@ interface RedisCommandBoxProps {
     searchQuery: string
     searchFilter: string
     showRedisCommand: boolean
-    setShowRedisCommand: (show: boolean) => void
 }
 
 export default function RedisCommandBox({
@@ -19,7 +18,6 @@ export default function RedisCommandBox({
     searchQuery,
     searchFilter,
     showRedisCommand,
-    setShowRedisCommand
 }: RedisCommandBoxProps) {
     // Add a useEffect to log when the executedCommand changes
     useEffect(() => {
@@ -42,49 +40,49 @@ export default function RedisCommandBox({
                 const valuesIndex = executedCommand.indexOf(valuesToken);
                 const countStr = valuesMatch[1];
                 const countNum = parseInt(countStr);
-                
+
                 if (!isNaN(countNum) && countNum > 2) {
                     // Find the beginning of the number sequence
                     const valuesList = executedCommand.substring(valuesIndex);
                     const numberEndIndex = valuesList.indexOf(countStr) + countStr.length;
                     const valuesStart = valuesIndex + numberEndIndex;
-                    
+
                     // Skip initial whitespace
                     let startPos = valuesStart;
                     while (startPos < executedCommand.length && /\s/.test(executedCommand[startPos])) {
                         startPos++;
                     }
-                    
+
                     // Continue past any numeric values to find where non-numeric content begins
                     let currentPos = startPos;
-                    
+
                     // Continue past all numeric values
                     while (currentPos < executedCommand.length) {
                         // Skip whitespace
                         while (currentPos < executedCommand.length && /\s/.test(executedCommand[currentPos])) {
                             currentPos++;
                         }
-                        
+
                         // Check if we're looking at a number
                         const isNumberStart = /[\d\.\-]/.test(executedCommand[currentPos]);
-                        
+
                         if (!isNumberStart) {
                             // Found non-numeric content, we're done
                             break;
                         }
-                        
+
                         // Skip this number
-                        while (currentPos < executedCommand.length && 
-                              !/\s/.test(executedCommand[currentPos])) {
+                        while (currentPos < executedCommand.length &&
+                            !/\s/.test(executedCommand[currentPos])) {
                             currentPos++;
                         }
                     }
-                    
+
                     // Extract parts
                     const prefix = executedCommand.substring(0, startPos);
                     const allVectors = executedCommand.substring(startPos, currentPos).trim();
                     const suffix = currentPos < executedCommand.length ? executedCommand.substring(currentPos) : "";
-                    
+
                     // Return a structured result for display
                     return {
                         type: 'structured',
@@ -94,20 +92,20 @@ export default function RedisCommandBox({
                     };
                 }
             }
-            
+
             // If we couldn't parse the structure, return the original command as a string
             return { type: 'simple', text: executedCommand };
         }
-        
+
         // If no executed command yet, show a loading message
         if (searchQuery || searchFilter) {
             return { type: 'simple', text: "Searching..." };
         }
-        
+
         // Default fallback for initial state
-        return { 
-            type: 'simple', 
-            text: `V? ${vectorSetName} VALUES ${dim} 0.0, 0.0, ...` 
+        return {
+            type: 'simple',
+            text: `V? ${vectorSetName} VALUES ${dim} 0.0, 0.0, ...`
         };
     }
 
@@ -121,20 +119,20 @@ export default function RedisCommandBox({
                     if (!commandData) {
                         return "Enter search parameters to see the Redis command";
                     }
-                    
+
                     if (typeof commandData === 'string') {
                         return commandData;
                     }
-                    
+
                     if (commandData.type === 'simple') {
                         return commandData.text;
                     }
-                    
+
                     // Render structured command
                     return (
                         <div className="text-gray-500 font-mono text-xs">
                             {commandData.prefix}
-                            <span 
+                            <span
                                 className="inline-flex items-center bg-yellow-50 rounded mx-1"
                                 title="Vector values truncated, click copy to see the whole command"
                             >

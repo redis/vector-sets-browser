@@ -15,7 +15,7 @@ import { Shuffle } from "lucide-react"
 import { useEffect, useMemo, useState } from "react"
 import ImageUploader from "../components/ImageUploader"
 import RedisCommandBox from "../components/RedisCommandBox"
-import { CLIP_MODELS } from "@/app/embeddings/types/embeddingModels" 
+import { CLIP_MODELS } from "@/app/embeddings/types/embeddingModels"
 
 // Import ImageFileInfo type 
 import type { ImageFileInfo } from "../components/ImageUploader"
@@ -66,7 +66,7 @@ export default function AddVectorModal({
             // Fall back to original logic if needed
             return imageEmbedding !== null || imageData !== "";
         }
-        
+
         // Use existing logic for other tabs
         // Element ID is required for all tabs
         if (!element.trim()) {
@@ -215,9 +215,9 @@ export default function AddVectorModal({
             for (let i = 0; i < uploadImages.length; i++) {
                 const img = uploadImages[i];
                 const imgElement = img.fileName.replace(/\.[^/.]+$/, "").replace(/[^a-zA-Z0-9]/g, "_");
-                
+
                 setStatus(`Adding vector ${i + 1} of ${uploadImages.length}: ${imgElement}`);
-                
+
                 // Use embedding if available, otherwise use base64 data
                 if (img.embedding) {
                     await onAdd(imgElement, img.embedding, useCAS);
@@ -225,21 +225,21 @@ export default function AddVectorModal({
                     await onAdd(imgElement, img.base64Data, useCAS);
                 }
             }
-            
+
             setStatus(`Successfully added ${uploadImages.length} vectors!`);
-            
+
             // Reset form
             setElement("");
             setElementData("");
             setImageData("");
             setImageEmbedding(null);
             setUploadImages([]);
-            
+
             // Close modal
             onClose();
         } catch (err) {
             console.error("Error adding vectors:", err);
-            
+
             // Extract error message
             let errorMessage = "Failed to add vectors";
             if (err instanceof Error) {
@@ -259,7 +259,7 @@ export default function AddVectorModal({
                     errorMessage = err.data.error;
                 }
             }
-            
+
             setError(errorMessage);
             setStatus("Error adding vectors");
         } finally {
@@ -281,7 +281,7 @@ export default function AddVectorModal({
     // Handle changes to the collection of images
     const handleImagesChange = (images: ImageFileInfo[]) => {
         setUploadImages(images);
-        
+
         // If we have images, update the preview
         if (images.length > 0) {
             // If there's only one image, use it to set the form element name
@@ -290,7 +290,7 @@ export default function AddVectorModal({
                 const cleanName = nameWithoutExtension.replace(/[^a-zA-Z0-9]/g, "_");
                 setElement(cleanName);
             }
-            
+
             // For compatibility, set the imageData and imageEmbedding from the last image
             const lastImage = images[images.length - 1];
             setImageData(lastImage.base64Data);
@@ -437,16 +437,13 @@ export default function AddVectorModal({
                 (activeTab === "text" || activeTab === "rawVector")) ||
             (!imageData && activeTab === "image")
         ) {
-            return `VADD ${vectorSetName || "vector-set"} ${
-                reduceDimensions ? `REDUCE ${reduceDimensions}` : ""
-            } VALUES [vector values...] ${element || "element_id"} ${
-                useCAS ? "CAS" : ""
-            }`
+            return `VADD ${vectorSetName || "vector-set"} ${reduceDimensions ? `REDUCE ${reduceDimensions}` : ""
+                } VALUES [vector values...] ${element || "element_id"} ${useCAS ? "CAS" : ""
+                }`
         }
 
-        let command = `VADD ${vectorSetName || "vector-set"} ${
-            reduceDimensions ? `REDUCE ${reduceDimensions}` : ""
-        }`
+        let command = `VADD ${vectorSetName || "vector-set"} ${reduceDimensions ? `REDUCE ${reduceDimensions}` : ""
+            }`
 
         // Add VALUES part
         if (activeTab === "rawVector") {
@@ -477,9 +474,8 @@ export default function AddVectorModal({
 
                 // Only include dimensions if we have them
                 if (vectorValues.length > 0) {
-                    command += ` VALUES ${
-                        vectorValues.length
-                    } ${vectorValues.join(" ")}`
+                    command += ` VALUES ${vectorValues.length
+                        } ${vectorValues.join(" ")}`
                 } else {
                     command += ` VALUES [vector values...]`
                 }
@@ -623,7 +619,7 @@ export default function AddVectorModal({
 
                                         {isRawVectorDetected && (
                                             <div className="mt-2 text-xs p-2 bg-yellow-100 border border-yellow-400 text-yellow-700 rounded">
-                                                The text you've entered looks
+                                                The text you{'\''}ve entered looks
                                                 like vector data. Do you want
                                                 to:
                                                 <div className="mt-2 flex space-x-2">
@@ -694,12 +690,11 @@ export default function AddVectorModal({
 
                                         {elementData.trim() !== "" && (
                                             <div
-                                                className={`mt-2 text-sm ${
-                                                    getRawVectorValidationStatus()
+                                                className={`mt-2 text-sm ${getRawVectorValidationStatus()
                                                         .isValid
                                                         ? "text-green-600"
                                                         : "text-yellow-600"
-                                                }`}
+                                                    }`}
                                             >
                                                 {
                                                     getRawVectorValidationStatus()
@@ -727,7 +722,7 @@ export default function AddVectorModal({
                                             onEmbeddingGenerated={handleEmbeddingGenerated}
                                             onFileNameSelect={handleFileNameSelect}
                                             onImagesChange={handleImagesChange}
-                                            config={metadata?.embedding || { provider: "image", image: { model: "mobilenet" }}}
+                                            config={metadata?.embedding || { provider: "image", image: { model: "mobilenet" } }}
                                             allowMultiple={true}
                                         />
                                         {/* {imageEmbedding && uploadImages.length <= 1 && (
@@ -784,14 +779,14 @@ export default function AddVectorModal({
                                 {!element.trim()
                                     ? "Please enter an Element ID"
                                     : activeTab === "text" &&
-                                      !elementData.trim()
-                                    ? "Please enter text to embed"
-                                    : activeTab === "rawVector" &&
-                                      !getRawVectorValidationStatus().isValid
-                                    ? getRawVectorValidationStatus().message
-                                    : activeTab === "image" && !imageData
-                                    ? "Please upload an image"
-                                    : "Please complete all required fields"}
+                                        !elementData.trim()
+                                        ? "Please enter text to embed"
+                                        : activeTab === "rawVector" &&
+                                            !getRawVectorValidationStatus().isValid
+                                            ? getRawVectorValidationStatus().message
+                                            : activeTab === "image" && !imageData
+                                                ? "Please upload an image"
+                                                : "Please complete all required fields"}
                             </div>
                         )}
 
@@ -824,8 +819,8 @@ export default function AddVectorModal({
                                 type="submit"
                                 disabled={!isFormValid || isAdding}
                             >
-                                {isAdding 
-                                    ? "Adding..." 
+                                {isAdding
+                                    ? "Adding..."
                                     : activeTab === "image" && uploadImages.length > 1
                                         ? `Add ${uploadImages.length} Vectors`
                                         : "Add Vector"}

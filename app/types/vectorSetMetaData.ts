@@ -1,4 +1,4 @@
-import { EmbeddingConfig, EmbeddingProvider, getModelData, ImageModelName, TensorFlowModelName } from "@/app/embeddings/types/embeddingModels";
+import { EmbeddingConfig, getModelData } from "@/app/embeddings/types/embeddingModels";
 
 export interface VectorSetAdvancedConfig {
     reduceDimensions?: number // If set, reduces vector dimensions using random projection

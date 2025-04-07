@@ -102,7 +102,7 @@ export default function EditAttributesDialog({
                 keyName,
                 element,
             });
-            
+
             console.log("Attr: ", response);
             if (!response) {
                 setAttributes([]);
@@ -113,7 +113,7 @@ export default function EditAttributesDialog({
             try {
                 // Parse the JSON string from the API response
                 const parsedAttributes = JSON.parse(response);
-                
+
                 // Convert the flat JSON object into our Attribute[] format
                 const attributeArray = Object.entries(parsedAttributes).map(
                     ([key, value]) => {
@@ -129,7 +129,7 @@ export default function EditAttributesDialog({
                         };
                     }
                 ) as Attribute[];
-                
+
                 // Set both original and current attributes
                 setAttributes(attributeArray);
                 setOriginalAttributes(attributeArray);
@@ -212,7 +212,7 @@ export default function EditAttributesDialog({
                             };
                         }
                     );
-                } catch (err) {
+                } catch (_err) {
                     setError("Invalid JSON format");
                     return;
                 }
@@ -234,7 +234,7 @@ export default function EditAttributesDialog({
                 element,
                 attributes: attributesJson,
             });
-            
+
             // Close dialog and pass the updated attributes back
             onClose(attributesJson);
         } catch (err) {
@@ -385,21 +385,21 @@ export default function EditAttributesDialog({
                                                                 index
                                                             ].value =
                                                                 attr.type ===
-                                                                "number"
+                                                                    "number"
                                                                     ? Number(
-                                                                          e
-                                                                              .target
-                                                                              .value
-                                                                      )
+                                                                        e
+                                                                            .target
+                                                                            .value
+                                                                    )
                                                                     : e.target
-                                                                          .value
+                                                                        .value
                                                             updateAttributes(
                                                                 newAttributes
                                                             )
                                                         }}
                                                         type={
                                                             attr.type ===
-                                                            "number"
+                                                                "number"
                                                                 ? "number"
                                                                 : "text"
                                                         }

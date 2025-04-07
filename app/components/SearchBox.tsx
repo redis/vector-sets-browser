@@ -61,13 +61,10 @@ interface SearchBoxProps {
     searchCount?: string
     setSearchCount?: (value: string) => void
     error?: string | null
-    clearError?: () => void
     expansionFactor?: number
     setExpansionFactor?: (value: number | undefined) => void
     filterExpansionFactor?: number
     setFilterExpansionFactor?: (value: number | undefined) => void
-    lastTextEmbedding?: number[]
-    executedCommand?: string
     results?: VectorTuple[]
 }
 
@@ -84,13 +81,10 @@ export default function SearchBox({
     searchCount,
     setSearchCount,
     error,
-    clearError,
     expansionFactor,
     setExpansionFactor,
     filterExpansionFactor,
     setFilterExpansionFactor,
-    lastTextEmbedding,
-    executedCommand,
     results = [],
 }: SearchBoxProps) {
     const [showFilters, setShowFilters] = useState(() => {
@@ -118,11 +112,6 @@ export default function SearchBox({
             "200"
         )
     })
-
-    // Add state for the last generated image embedding
-    const [lastImageEmbedding, setLastImageEmbedding] = useState<
-        number[] | null
-    >(null)
 
     // Add a ref to track if we've initialized the search type
     const initialSearchTypeSetRef = useRef(false)
@@ -293,11 +282,6 @@ export default function SearchBox({
         userSettings.set("showRedisCommand", showRedisCommand)
     }, [showRedisCommand])
 
-    // Add a useEffect to log when the executedCommand changes
-    useEffect(() => {
-        //console.log("Executed command updated:", executedCommand);
-    }, [executedCommand])
-
     // Handle image embedding generation
     const handleImageSelect = (base64Data: string) => {
         setSearchType("Image")  // Set search type to Image when an image is selected
@@ -305,9 +289,6 @@ export default function SearchBox({
     }
 
     const handleImageEmbeddingGenerated = (embedding: number[]) => {
-        // Store the embedding
-        setLastImageEmbedding(embedding)
-
         // Set search query to a vector representation (needed for the search)
         setSearchQuery(embedding.join(", "))
     }
@@ -457,11 +438,10 @@ export default function SearchBox({
                             <Button
                                 variant="outline"
                                 size="icon"
-                                className={`h-9 ${
-                                    showFilters
-                                        ? "bg-gray-500 hover:bg-gray-600 text-white"
-                                        : "bg-[white] hover:bg-gray-100"
-                                }`}
+                                className={`h-9 ${showFilters
+                                    ? "bg-gray-500 hover:bg-gray-600 text-white"
+                                    : "bg-[white] hover:bg-gray-100"
+                                    }`}
                                 onClick={() => setShowFilters(!showFilters)}
                             >
                                 <Filter className="h-4 w-4" />
@@ -480,8 +460,8 @@ export default function SearchBox({
                                     error={
                                         error
                                             ? error.includes(
-                                                  "syntax error in FILTER"
-                                              )
+                                                "syntax error in FILTER"
+                                            )
                                             : false
                                     }
                                     onHelp={() => setShowFilterHelp(true)}
@@ -713,7 +693,7 @@ export default function SearchBox({
                         </div>
                     </div>
                     <DialogFooter>
-                        <Button onClick={()=>setShowSearchOptions(false)}>Done</Button>
+                        <Button onClick={() => setShowSearchOptions(false)}>Done</Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>

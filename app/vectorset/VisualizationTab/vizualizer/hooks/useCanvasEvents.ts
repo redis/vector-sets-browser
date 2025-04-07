@@ -1,23 +1,71 @@
-import { useEffect, useRef } from "react"
-import * as THREE from "three"
+import { useEffect, useRef, useMemo } from "react"
+import { OrthographicCamera, Scene, Mesh, Raycaster, Vector2 } from 'three'
 
-export function useCanvasEvents(
-    canvasRef: React.RefObject<HTMLCanvasElement>,
-    camera: THREE.OrthographicCamera | null,
-    scene: THREE.Scene | null,
-    onNodeClick: (mesh: THREE.Mesh) => void,
-    onNodeHover: (mesh: THREE.Mesh | null) => void,
-    updateHoverLabel: (mesh: THREE.Mesh | null, x: number, y: number) => void
-) {
-    const raycaster = new THREE.Raycaster()
-    const mouse = new THREE.Vector2()
-    const hoveredNodeRef = useRef<THREE.Mesh | null>(null)
+interface UseCanvasEventsProps {
+    camera: OrthographicCamera | null
+    scene: Scene | null
+    onPointClick?: (idx: number) => void
+    onPointHover?: (idx: number | null) => void
+    updateHoverLabel?: (mesh: Mesh | null, x: number, y: number) => void
+    isPanning?: boolean
+}
+
+export function useCanvasEvents({
+    camera,
+    scene,
+    onPointClick,
+    onPointHover,
+    updateHoverLabel,
+    isPanning,
+}: UseCanvasEventsProps) {
+    const raycaster = useMemo(() => new Raycaster(), [])
+    const mouse = useMemo(() => new Vector2(), [])
+    const canvasRef = useRef<HTMLCanvasElement | null>(null)
+    const hoveredNodeRef = useRef<Mesh | null>(null)
     const lastClickTimeRef = useRef<number>(0)
-    const lastClickedNodeRef = useRef<THREE.Mesh | null>(null)
+    const lastClickedNodeRef = useRef<Mesh | null>(null)
     const isDraggingRef = useRef<boolean>(false)
-    const previousMousePositionRef = useRef<{ x: number; y: number } | null>(
-        null
-    )
+    const previousMousePositionRef = useRef<{ x: number; y: number } | null>(null)
+
+    useEffect(() => {
+        const canvas = canvasRef.current
+        if (!canvas || !camera || !scene) return
+
+        const handleMouseMove = (event: MouseEvent) => {
+            // Update mouse position
+            const rect = canvas.getBoundingClientRect()
+            mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1
+            mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1
+
+            // Skip raycasting during panning for performance
+            if (isPanning || isDraggingRef.current) {
+                onPointHover?.(null)
+                updateHoverLabel?.(null, event.clientX, event.clientY)
+                return
+            }
+
+            // Update raycaster
+            raycaster.setFromCamera(mouse, camera)
+
+            // Check for intersections
+            const intersects = raycaster.intersectObjects(scene.children, true)
+            const hovered = intersects.find(i => i.object instanceof Mesh)
+
+            if (hovered) {
+                const hoveredMesh = hovered.object as Mesh
+                onPointHover?.(hoveredMesh.userData.index)
+                updateHoverLabel?.(hoveredMesh, event.clientX, event.clientY)
+            } else {
+                onPointHover?.(null)
+                updateHoverLabel?.(null, event.clientX, event.clientY)
+            }
+        }
+
+        canvas.addEventListener('mousemove', handleMouseMove)
+        return () => {
+            canvas.removeEventListener('mousemove', handleMouseMove)
+        }
+    }, [camera, scene, isPanning, onPointHover, updateHoverLabel, mouse, raycaster])
 
     useEffect(() => {
         const canvas = canvasRef.current
@@ -56,7 +104,10 @@ export function useCanvasEvents(
                 return
             }
 
-            raycaster.setFromCamera(mouse, camera)
+            // Only update raycaster if camera is available
+            if (camera) {
+                raycaster.setFromCamera(mouse, camera)
+            }
 
             // Handle hover effects
             const intersects = raycaster.intersectObjects(scene.children)
@@ -65,8 +116,8 @@ export function useCanvasEvents(
             if (hovered) {
                 if (hoveredNodeRef.current !== hovered.object) {
                     // New node hovered
-                    hoveredNodeRef.current = hovered.object as THREE.Mesh
-                    onNodeHover(hoveredNodeRef.current)
+                    hoveredNodeRef.current = hovered.object as Mesh
+                    onPointHover(hoveredNodeRef.current.userData.index)
                     // Update hover label with mouse position
                     updateHoverLabel(
                         hoveredNodeRef.current,
@@ -84,7 +135,7 @@ export function useCanvasEvents(
             } else if (hoveredNodeRef.current) {
                 // No longer hovering over any node
                 hoveredNodeRef.current = null
-                onNodeHover(null)
+                onPointHover(null)
                 updateHoverLabel(null, event.clientX, event.clientY)
             }
         }
@@ -103,7 +154,7 @@ export function useCanvasEvents(
             const clicked = intersects.find((i) => i.object.userData.isNode)
 
             if (clicked) {
-                const clickedNode = clicked.object as THREE.Mesh
+                const clickedNode = clicked.object as Mesh
                 const now = Date.now()
                 const timeSinceLastClick = now - lastClickTimeRef.current
                 const isDoubleClick =
@@ -114,10 +165,10 @@ export function useCanvasEvents(
                     // Force expand on double click, regardless of current state
                     clickedNode.userData.expanded = false
                     clickedNode.userData.displayState = "expanded"
-                    onNodeClick(clickedNode)
+                    onPointClick(clickedNode.userData.index)
                 } else {
                     // Single click behavior - just select the node
-                    onNodeClick(clickedNode)
+                    onPointClick(clickedNode.userData.index)
                 }
 
                 lastClickTimeRef.current = now
@@ -162,7 +213,7 @@ export function useCanvasEvents(
             // Clear hover state when mouse leaves canvas
             if (hoveredNodeRef.current) {
                 hoveredNodeRef.current = null
-                onNodeHover(null)
+                onPointHover(null)
                 updateHoverLabel(null, 0, 0)
             }
         }
@@ -216,5 +267,7 @@ export function useCanvasEvents(
             canvas.removeEventListener("mouseleave", onMouseLeave)
             canvas.removeEventListener("wheel", onWheel)
         }
-    }, [canvasRef, camera, scene, onNodeClick, onNodeHover, updateHoverLabel])
+    }, [canvasRef, camera, scene, onPointClick, onPointHover, updateHoverLabel])
+
+    return canvasRef
 }

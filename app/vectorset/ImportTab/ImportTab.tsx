@@ -35,7 +35,6 @@ export default function ImportTab({
     initialShowSampleData = false,
 }: ImportTabProps) {
     const [jobList, setJobList] = useState<Job[]>([])
-    const [error, setError] = useState<string | null>(null)
     const [showImportCSV, setShowImportCSV] = useState(false)
     const [showImportSample, setShowImportSample] = useState(initialShowSampleData)
     const [showImportSuccessDialog, setShowImportSuccessDialog] = useState(false)
@@ -56,7 +55,6 @@ export default function ImportTab({
             }
         } catch (error) {
             console.error("Error fetching jobs:", error)
-            setError("Failed to fetch jobs")
         }
     }, [vectorSetName, dismissedJobIds])
 
@@ -71,7 +69,7 @@ export default function ImportTab({
             if (data.vectorSetName !== vectorSetName) return
 
             console.log(`Job status changed:`, data)
-            
+
             // Show success dialog when a job completes
             if (data.status === "completed") {
                 try {
@@ -85,7 +83,7 @@ export default function ImportTab({
                     console.error("Error fetching completed job details:", error)
                 }
             }
-            
+
             // Refresh job list to show current state
             fetchJobs()
         }
@@ -110,7 +108,6 @@ export default function ImportTab({
             fetchJobs()
         } catch (error) {
             console.error("Error cancelling job:", error)
-            setError("Failed to cancel job")
         }
     }
 
@@ -124,7 +121,6 @@ export default function ImportTab({
             fetchJobs()
         } catch (error) {
             console.error(`Error pausing job:`, error)
-            setError(`Failed to pause job`)
         }
     }
 
@@ -135,7 +131,6 @@ export default function ImportTab({
             fetchJobs()
         } catch (error) {
             console.error(`Error resuming job:`, error)
-            setError(`Failed to resume job`)
         }
     }
 
@@ -156,19 +151,17 @@ export default function ImportTab({
             removeJob(jobId)
         } catch (error) {
             console.error("Error force cleaning job:", error)
-            setError("Failed to force clean job")
         }
     }
 
     const handleJsonImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
         if (!metadata || !event.target.files || event.target.files.length === 0) return;
-        
+
         const file = event.target.files[0];
         try {
             // Read and parse the JSON to validate it and extract vectors
             const jsonContent = await file.text();
-            const jsonData = JSON.parse(jsonContent);
-            
+
             // Create an import job with the JSON file
             const importJobConfig: ImportJobConfig = {
                 fileType: 'json',
@@ -177,7 +170,7 @@ export default function ImportTab({
                 // Let the server determine the appropriate columns and attributes
                 // based on the JSON structure
             };
-            
+
             await jobs.createImportJob(vectorSetName, file, importJobConfig);
 
             // Clear the file input for future imports
@@ -187,10 +180,9 @@ export default function ImportTab({
 
             // Fetch jobs to update the UI
             await fetchJobs();
-            
+
         } catch (error) {
             console.error("Failed to import JSON data:", error);
-            setError(error instanceof Error ? error.message : "Failed to import JSON file");
             // Clear the file input so the user can try again
             if (jsonFileInputRef.current) {
                 jsonFileInputRef.current.value = '';
@@ -201,7 +193,7 @@ export default function ImportTab({
     useEffect(() => {
         const pollInterval = setInterval(fetchJobs, 1000);
         fetchJobs(); // Initial fetch
-        
+
         return () => clearInterval(pollInterval);
     }, [fetchJobs]);
 
@@ -209,7 +201,7 @@ export default function ImportTab({
     useEffect(() => {
         const pollLogsInterval = setInterval(fetchImportLogs, 5000);
         fetchImportLogs(); // Initial fetch
-        
+
         return () => clearInterval(pollLogsInterval);
     }, [fetchImportLogs]);
 
@@ -282,7 +274,7 @@ export default function ImportTab({
                                             onImportComplete={(success) => {
                                                 console.log("onImportComplete called with success:", success);
                                                 fetchJobs();
-                                                
+
                                                 if (success) {
                                                     console.log("Import was successful, showing success dialog soon");
                                                     setTimeout(async () => {
@@ -299,10 +291,10 @@ export default function ImportTab({
                                                                     };
                                                                     return getTimestamp(b) - getTimestamp(a);
                                                                 });
-                                                                
+
                                                                 const completedJob = sortedJobs.find(j => j.status.status === "completed");
                                                                 console.log("Found completed job:", completedJob);
-                                                                
+
                                                                 if (completedJob) {
                                                                     setSuccessJob(completedJob);
                                                                     setShowImportSuccessDialog(true);
@@ -353,8 +345,8 @@ export default function ImportTab({
                                             <strong>
                                                 {metadata
                                                     ? getModelName(
-                                                          metadata.embedding
-                                                      )
+                                                        metadata.embedding
+                                                    )
                                                     : "Unknown"}
                                             </strong>
                                             . You can change the embedding
@@ -437,7 +429,7 @@ export default function ImportTab({
                     <DialogHeader>
                         <DialogTitle>Import Started Successfully</DialogTitle>
                         <DialogDescription>
-                            Your data import has started. For large files this may take a long time. 
+                            Your data import has started. For large files this may take a long time.
                             You can see the import status and pause/cancel on the vectorset list.
                         </DialogDescription>
                     </DialogHeader>

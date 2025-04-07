@@ -16,11 +16,11 @@ export interface VectorOperationResult {
     success: boolean
     error?: string
     result?:
-        | number
-        | number[]
-        | [string, number, number[]][]
-        | [string, number, number[]][][]
-        | any
+    | number
+    | number[]
+    | [string, number, number[]][]
+    | [string, number, number[]][][]
+    | any
     executionTimeMs?: number
     executedCommand?: string
 }
@@ -248,8 +248,8 @@ export async function scanVectorSets(
     })
 }
 
-export async function vadd(redisUrl: string, request: VaddRequestBody) : Promise<VectorOperationResult> {
-    
+export async function vadd(redisUrl: string, request: VaddRequestBody): Promise<VectorOperationResult> {
+
     return RedisClient.withConnection(redisUrl, async (client) => {
 
         // Ensure vector is an array of numbers
@@ -317,9 +317,8 @@ export async function vadd(redisUrl: string, request: VaddRequestBody) : Promise
             console.error("Error executing VADD command:", error)
             return {
                 success: false,
-                error: `${
-                    error instanceof Error ? error.message : String(error)
-                }`,
+                error: `${error instanceof Error ? error.message : String(error)
+                    }`,
             }
         }
     })
@@ -340,9 +339,8 @@ export async function vgetattr(
             console.error("Error executing VGETATTR command:", error)
             return {
                 success: false,
-                error: `Failed to get vector attributes: ${
-                    error instanceof Error ? error.message : String(error)
-                }`,
+                error: `Failed to get vector attributes: ${error instanceof Error ? error.message : String(error)
+                    }`,
             }
         }
     })
@@ -365,9 +363,8 @@ export async function vsetattr(
             console.error("Error executing VSETATTR command:", error)
             return {
                 success: false,
-                error: `Failed to set vector attributes: ${
-                    error instanceof Error ? error.message : String(error)
-                }`,
+                error: `Failed to set vector attributes: ${error instanceof Error ? error.message : String(error)
+                    }`,
             }
         }
     })
@@ -427,7 +424,7 @@ export async function vsim(
             const result = (await client.sendCommand(baseCommand)) as string[]
             const endTime = performance.now()
             const executionTimeMs = endTime - startTime
-            
+
             if (!result || !Array.isArray(result)) {
                 throw new Error("Invalid response from Redis VSIM command")
             }
@@ -481,7 +478,7 @@ export async function vsim(
             }
         } catch (error) {
             const err = error instanceof Error ? error.message : String(error)
-            
+
             // special case - element not found should not be an "Error"
             if (err.includes("element not found")) {
                 return {
@@ -514,7 +511,7 @@ export async function vdim(
     return RedisClient.withConnection(url, async (client) => {
         try {
             const result = await client.sendCommand(["VDIM", keyName])
-            
+
             if (result === null || result === undefined) {
                 throw new Error(`Failed to get dimensions for key ${keyName}`)
             }
@@ -574,8 +571,7 @@ export async function vcard(
         } catch (error) {
             console.error("VCARD operation error:", error)
             throw new Error(
-                `Failed to get cardinality for key ${keyName}: ${
-                    error instanceof Error ? error.message : String(error)
+                `Failed to get cardinality for key ${keyName}: ${error instanceof Error ? error.message : String(error)
                 }`
             )
         }
@@ -606,7 +602,7 @@ export async function vrem_multi(
         // Execute all commands in parallel
         const results = await multi.exec()
         console.log("Results:", results)
-        return true 
+        return true
 
     })
 }
@@ -705,8 +701,7 @@ export async function vemb_multi(
         } catch (error) {
             console.error("VEMB batch operation error:", error)
             throw new Error(
-                `Failed to get vectors for elements: ${
-                    error instanceof Error ? error.message : String(error)
+                `Failed to get vectors for elements: ${error instanceof Error ? error.message : String(error)
                 }`
             )
         }
@@ -729,15 +724,15 @@ export async function getMetadata(
         const configKey = "vector-set-browser:config"
         const hashKey = `vset:${keyName}:metadata`
 
-        let storedData = await client.hGet(configKey, hashKey)
+        const storedData = await client.hGet(configKey, hashKey)
 
         try {
             // Parse the stored data
             const parsedData = storedData ? JSON.parse(storedData) : null
 
             // Validate and correct the metadata
-           // const validatedMetadata = validateAndCorrectMetadata(parsedData)
-            const validatedMetadata = parsedData 
+            // const validatedMetadata = validateAndCorrectMetadata(parsedData)
+            const validatedMetadata = parsedData
 
             // If the metadata needed correction, write it back to Redis
             if (
@@ -748,7 +743,7 @@ export async function getMetadata(
                     [hashKey]: JSON.stringify(validatedMetadata),
                 })
             }
-            return { 
+            return {
                 success: true,
                 result: validatedMetadata
             }
@@ -756,7 +751,7 @@ export async function getMetadata(
             console.error(`Error processing metadata for ${keyName}:`, error)
             // Return a default metadata object in case of error
             // const defaultMetadata = validateAndCorrectMetadata(null)
-            
+
             // await client.hSet(configKey, {
             //     [hashKey]: JSON.stringify(defaultMetadata),
             // })
@@ -827,13 +822,13 @@ export async function createVectorSet(
             if (metadata?.dimensions && metadata.dimensions >= 2) {
                 effectiveDimensions = metadata.dimensions;
                 console.log(`Using dimensions from metadata: ${effectiveDimensions}`)
-            } 
+            }
             // If not available in metadata, try to determine from embedding configuration
             else if (metadata?.embedding) {
                 try {
                     // Try to get expected dimensions from config
                     const expectedDimensions = getExpectedDimensions(metadata.embedding)
-                    
+
                     if (expectedDimensions >= 2) {
                         effectiveDimensions = expectedDimensions
                         console.log(`Using dimensions from config: ${effectiveDimensions}`)
@@ -842,7 +837,7 @@ export async function createVectorSet(
                         const embeddingService = new EmbeddingService()
                         console.log("Getting dimensions from EmbeddingService")
                         console.log("metadata.embedding", metadata.embedding)
-                        
+
                         // Get a test embedding to determine dimensions
                         const testEmbedding = await embeddingService.getEmbedding("test", metadata.embedding)
                         effectiveDimensions = testEmbedding.length
@@ -850,8 +845,7 @@ export async function createVectorSet(
                     }
                 } catch (error) {
                     throw new Error(
-                        `Failed to determine vector dimensions: ${
-                            error instanceof Error ? error.message : String(error)
+                        `Failed to determine vector dimensions: ${error instanceof Error ? error.message : String(error)
                         }`
                     )
                 }
@@ -933,8 +927,7 @@ export async function createVectorSet(
         } catch (error) {
             console.error("Error executing VADD command:", error)
             throw new Error(
-                `Failed to create vector set: ${
-                    error instanceof Error ? error.message : String(error)
+                `Failed to create vector set: ${error instanceof Error ? error.message : String(error)
                 }`
             )
         }
@@ -969,7 +962,6 @@ export async function vlinks(
     url: string,
     keyName: string,
     element: string,
-    count: number = 10
 ): Promise<VectorOperationResult> {
     if (!keyName || !element) {
         console.error("Invalid VLINKS parameters:", { keyName, element })
@@ -1116,36 +1108,36 @@ export async function vadd_multi(
     return RedisClient.withConnection(url, async (client) => {
         try {
             const multi = client.multi()
-            
+
             for (let i = 0; i < request.elements.length; i++) {
                 const command = ["VADD", request.keyName]
-                
+
                 if (request.reduceDimensions) {
                     command.push("REDUCE", request.reduceDimensions.toString())
                 }
-                
+
                 command.push(
                     "VALUES",
                     request.vectors[i].length.toString(),
                     ...request.vectors[i].map(v => v.toString()),
                     request.elements[i]
                 )
-                
+
                 if (request.attributes && request.attributes[i]) {
                     command.push("SETATTR", JSON.stringify(request.attributes[i]))
                 }
-                
+
                 if (request.useCAS) {
                     command.push("CAS")
                 }
-                
+
                 if (request.ef) {
                     command.push("EF", request.ef.toString())
                 }
-                
+
                 multi.addCommand(command)
             }
-            
+
             const results = await multi.exec()
             return {
                 success: true,

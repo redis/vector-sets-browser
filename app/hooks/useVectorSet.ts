@@ -152,7 +152,7 @@ export function useVectorSet(): UseVectorSetReturn {
                         `Vector dimensions mismatch: expected ${dim}, got ${elementData.length}`
                     )
                 }
-                
+
                 newVector = elementData
             } else {
                 // Assume elementData is text that needs to be embedded
@@ -176,7 +176,7 @@ export function useVectorSet(): UseVectorSetReturn {
             }
 
             // Validate the vector (no normalization)
-            let validationResult = validateVector(
+            const validationResult = validateVector(
                 newVector,
                 metadata?.embedding ? getExpectedDimensions(metadata?.embedding) : undefined,
             )
@@ -232,10 +232,10 @@ export function useVectorSet(): UseVectorSetReturn {
             }
 
             // Emit event to notify other components
-            eventBus.emit(AppEvents.VECTOR_ADDED, { 
-                vectorSetName, 
-                element, 
-                newCount: newRecordCount 
+            eventBus.emit(AppEvents.VECTOR_ADDED, {
+                vectorSetName,
+                element,
+                newCount: newRecordCount
             })
         } catch (error) {
             console.error("Error creating vector:", error)
@@ -284,10 +284,10 @@ export function useVectorSet(): UseVectorSetReturn {
             }
 
             // Emit event to notify other components
-            eventBus.emit(AppEvents.VECTOR_DELETED, { 
-                vectorSetName, 
-                element, 
-                newCount: newRecordCount 
+            eventBus.emit(AppEvents.VECTOR_DELETED, {
+                vectorSetName,
+                element,
+                newCount: newRecordCount
             })
         } catch (error) {
             console.error("Error deleting vector:", error)
@@ -304,40 +304,40 @@ export function useVectorSet(): UseVectorSetReturn {
             setStatusMessage("Please select a vector set first")
             return
         }
-         try {
-             setStatusMessage(`Deleting elements "${elements}"...`)
-             // Delete the vectors from Redis
-                 
-             await vrem({
-                 keyName: vectorSetName,
-                 elements,
-             })
-             setStatusMessage("Vectors deleted successfully")
+        try {
+            setStatusMessage(`Deleting elements "${elements}"...`)
+            // Delete the vectors from Redis
 
-             // Remove the vector from the results list
-             setResults((prevResults) =>
-                 prevResults.filter(([id]) => !elements.includes(id))
-             )
+            await vrem({
+                keyName: vectorSetName,
+                elements,
+            })
+            setStatusMessage("Vectors deleted successfully")
 
-             // Update the record count
-             const newRecordCount = await vcard({
-                 keyName: vectorSetName,
-             })
-             setRecordCount(newRecordCount)
+            // Remove the vector from the results list
+            setResults((prevResults) =>
+                prevResults.filter(([id]) => !elements.includes(id))
+            )
 
-             // Update the cache
-             if (vectorSetCacheRef.current[vectorSetName]) {
-                 vectorSetCacheRef.current[vectorSetName].recordCount =
-                     newRecordCount
-             }
+            // Update the record count
+            const newRecordCount = await vcard({
+                keyName: vectorSetName,
+            })
+            setRecordCount(newRecordCount)
 
-             // Emit event to notify other components
-             eventBus.emit(AppEvents.VECTOR_DELETED, { 
-                 vectorSetName, 
-                 elements, 
-                 newCount: newRecordCount 
-             })
-         } catch (error) {
+            // Update the cache
+            if (vectorSetCacheRef.current[vectorSetName]) {
+                vectorSetCacheRef.current[vectorSetName].recordCount =
+                    newRecordCount
+            }
+
+            // Emit event to notify other components
+            eventBus.emit(AppEvents.VECTOR_DELETED, {
+                vectorSetName,
+                elements,
+                newCount: newRecordCount
+            })
+        } catch (error) {
             console.error("Error deleting vectors:", error)
             setStatusMessage(
                 error instanceof ApiError
@@ -394,8 +394,8 @@ export function useVectorSet(): UseVectorSetReturn {
                 // Handle response in {success: true, result: [...]} format
                 vector =
                     response.success &&
-                    "result" in response &&
-                    Array.isArray(response.result)
+                        "result" in response &&
+                        Array.isArray(response.result)
                         ? response.result
                         : null
             } else if (Array.isArray(response)) {
@@ -465,9 +465,9 @@ export function useVectorSet(): UseVectorSetReturn {
             };
 
             // Emit event for other components that might need to know
-            eventBus.emit(AppEvents.METADATA_UPDATED, { 
-                vectorSetName, 
-                metadata: newMetadata 
+            eventBus.emit(AppEvents.METADATA_UPDATED, {
+                vectorSetName,
+                metadata: newMetadata
             });
         } catch (error) {
             console.error("[useVectorSet] Error updating metadata:", error);

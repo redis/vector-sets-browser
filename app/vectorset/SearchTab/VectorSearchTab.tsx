@@ -64,7 +64,7 @@ export default function VectorSearchTab({
         [setResults]
     )
 
-    const handleStatusChange = useCallback((status: string) => {}, [])
+    const handleStatusChange = useCallback(() => { }, [])
 
     const handleSearchStateChange = useCallback(
         (newState: Partial<VectorSetSearchState>) => {
@@ -154,7 +154,6 @@ export default function VectorSearchTab({
     const getNeighbors = async (
         element: string,
         count: number,
-        withEmbeddings?: boolean
     ): Promise<{ element: string; similarity: number; vector: number[] }[]> => {
         try {
             const data = await vlinks({
@@ -165,7 +164,7 @@ export default function VectorSearchTab({
             })
             console.log("vlink DATA", data)
             if (!data) return []
-            
+
             // data is an array of arrays
             // each inner array contains [element, similarity, vector]
             const response = data.flat().map((item) => ({

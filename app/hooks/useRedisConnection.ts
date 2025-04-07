@@ -30,7 +30,7 @@ export function useRedisConnection(
     const [showVectorSets, setShowVectorSets] = useState(false)
     const [statusMessage, setStatusMessage] = useState("")
     const [isInitializing, setIsInitializing] = useState(true)
-    const [state, setState] = useState<StoredConnectionState>({
+    const [_state, setState] = useState<StoredConnectionState>({
         redisUrl: "",
         showVectorSets: true,
     })

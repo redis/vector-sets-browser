@@ -77,15 +77,9 @@ export class JobProcessor {
                 this.jobId,
                 progress
             );
-            
+
             // If there was a status change, try to emit an event and register for client notification
             if (progress.status && this.metadata?.vectorSetName) {
-                const statusData = {
-                    vectorSetName: this.metadata.vectorSetName,
-                    status: progress.status,
-                    jobId: this.jobId
-                };
-                                
                 // Register status change for client notification via completed jobs API
                 if (progress.status === "completed" || progress.status === "failed" || progress.status === "cancelled") {
                     registerCompletedJob(this.jobId, this.metadata.vectorSetName)
@@ -163,13 +157,13 @@ export class JobProcessor {
         }
 
         const vectorElement = buildVectorElement(elementId, embedding, attributes)
-        
+
         // Store the vector element in memory until we're ready to save
         if (!this._vectorElements) {
             this._vectorElements = []
         }
         this._vectorElements.push(vectorElement)
-        
+
     }
 
     public async start(): Promise<void> {
@@ -226,7 +220,7 @@ export class JobProcessor {
                             console.log(`[JobProcessor] Starting JSON export of ${this._vectorElements.length} vectors to ${this.metadata.outputFilename}`)
                             const result = await saveVectorData(this.metadata.outputFilename, this._vectorElements)
                             console.log(`[JobProcessor] Successfully saved vectors to ${result.filePath}`)
-                            
+
                             // Update the progress with the file location
                             await this.updateProgress({
                                 status: "completed",
@@ -250,15 +244,9 @@ export class JobProcessor {
 
                     // Create an import log entry before cleaning up the job
                     await this.createImportLogEntry()
-                    
+
                     // Notify about the import completing
                     if (this.metadata?.vectorSetName) {
-                        
-                        const importData = {
-                            vectorSetName: this.metadata.vectorSetName,
-                            jobId: this.jobId
-                        };
-                        
                         // Register the completed job for client polling
                         registerCompletedJob(this.jobId, this.metadata.vectorSetName)
                     }
@@ -351,15 +339,13 @@ export class JobProcessor {
 
                     if (!elementId) {
                         console.warn(
-                            `[JobProcessor] Skipping item ${
-                                item.index + 1
+                            `[JobProcessor] Skipping item ${item.index + 1
                             }: Element identifier not found`
                         )
                         await this.updateProgress({
                             current: item.index + 1,
-                            message: `Skipped item ${
-                                item.index + 1
-                            }: Missing element identifier`,
+                            message: `Skipped item ${item.index + 1
+                                }: Missing element identifier`,
                         })
                         continue
                     }
@@ -381,15 +367,13 @@ export class JobProcessor {
 
                         if (!textToEmbed) {
                             console.warn(
-                                `[JobProcessor] Skipping item ${
-                                    item.index + 1
+                                `[JobProcessor] Skipping item ${item.index + 1
                                 }: Text to embed not found`
                             )
                             await this.updateProgress({
                                 current: item.index + 1,
-                                message: `Skipped item ${
-                                    item.index + 1
-                                }: Missing text to embed`,
+                                message: `Skipped item ${item.index + 1
+                                    }: Missing text to embed`,
                             })
                             continue
                         }
@@ -432,16 +416,14 @@ export class JobProcessor {
                     const errorMessage =
                         error instanceof Error ? error.message : String(error)
                     console.error(
-                        `[JobProcessor] Error processing item ${
-                            item.index + 1
+                        `[JobProcessor] Error processing item ${item.index + 1
                         }:`,
                         error
                     )
                     await this.updateProgress({
                         current: item.index + 1,
-                        message: `Error processing item ${
-                            item.index + 1
-                        }: ${errorMessage}`,
+                        message: `Error processing item ${item.index + 1
+                            }: ${errorMessage}`,
                     })
                     // Continue with next item after error
                     await new Promise((resolve) => setTimeout(resolve, 1000))

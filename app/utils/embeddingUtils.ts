@@ -1,4 +1,4 @@
-import { EmbeddingConfig, EmbeddingProvider } from "@/app/embeddings/types/embeddingModels";
+import { EmbeddingConfig } from "@/app/embeddings/types/embeddingModels";
 
 /**
  * Checks if Ollama is available on the default port
@@ -12,7 +12,7 @@ export async function isOllamaAvailable(): Promise<boolean> {
         "Content-Type": "application/json",
       },
     });
-    
+
     return response.ok;
   } catch (error) {
     console.log("Ollama not available:", error);
@@ -37,12 +37,12 @@ export async function getDefaultTextEmbeddingConfig(): Promise<EmbeddingConfig> 
         model: "clip-vit-base-patch32"
       }
     }
-  } catch (e) {
+  } catch (_e) {
     console.log("CLIP not available, falling back to other providers")
   }
-  
+
   const ollamaAvailable = await isOllamaAvailable();
-  
+
   if (ollamaAvailable) {
     return {
       provider: "ollama",
@@ -52,7 +52,7 @@ export async function getDefaultTextEmbeddingConfig(): Promise<EmbeddingConfig> 
       },
     };
   }
-  
+
   // Fall back to TensorFlow
   return {
     provider: "tensorflow",
@@ -76,7 +76,7 @@ export function getDefaultImageEmbeddingConfig(): EmbeddingConfig {
         model: "clip-vit-base-patch32"
       }
     }
-  } catch (e) {
+  } catch (_e) {
     console.log("CLIP not available, falling back to MobileNet")
     // Fall back to MobileNet
     return {

@@ -25,7 +25,7 @@ export class TensorFlowProvider implements EmbeddingProvider {
             // Convert to array
             const embeddingsArray = await embeddings.arraySync()
             const embedding = embeddingsArray[0]
-            
+
             // Validate embedding dimensions
             const modelData = getModelData(config)
             const expectedDim = modelData?.dimensions
@@ -34,7 +34,7 @@ export class TensorFlowProvider implements EmbeddingProvider {
                     `Unexpected embedding dimension: got ${embedding.length}, expected ${expectedDim}`
                 )
             }
-            
+
             return embedding
         } catch (error) {
             console.error("[TensorFlow] Error generating embedding:", error)
@@ -56,7 +56,7 @@ export class TensorFlowProvider implements EmbeddingProvider {
 
             // Convert to array
             const embeddingsArray = await embeddings.arraySync()
-            
+
             // Validate embedding dimensions
             const modelData = getModelData(config)
             const expectedDim = modelData?.dimensions
@@ -70,7 +70,7 @@ export class TensorFlowProvider implements EmbeddingProvider {
                     }
                 }
             }
-            
+
             return embeddingsArray
         } catch (error) {
             console.error("[TensorFlow] Error generating batch embeddings:", error)
@@ -86,16 +86,16 @@ export class TensorFlowProvider implements EmbeddingProvider {
 
         try {
             // Dynamically import TensorFlow.js and Universal Sentence Encoder
-            const tf = await import('@tensorflow/tfjs')
+            // const tf = await import('@tensorflow/tfjs')
             const use = await import('@tensorflow-models/universal-sentence-encoder')
 
             // Load the model
             console.log(`[TensorFlow] Loading model from ${modelUrl}`)
             const model = await use.load()
-            
+
             // Cache the model
             modelCache.set(modelUrl, model)
-            
+
             return model
         } catch (error) {
             console.error(`[TensorFlow] Error loading model from ${modelUrl}:`, error)

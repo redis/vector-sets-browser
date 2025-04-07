@@ -4,10 +4,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useEffect, useState } from "react"
 import { useRedisConnection } from "../hooks/useRedisConnection"
-import { VectorSetSearchState } from "../hooks/useVectorSearch"
 import { useVectorSet } from "../hooks/useVectorSet"
 import { getConnection, removeConnection } from "../redis-server/connectionManager"
-import { EmbeddingConfig, VectorSetMetadata } from "@/app/embeddings/types/embeddingModels"
 import { userSettings } from "../utils/userSettings"
 import AddVectorModal from "./AddVectorDialog"
 import ImportTab from "./ImportTab/ImportTab"
@@ -32,15 +30,6 @@ import VectorSettings from "./SettingsTab/VectorSettings"
  * - Connection failure -> redirect to /home
  * - Connection verification failure -> redirect to /home
  */
-
-// Default search state
-const DEFAULT_SEARCH_STATE: VectorSetSearchState = {
-    searchType: "Vector",
-    searchQuery: "",
-    searchCount: "10",
-    resultsTitle: "Search Results",
-    searchFilter: "",
-}
 
 export default function VectorSetPage() {
     const router = useRouter()
@@ -86,8 +75,6 @@ export default function VectorSetPage() {
         handleShowVector,
         results,
         setResults,
-        loadVectorSet,
-        setMetadata,
         updateMetadata,
     } = useVectorSet()
 
@@ -135,7 +122,7 @@ export default function VectorSetPage() {
                             }) =>
                                 conn.id === connection.url ||
                                 `redis://${conn.host}:${conn.port}` ===
-                                    connection.url
+                                connection.url
                         )
                         if (matchingConnection) {
                             setRedisName(matchingConnection.name)

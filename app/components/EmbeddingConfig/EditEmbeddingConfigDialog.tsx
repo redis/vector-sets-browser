@@ -150,11 +150,11 @@ export default function EditEmbeddingConfigModal({
     // Update provider if it doesn't match the dataFormat
     useEffect(() => {
         if (!dataFormat) return
-        
-        const isCurrentProviderValid = 
+
+        const isCurrentProviderValid =
             (dataFormat === "text" && ["openai", "ollama", "tensorflow"].includes(provider)) ||
             (dataFormat === "image" && ["image"].includes(provider))
-            
+
         if (!isCurrentProviderValid) {
             // Set default provider based on data format
             if (dataFormat === "text") {
@@ -179,12 +179,12 @@ export default function EditEmbeddingConfigModal({
                     setError("Please enter an OpenAI API key")
                     return
                 }
-                
+
                 // If user entered a new API key in the form, save it globally
                 if (tempApiKey && tempApiKey !== apiKey) {
                     saveApiKey(tempApiKey)
                 }
-                
+
                 // No need to include apiKey in the config anymore
                 newConfig.openai = {
                     model: openaiConfig.model,
@@ -226,7 +226,7 @@ export default function EditEmbeddingConfigModal({
         if (!dataFormat) {
             return ["tensorflow", "image", "ollama", "openai", "clip"]
         }
-        
+
         if (dataFormat === "text") {
             return ["tensorflow", "ollama", "openai", "clip"]
         } else {
@@ -289,7 +289,7 @@ export default function EditEmbeddingConfigModal({
                                                 CLIP - Text & Image Embeddings
                                             </div>
                                             <div className="text-gray-500">
-                                                OpenAI's CLIP model for text-to-image and image-to-image search
+                                                OpenAI{'\''}s CLIP model for text-to-image and image-to-image search
                                             </div>
                                         </div>
                                     </SelectItem>

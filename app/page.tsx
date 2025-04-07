@@ -88,7 +88,7 @@ export default function Home() {
                         <Card>
                             <CardHeader className="flex flex-row items-center gap-4">
                                 <div className="rounded-lg bg-primary/10 p-2">
-                                    <Image className="h-6 w-6 text-primary" />
+                                    <Image className="h-6 w-6 text-primary" alt="Image Embeddings" />
                                 </div>
                                 <div>
                                     <CardTitle>Image Embeddings</CardTitle>
@@ -128,7 +128,7 @@ export default function Home() {
                                     querying audio embeddings. Use them for
                                     audio fingerprinting, voice recognition,
                                     music recommendation, and sound
-                                    classification. With Redis's in-memory
+                                    classification. With Redis{'\''}s in-memory
                                     performance, your audio similarity searches
                                     will be lightning fast.
                                 </p>

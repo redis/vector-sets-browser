@@ -44,7 +44,7 @@ export class TextDataset implements Dataset {
         }
     }
 
-    async prepareImport({ onProgress }: { onProgress?: (progress: ImportProgress) => void } = {}): Promise<{ file: File, config: ImportJobConfig }> {
+    async prepareImport(): Promise<{ file: File, config: ImportJobConfig }> {
         // Fetch the CSV file
         const response = await fetch(this.config.fileUrl)
         if (!response.ok) {
