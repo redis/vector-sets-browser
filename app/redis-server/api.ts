@@ -119,7 +119,7 @@ export async function vadd(request: VaddRequestBody) {
             "/api/redis/command/vadd",
             request
         );
-        return response.result
+        return response
     } catch (error) {
         console.error("[vadd] API error:", error);
         // Re-throw the error to be caught by the caller
