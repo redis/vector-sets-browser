@@ -3,7 +3,10 @@ import {
     ColumnConfig,
     useVectorResultsSettings,
 } from "@/app/hooks/useVectorResultsSettings"
-import { VectorTuple, vgetattr, vgetattr_multi } from "@/app/redis-server/api"
+import {
+    VectorTuple,
+    vgetattr_multi,
+} from "@/app/redis-server/api"
 import { parseFieldFilters } from "@/app/utils/filterParser"
 import { Button } from "@/components/ui/button"
 import {
@@ -313,75 +316,83 @@ export default function VectorResults({
         setIsLoadingAttributes(false)
     }, [keyName])
 
-    // Fetch attributes when showAttributes is enabled
+    // Single source of truth for attribute fetching
+    const fetchAttributes = async (elements: string[]) => {
+        try {
+            const response = await vgetattr_multi({ keyName, elements, returnCommandOnly: false });
+
+            if (!response?.success || !response?.result) {
+                console.error(`Error fetching attributes`, response?.error);
+                return null;
+            }
+            return response.result;
+        } catch (error) {
+            console.error(`Error fetching attributes`, error);
+            return null;
+        }
+    };
+
+    // Use this in the first useEffect
     useEffect(() => {
-        // skip if showAttributes is off or there are no results
-        if (!showAttributes || results.length === 0) {
-            return
-        }
+        if (!showAttributes || results.length === 0) return;
 
-        // skip if attributes are already loaded
-        if (isLoadingAttributes) {
-            return
-        }
+        let isCancelled = false;
+        const elements = results.map(row => row[0]);
 
-        const fetchAttributes = async () => {
-            setIsLoadingAttributes(true)
-            const newCache: AttributeCache = { ...attributeCache }
-            let hasChanges = false
+        const fetchAndProcessAttributes = async () => {
+            setIsLoadingAttributes(true);
+            try {
+                const attributes = await fetchAttributes(elements);
 
-            const supportMultiCommand = true
+                if (isCancelled || !attributes) return;
 
-            if (supportMultiCommand) {
-                const elements = results.map((row) => row[0])
-                let attributes: string[] | null = []
-                try {
-                    attributes = await vgetattr_multi({
-                        keyName,
-                        elements,
-                    })
-                } catch (error) {
-                    console.error(`Error fetching attributes`, error)
-                }
+                const newCache = { ...attributeCache };
+                const newParsedCache: Record<string, ParsedAttributes> = {};
+                const allAttributeColumns = new Set<string>();
 
-                if (attributes) {
-                    for (let i = 0; i < elements.length; i++) {
-                        const element = elements[i]
-                        const attribute = attributes[i]
-                        newCache[element] = attribute
-                        hasChanges = true
-                    }
-                }
-            } else {
-                for (const row of results) {
-                    const element = row[0]
-                    if (attributeCache[element] === undefined) {
+                elements.forEach((element, i) => {
+                    newCache[element] = attributes[i];
+                    if (attributes[i]) {
                         try {
-                            const attributes = await vgetattr({
-                                keyName,
-                                element,
-                            })
-                            newCache[element] = attributes
-                            hasChanges = true
+                            const parsed = JSON.parse(attributes[i]);
+                            newParsedCache[element] = parsed;
+                            Object.keys(parsed).forEach(key => allAttributeColumns.add(key));
                         } catch (error) {
-                            console.error(
-                                `Error fetching attributes for ${element}:`,
-                                error
-                            )
-                            newCache[element] = null
-                            hasChanges = true
+                            console.error(`Error parsing attributes for ${element}:`, error);
                         }
                     }
+                });
+
+                if (!isCancelled) {
+                    setAttributeCache(newCache);
+                    setParsedAttributeCache(newParsedCache);
+
+                    // Update columns in a single operation
+                    setAvailableColumns(prev => {
+                        const systemColumns = prev.filter(col => col.type === "system");
+                        const attributeColumns = Array.from(allAttributeColumns).map(name => ({
+                            name,
+                            visible: getColumnVisibilityRef.current(name, true),
+                            type: "attribute" as const
+                        }));
+                        return [...systemColumns, ...attributeColumns];
+                    });
+                }
+            } catch (error) {
+                console.error('Error fetching attributes:', error);
+            } finally {
+                if (!isCancelled) {
+                    setIsLoadingAttributes(false);
                 }
             }
-            if (hasChanges) {
-                setAttributeCache(newCache)
-            }
-            setIsLoadingAttributes(false)
-        }
+        };
 
-        fetchAttributes()
-    }, [showAttributes, results, keyName])
+        fetchAndProcessAttributes();
+
+        return () => {
+            isCancelled = true;
+        };
+    }, [showAttributes, results, keyName]);
 
     // Extract field names from searchFilter
     const filteredFields = useMemo(() => {
@@ -398,137 +409,55 @@ export default function VectorResults({
         )
     }, [searchFilter])
 
-    // Unified effect to handle attribute parsing and column management
+    // Modify the column management effect to be simpler
     useEffect(() => {
         if (!showAttributes || (showOnlyFilteredAttributes && !searchFilter)) {
-            // Remove all attribute columns when showAttributes is off
-            // OR when showOnlyFilteredAttributes is on but there's no filter
-            setAvailableColumns((prev) =>
-                prev.filter((col) => col.type === "system")
-            )
-            return
-        }
-
-        // First parse all attributes
-        const newParsedCache: Record<string, ParsedAttributes> = {}
-        const allAttributeColumns = new Set<string>()
-
-        // Collect all attribute names and parse values
-        Object.entries(attributeCache).forEach(([element, attrStr]) => {
-            if (!attrStr) return
-
-            try {
-                const parsed = JSON.parse(attrStr)
-                newParsedCache[element] = parsed
-                Object.keys(parsed).forEach((key) =>
-                    allAttributeColumns.add(key)
-                )
-            } catch (error) {
-                console.error(`Error parsing attributes for ${element}:`, error)
-            }
-        })
-
-        setParsedAttributeCache(newParsedCache)
-
-        // Then determine which columns should be visible
-        const systemColumns = [
-            {
-                name: "element",
-                visible: getColumnVisibilityRef.current("element", true),
-                type: "system" as const,
-            },
-            {
-                name: "score",
-                visible: getColumnVisibilityRef.current("score", true),
-                type: "system" as const,
-            },
-        ]
-
-        let attributeColumns: ColumnConfig[] = []
-
-        if (showOnlyFilteredAttributes && searchFilter) {
-            // Only include columns that are referenced in the search filter
-            attributeColumns = Array.from(allAttributeColumns)
-                .filter((name) => filteredFields.includes(name))
-                .map((name) => ({
-                    name,
-                    visible: getColumnVisibilityRef.current(name, true),
-                    type: "attribute" as const,
+            // Only hide attribute columns, don't remove them
+            setAvailableColumns(prev =>
+                prev.map(col => ({
+                    ...col,
+                    visible: col.type === "system" ? col.visible : false
                 }))
-        } else {
-            // Include all attribute columns
-            attributeColumns = Array.from(allAttributeColumns).map((name) => ({
-                name,
-                visible: getColumnVisibilityRef.current(name, true),
-                type: "attribute" as const,
-            }))
+            );
+            return;
         }
 
-        setAvailableColumns([...systemColumns, ...attributeColumns])
-    }, [
-        showAttributes,
-        attributeCache,
-        showOnlyFilteredAttributes,
-        searchFilter,
-        filteredFields,
-    ])
+        // Show/hide appropriate columns based on filter
+        setAvailableColumns(prev => {
+            return prev.map(col => {
+                if (col.type === "system") return col;
+
+                const shouldBeVisible = !showOnlyFilteredAttributes ||
+                    (showOnlyFilteredAttributes && filteredFields.includes(col.name));
+
+                return {
+                    ...col,
+                    visible: shouldBeVisible
+                };
+            });
+        });
+    }, [showAttributes, showOnlyFilteredAttributes, searchFilter, filteredFields]);
 
     // Fetch field values when filtered fields change
     useEffect(() => {
-        if (
-            !showAttributes ||
-            !showOnlyFilteredAttributes ||
-            filteredFields.length === 0
-        ) {
-            return
-        }
+        if (!showAttributes || !showOnlyFilteredAttributes || filteredFields.length === 0) return;
 
-        const fetchFieldValues = async () => {
-            const newValues: Record<string, Record<string, string>> = {}
+        const newValues: Record<string, Record<string, string>> = {};
 
-            for (const row of results) {
-                const element = row[0]
-                if (!newValues[element]) {
-                    try {
-                        const attributes = await vgetattr({
-                            keyName,
-                            element,
-                        })
-                        if (attributes) {
-                            try {
-                                const parsed = JSON.parse(attributes)
-                                newValues[element] = {}
-                                for (const field of filteredFields) {
-                                    newValues[element][field] =
-                                        parsed[field]?.toString() || ""
-                                }
-                            } catch (e) {
-                                console.error(
-                                    `Error parsing attributes for ${element}:`,
-                                    e
-                                )
-                            }
-                        }
-                    } catch (error) {
-                        console.error(
-                            `Error fetching attributes for ${element}:`,
-                            error
-                        )
-                    }
+        for (const row of results) {
+            const element = row[0];
+            const parsedAttributes = parsedAttributeCache[element];
+
+            if (parsedAttributes) {
+                newValues[element] = {};
+                for (const field of filteredFields) {
+                    newValues[element][field] = parsedAttributes[field]?.toString() || "";
                 }
             }
-
-            setFilteredFieldValues(newValues)
         }
 
-        fetchFieldValues()
-    }, [
-        showAttributes,
-        showOnlyFilteredAttributes,
-        filteredFields,
-        results,
-        keyName,
-    ])
+        setFilteredFieldValues(newValues);
+    }, [showAttributes, showOnlyFilteredAttributes, filteredFields, results, parsedAttributeCache]);
 
     // Handle dialog close with updated attributes
     const handleAttributesDialogClose = (updatedAttributes?: string) => {
@@ -1172,7 +1101,10 @@ export default function VectorResults({
                         {filteredAndSortedResults.map((row, index) => (
                             <TableRow
                                 key={index}
-                                className={`group ${selectedElements.has(row[0]) ? "bg-blue-50" : ""}`}
+                                className={`group ${selectedElements.has(row[0])
+                                        ? "bg-blue-50"
+                                        : ""
+                                    }`}
                             >
                                 {/* Add a checkbox cell when in select mode */}
                                 {selectMode && (

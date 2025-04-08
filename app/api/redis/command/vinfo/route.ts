@@ -1,50 +1,71 @@
-import { VinfoRequestBody } from "@/app/redis-server/api"
-import * as redis from "@/app/redis-server/server/commands"
-import { getRedisUrl } from "@/app/redis-server/server/commands"
-import { NextResponse } from "next/server"
+import { RedisConnection, getRedisUrl } from '@/app/redis-server/RedisConnection'
+import { validateRequest, formatResponse, handleError } from '@/app/redis-server/utils'
+import { validateVinfoRequest, buildVinfoCommand } from './command'
+import { NextResponse } from 'next/server'
 
 export async function POST(request: Request) {
     try {
-        const body = (await request.json()) as VinfoRequestBody
-        const { keyName } = body
-
-        if (!keyName) {
-            return NextResponse.json(
-                { success: false, error: "Key name is required" },
-                { status: 400 }
-            )
-        }
-
-        const redisUrl = await redis.getRedisUrl()
+        // Validate request
+        const validatedRequest = await validateRequest(request, validateVinfoRequest)
+        console.log("Received VINFO request")
+        
+        // Get Redis URL
+        const redisUrl = await getRedisUrl()
         if (!redisUrl) {
             return NextResponse.json(
-                { success: false, error: "No Redis connection available" },
+                { success: false, error: 'No Redis connection available' },
                 { status: 401 }
             )
         }
 
-        const result = await redis.vinfo(redisUrl, keyName)
+        // Build command
+        const commands = buildVinfoCommand(validatedRequest)
+        const commandStr = commands[0].join(' ')
 
-        if (!result.success) {
-            return NextResponse.json(
-                { success: false, error: result.error },
-                { status: 500 }
-            )
+        // If returnCommandOnly is true, return just the command
+        if (validatedRequest.returnCommandOnly) {
+            return NextResponse.json({
+                success: true,
+                executedCommand: commandStr
+            })
         }
 
-        return NextResponse.json({
+        // Execute command
+        const redisResult = await RedisConnection.withClient(redisUrl, async (client) => {
+            return await client.sendCommand(commands[0])
+        })
+
+        // Check if the Redis operation itself failed
+        if (!redisResult.success) {
+            return formatResponse(redisResult)
+        }
+
+        // Process VINFO result
+        // VINFO returns an array of alternating keys and values
+        const result = redisResult.result as string[]
+        const info: Record<string, any> = {}
+
+        for (let i = 0; i < result.length; i += 2) {
+            const key = result[i]
+            const value = result[i + 1]
+
+            if (key && value !== undefined) {
+                // Convert numeric strings to numbers
+                if (typeof value === 'string' && !isNaN(Number(value))) {
+                    info[key] = Number(value)
+                } else {
+                    info[key] = value
+                }
+            }
+        }
+
+        return formatResponse({
             success: true,
-            result: result.result,
+            result: info,
+            executedCommand: commandStr
         })
     } catch (error) {
-        console.error("Error in VINFO API:", error)
-        return NextResponse.json(
-            {
-                success: false,
-                error: error instanceof Error ? error.message : String(error),
-            },
-            { status: 500 }
-        )
+        return handleError(error)
     }
 }
 
@@ -53,43 +74,12 @@ export async function GET(request: Request) {
     const url = new URL(request.url)
     const keyName = url.searchParams.get("key")
 
-    if (!keyName) {
-        return NextResponse.json(
-            { success: false, error: "Key parameter is required" },
-            { status: 400 }
-        )
-    }
+    // Convert the GET request to a POST request format
+    const postRequest = new Request(request.url, {
+        method: 'POST',
+        headers: request.headers,
+        body: JSON.stringify({ keyName })
+    })
 
-    const redisUrl = await getRedisUrl()
-    if (!redisUrl) {
-        return NextResponse.json(
-            { success: false, error: "No Redis connection available" },
-            { status: 401 }
-        )
-    }
-
-    try {
-        const result = await redis.vinfo(redisUrl, keyName)
-
-        if (!result.success) {
-            return NextResponse.json(
-                { success: false, error: result.error },
-                { status: 500 }
-            )
-        }
-
-        return NextResponse.json({
-            success: true,
-            result: result.result,
-        })
-    } catch (error) {
-        console.error("Error in VINFO API (GET):", error)
-        return NextResponse.json(
-            {
-                success: false,
-                error: error instanceof Error ? error.message : String(error),
-            },
-            { status: 500 }
-        )
-    }
+    return POST(postRequest)
 }

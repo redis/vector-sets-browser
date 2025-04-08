@@ -17,7 +17,7 @@ export class OllamaProvider implements EmbeddingProvider {
                 input: prompt,
             }),
         })
-
+        
         if (!response.ok) {
             const errorText = await response.text()
             throw new Error(`Ollama API error: ${response.status} - ${errorText}`)

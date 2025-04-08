@@ -45,10 +45,10 @@ export default function CreateVectorSetModal({
         "manual" | "embedding"
     >("embedding")
     const [embeddingConfig, setEmbeddingConfig] = useState<EmbeddingConfig>({
-        provider: "tensorflow",
-        tensorflow: {
-            model: "universal-sentence-encoder",
-        },
+        provider: "clip",
+        clip: {
+            model: "clip-vit-base-patch32"
+        }
     })
     const [isOllamaAvailable, setIsOllamaAvailable] = useState(false)
     const [isConfigInitialized, setIsConfigInitialized] = useState(false)

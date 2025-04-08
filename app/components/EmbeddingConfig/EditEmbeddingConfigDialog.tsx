@@ -3,7 +3,6 @@ import {
     EmbeddingProvider,
     ImageModelName,
     OpenAIModelName,
-    TensorFlowModelName,
 } from "@/app/embeddings/types/embeddingModels"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
@@ -27,7 +26,6 @@ import { userSettings } from "@/app/utils/userSettings"
 import { useEffect, useState } from "react"
 import ImageModelSelector from "./ImageModelSelector"
 import OllamaModelSelector from "./OllamaModelSelector"
-import TensorFlowModelSelector from "./TensorFlowModelSelector"
 
 const DEFAULT_CONFIG: EmbeddingConfig = {
     provider: "openai",
@@ -98,11 +96,6 @@ export default function EditEmbeddingConfigModal({
         promptTemplate: config.ollama?.promptTemplate ?? "",
     })
 
-    // TensorFlow specific state
-    const [tensorflowConfig, setTensorflowConfig] = useState({
-        model: config.tensorflow?.model || "universal-sentence-encoder",
-    })
-
     // Image specific state
     const [imageConfig, setImageConfig] = useState({
         model: config.image?.model || ("mobilenet" as ImageModelName),
@@ -133,11 +126,6 @@ export default function EditEmbeddingConfigModal({
                     modelName: config.ollama.modelName ?? "llama2",
                     promptTemplate: config.ollama.promptTemplate ?? "",
                 })
-            } else if (config.provider === "tensorflow" && config.tensorflow) {
-                setTensorflowConfig({
-                    model:
-                        config.tensorflow.model || "universal-sentence-encoder",
-                })
             } else if (config.provider === "image" && config.image) {
                 setImageConfig({
                     model: config.image.model || "mobilenet",
@@ -152,13 +140,13 @@ export default function EditEmbeddingConfigModal({
         if (!dataFormat) return
 
         const isCurrentProviderValid =
-            (dataFormat === "text" && ["openai", "ollama", "tensorflow"].includes(provider)) ||
+            (dataFormat === "text" && ["openai", "ollama"].includes(provider)) ||
             (dataFormat === "image" && ["image"].includes(provider))
 
         if (!isCurrentProviderValid) {
             // Set default provider based on data format
             if (dataFormat === "text") {
-                setProvider("tensorflow")
+                setProvider("ollama")
             } else if (dataFormat === "image") {
                 setProvider("image")
             }
@@ -196,10 +184,6 @@ export default function EditEmbeddingConfigModal({
                     return
                 }
                 newConfig.ollama = ollamaConfig
-            } else if (provider === "tensorflow") {
-                newConfig.tensorflow = {
-                    model: tensorflowConfig.model as TensorFlowModelName,
-                }
             } else if (provider === "image") {
                 newConfig.image = {
                     model: imageConfig.model as ImageModelName,
@@ -224,11 +208,11 @@ export default function EditEmbeddingConfigModal({
     // Filter providers based on dataFormat
     const getFilteredProviders = () => {
         if (!dataFormat) {
-            return ["tensorflow", "image", "ollama", "openai", "clip"]
+            return ["image", "ollama", "openai", "clip"]
         }
 
         if (dataFormat === "text") {
-            return ["tensorflow", "ollama", "openai", "clip"]
+            return ["ollama", "openai", "clip"]
         } else {
             return ["image", "clip"]
         }
@@ -268,20 +252,6 @@ export default function EditEmbeddingConfigModal({
                                 <SelectValue placeholder="Select provider" />
                             </SelectTrigger>
                             <SelectContent className="w-full">
-                                {getFilteredProviders().includes("tensorflow") && (
-                                    <SelectItem key="tensorflow" value="tensorflow">
-                                        <div className="flex flex-col items-start">
-                                            <div className="font-medium text-lg">
-                                                TensorFlow - Text Embeddings
-                                                (built-in)
-                                            </div>
-                                            <div className="  text-gray-500">
-                                                Built in model for text embeddings -
-                                                uses Tensorflow.js
-                                            </div>
-                                        </div>
-                                    </SelectItem>
-                                )}
                                 {getFilteredProviders().includes("clip") && (
                                     <SelectItem key="clip" value="clip">
                                         <div className="flex flex-col items-start">
@@ -298,12 +268,10 @@ export default function EditEmbeddingConfigModal({
                                     <SelectItem key="image" value="image">
                                         <div className="flex flex-col items-start">
                                             <div className="font-medium text-lg">
-                                                TensorFlow - Image Embeddings
-                                                (built-in)
+                                                Image Embeddings
                                             </div>
                                             <div className=" text-gray-500">
-                                                Built in model for image embeddings
-                                                - uses Tensorflow.js
+                                                Image embedding models
                                             </div>
                                         </div>
                                     </SelectItem>
@@ -468,33 +436,6 @@ export default function EditEmbeddingConfigModal({
                                     />
                                 </div>
                             </>
-                        ) : provider === "tensorflow" ? (
-                            <>
-                                <div className="space-y-2">
-                                    <Label
-                                        htmlFor="model"
-                                        className="font-medium"
-                                    >
-                                        Choose a Model
-                                    </Label>
-                                    <TensorFlowModelSelector
-                                        value={tensorflowConfig.model}
-                                        onChange={(value) =>
-                                            setTensorflowConfig({
-                                                ...tensorflowConfig,
-                                                model: value,
-                                            })
-                                        }
-                                    />
-                                </div>
-                                <div className="text-gray-500 mt-4 p-4 bg-gray-50 rounded-md">
-                                    <p>
-                                        TensorFlow.js models run directly in the
-                                        browser. The first use may take a moment
-                                        to download the model.
-                                    </p>
-                                </div>
-                            </>
                         ) : provider === "image" ? (
                             <>
                                 <div className="space-y-2">
@@ -541,10 +482,16 @@ export default function EditEmbeddingConfigModal({
                                     </p>
                                 </div>
                             </>
+                        ) : provider === "clip" ? (
+                            <div className="text-sm text-gray-500 mt-4 p-4 bg-gray-50 rounded-md">
+                                <p>
+                                    CLIP model will be used for both text and image embeddings.
+                                    No additional configuration needed.
+                                </p>
+                            </div>
                         ) : (
                             <div className="text-sm text-gray-500 mt-4 p-4 bg-gray-50 rounded-md">
-                                No additional configuration needed. This
-                                provider will not generate embeddings.
+                                No additional configuration needed.
                             </div>
                         )}
                     </div>

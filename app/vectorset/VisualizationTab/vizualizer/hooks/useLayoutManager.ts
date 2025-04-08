@@ -224,9 +224,11 @@ export function useLayoutManager(
                 const nodeOrder: ForceNode[] = []
 
                 nodes.forEach((node) => {
-                    if (node.vector) {
+                    if (node.vector && node.vector.length > 0) {
                         vectors.push(node.vector)
                         nodeOrder.push(node)
+                    } else {
+                        console.error("vector is not available for node", node.mesh.userData)
                     }
                 })
                 if (vectors.length === 0) {
@@ -234,7 +236,10 @@ export function useLayoutManager(
                     setIsProjectionRunning(false)
                     return
                 }
+
                 // Run PCA
+                console.log("vectors", vectors.length)
+                console.log("vector length", vectors[0].length)
                 const pca = new PCA(vectors)
                 const embedding = pca.predict(vectors, { nComponents: 2 })
 

@@ -13,7 +13,7 @@ import { useCallback, useState } from "react"
 import { toast } from "sonner"
 import VectorResults from "./VectorResults"
 // import VectorViz3D from "../VisualizationTab/VectorViz3D"
-import HNSWVizPure from "../VisualizationTab/vizualizer/HNSWVizPure"
+import HNSW2dViz from "../VisualizationTab/vizualizer/HNSW2dViz"
 
 interface VectorSearchTabProps {
     vectorSetName: string
@@ -107,7 +107,7 @@ export default function VectorSearchTab({
         onError: handleError,
         searchState,
         onSearchStateChange: handleSearchStateChange,
-        fetchEmbeddings: true, // Always fetch embeddings for visualization
+        fetchEmbeddings: false, // Always fetch embeddings for visualization
     })
 
     const handleSearchQueryChange = (query: string) => {
@@ -156,24 +156,22 @@ export default function VectorSearchTab({
         count: number,
     ): Promise<{ element: string; similarity: number; vector: number[] }[]> => {
         try {
-            const data = await vlinks({
+            const response = await vlinks({
                 keyName: vectorSetName,
                 element,
                 count,
                 withEmbeddings: true, // Always fetch embeddings
             })
-            console.log("vlink DATA", data)
-            if (!data) return []
+            console.log("vlink DATA", response)
+            if (!response || !response.result) return []
 
             // data is an array of arrays
             // each inner array contains [element, similarity, vector]
-            const response = data.flat().map((item) => ({
+            return response.result.flat().map((item) => ({
                 element: item[0],
                 similarity: item[1],
                 vector: item[2] || [],
             }))
-
-            return response
         } catch (error) {
             console.error("Error fetching neighbors:", error)
             return []
@@ -245,7 +243,7 @@ export default function VectorSearchTab({
                             }}
                         >
                             {results[0] && (
-                                <HNSWVizPure
+                                <HNSW2dViz
                                     key={`${results[0][0]}-${searchCount}`}
                                     initialElement={{
                                         element: results[0][0],
@@ -253,6 +251,7 @@ export default function VectorSearchTab({
                                         vector: results[0][2] || [],
                                     }}
                                     maxNodes={500}
+                                    vectorSetName={vectorSetName}
                                     initialNodes={Number(searchCount)}
                                     getNeighbors={getNeighbors}
                                 />

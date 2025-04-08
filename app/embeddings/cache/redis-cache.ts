@@ -1,4 +1,4 @@
-import { RedisClient, getRedisUrl } from "@/app/redis-server/server/commands"
+import { RedisConnection, getRedisUrl } from "@/app/redis-server/RedisConnection"
 import { EmbeddingConfig } from "../types/embeddingModels"
 
 export const EMBEDDING_CACHE_KEY = "embeddingCache"
@@ -12,7 +12,7 @@ export class EmbeddingCache {
                 return null
             }
 
-            return await RedisClient.withConnection(redisUrl, async (client) => {
+            return await RedisConnection.withClient(redisUrl, async (client) => {
                 const field = this.generateHashField(input, config)
                 const cached = await client.hGet(EMBEDDING_CACHE_KEY, field)
 
@@ -48,7 +48,7 @@ export class EmbeddingCache {
 
             const field = this.generateHashField(input, config)
 
-            await RedisClient.withConnection(redisUrl, async (client) => {
+            await RedisConnection.withClient(redisUrl, async (client) => {
                 // Store the embedding in the hash
                 await client.hSet(
                     EMBEDDING_CACHE_KEY,

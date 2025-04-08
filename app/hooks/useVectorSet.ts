@@ -9,6 +9,7 @@ import {
     vdim,
     vemb,
     vgetattr,
+    vinfo,
     vrem
 } from "@/app/redis-server/api"
 import { VectorSetMetadata } from "@/app/types/vectorSetMetaData"
@@ -100,21 +101,25 @@ export function useVectorSet(): UseVectorSetReturn {
             setStatusMessage(`Loading vector set "${vectorSetName}"...`)
 
             // Load information from the vector set
-            const [dimResult, recordCountResult] = await Promise.all([
-                vdim({ keyName: vectorSetName }),
-                vcard({ keyName: vectorSetName }),
-            ])
+            // use vinfo to get the dimensions and record count
+            const infoResponse = await vinfo({ keyName: vectorSetName })
+            console.log("VINFO Response", infoResponse)
+            if (!infoResponse.success || !infoResponse.result) {
+                throw new Error(infoResponse.error || "Failed to get vector set info")
+            }
+            const dim = Number(infoResponse.result["vector-dim"])
+            const recordCount = Number(infoResponse.result["size"])
 
-            setDim(dimResult)
-            setRecordCount(recordCountResult)
+            setDim(dim)
+            setRecordCount(recordCount)
 
             // Always load fresh metadata when loadVectorSet is called
             const metadataValue = await loadMetadata()
 
             // Update the cache with fresh data
             vectorSetCacheRef.current[vectorSetName] = {
-                dim: dimResult,
-                recordCount: recordCountResult,
+                dim,
+                recordCount,
                 metadata: metadataValue,
                 loaded: true,
             }
@@ -211,45 +216,53 @@ export function useVectorSet(): UseVectorSetReturn {
                 useCAS: useCAS || metadata?.redisConfig?.defaultCAS,
                 reduceDimensions: metadata?.redisConfig?.reduceDimensions,
                 ef: metadata?.redisConfig?.buildExplorationFactor,
-                quantization: metadata?.redisConfig?.quantization,
             })
 
-            if (!result?.success) {
-                throw new Error(
-                    `Element "${element}" already exists in vector set "${vectorSetName}"`
-                )
+            if (!result.success) {
+                throw new Error(result.error || "Failed to add vector")
             }
 
-            setStatusMessage("Vector created successfully")
-
-            // Get the attributes for the added vector
+            // Get the attributes for the element
             const attributes = await vgetattr({
                 keyName: vectorSetName,
                 element,
+                returnCommandOnly: false
             })
-            setResults((prevResults) => [
-                ...prevResults,
-                [element, 1.0, newVector, attributes || ""],
-            ])
 
-            // Update the record count
-            const newRecordCount = await vcard({
+            if (!attributes.success) {
+                throw new Error(attributes.error || "Failed to get attributes")
+            }
+
+            // Get the new record count
+            const newRecordCountResponse = await vcard({
                 keyName: vectorSetName,
             })
-            setRecordCount(newRecordCount)
+
+            if (!newRecordCountResponse.success || newRecordCountResponse.result === undefined) {
+                throw new Error(newRecordCountResponse.error || "Failed to get updated record count")
+            }
+
+            setRecordCount(newRecordCountResponse.result)
 
             // Update the cache
             if (vectorSetCacheRef.current[vectorSetName]) {
-                vectorSetCacheRef.current[vectorSetName].recordCount =
-                    newRecordCount
+                vectorSetCacheRef.current[vectorSetName].recordCount = newRecordCountResponse.result
             }
 
-            // Emit event to notify other components
+            // Emit the vector added event
             eventBus.emit(AppEvents.VECTOR_ADDED, {
                 vectorSetName,
                 element,
-                newCount: newRecordCount
+                newCount: newRecordCountResponse.result
             })
+
+            setStatusMessage("Vector created successfully")
+
+            // Add to results with attributes
+            setResults((prevResults) => [
+                ...prevResults,
+                [element, 1.0, newVector, attributes.result || ""] as VectorTuple
+            ])
         } catch (error) {
             console.error("Error creating vector:", error)
             setStatusMessage(
@@ -272,36 +285,41 @@ export function useVectorSet(): UseVectorSetReturn {
         try {
             setStatusMessage(`Deleting element "${element}"...`)
 
-            // Delete the vector from Redis
+            // Delete the vector
             await vrem({
                 keyName: vectorSetName,
                 element,
             })
-            setStatusMessage("Vector deleted successfully")
 
-            // Remove the vector from the results list
-            setResults((prevResults) =>
-                prevResults.filter(([id]) => id !== element)
-            )
-
-            // Update the record count
-            const newRecordCount = await vcard({
+            // Get the new record count
+            const newRecordCountResponse = await vcard({
                 keyName: vectorSetName,
             })
-            setRecordCount(newRecordCount)
+
+            if (!newRecordCountResponse.success || newRecordCountResponse.result === undefined) {
+                throw new Error(newRecordCountResponse.error || "Failed to get updated record count")
+            }
+
+            setRecordCount(newRecordCountResponse.result)
 
             // Update the cache
             if (vectorSetCacheRef.current[vectorSetName]) {
-                vectorSetCacheRef.current[vectorSetName].recordCount =
-                    newRecordCount
+                vectorSetCacheRef.current[vectorSetName].recordCount = newRecordCountResponse.result
             }
 
             // Emit event to notify other components
             eventBus.emit(AppEvents.VECTOR_DELETED, {
                 vectorSetName,
                 element,
-                newCount: newRecordCount
+                newCount: newRecordCountResponse.result
             })
+
+            setStatusMessage("Vector deleted successfully")
+
+            // Remove the vector from the results list
+            setResults((prevResults) =>
+                prevResults.filter(([id]) => id !== element)
+            )
         } catch (error) {
             console.error("Error deleting vector:", error)
             setStatusMessage(
@@ -319,37 +337,42 @@ export function useVectorSet(): UseVectorSetReturn {
         }
         try {
             setStatusMessage(`Deleting elements "${elements}"...`)
-            // Delete the vectors from Redis
+            // Delete the vectors
 
             await vrem({
                 keyName: vectorSetName,
                 elements,
             })
-            setStatusMessage("Vectors deleted successfully")
 
-            // Remove the vector from the results list
-            setResults((prevResults) =>
-                prevResults.filter(([id]) => !elements.includes(id))
-            )
-
-            // Update the record count
-            const newRecordCount = await vcard({
+            // Get the new record count
+            const newRecordCountResponse = await vcard({
                 keyName: vectorSetName,
             })
-            setRecordCount(newRecordCount)
+
+            if (!newRecordCountResponse.success || newRecordCountResponse.result === undefined) {
+                throw new Error(newRecordCountResponse.error || "Failed to get updated record count")
+            }
+
+            setRecordCount(newRecordCountResponse.result)
 
             // Update the cache
             if (vectorSetCacheRef.current[vectorSetName]) {
-                vectorSetCacheRef.current[vectorSetName].recordCount =
-                    newRecordCount
+                vectorSetCacheRef.current[vectorSetName].recordCount = newRecordCountResponse.result
             }
 
             // Emit event to notify other components
             eventBus.emit(AppEvents.VECTOR_DELETED, {
                 vectorSetName,
                 elements,
-                newCount: newRecordCount
+                newCount: newRecordCountResponse.result
             })
+
+            setStatusMessage("Vectors deleted successfully")
+
+            // Remove the vectors from the results list
+            setResults((prevResults) =>
+                prevResults.filter(([id]) => !elements.includes(id))
+            )
         } catch (error) {
             console.error("Error deleting vectors:", error)
             setStatusMessage(
@@ -397,44 +420,19 @@ export function useVectorSet(): UseVectorSetReturn {
                 element,
             })
 
-            // Extract vector from response
-            let vector = null
-            if (
-                response &&
-                typeof response === "object" &&
-                "success" in response
-            ) {
-                // Handle response in {success: true, result: [...]} format
-                vector =
-                    response.success &&
-                        "result" in response &&
-                        Array.isArray(response.result)
-                        ? response.result
-                        : null
-            } else if (Array.isArray(response)) {
-                // Handle direct array response
-                vector = response
-            }
-            console.log("[handleShowVector] Extracted vector:", vector)
-
-            // Verify that we got a valid vector
-            if (!Array.isArray(vector) || vector.length === 0) {
-                console.error(
-                    "[handleShowVector] Invalid vector received:",
-                    vector
-                )
-                throw new Error("Retrieved vector is empty or invalid")
+            if (!response.success || !response.result) {
+                throw new Error(response.error || "Failed to get vector")
             }
 
-            // Add the vector to results without removing existing results
+            // Update results with the retrieved vector
             setResults((prevResults) => {
                 const filteredResults = prevResults.filter(
                     (r) => r[0] !== element
                 )
-                return [...filteredResults, [element, 1.0, vector, ""]]
+                return [...filteredResults, [element, 1.0, response.result, ""] as VectorTuple]
             })
             setStatusMessage("Vector retrieved successfully")
-            return vector
+            return response.result
         } catch (error) {
             console.error("Error retrieving vector:", error)
             setStatusMessage(

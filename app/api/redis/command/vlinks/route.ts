@@ -1,12 +1,44 @@
-import { VlinksRequestBody } from "@/app/redis-server/api"
-import * as redis from "@/app/redis-server/server/commands"
-import { getRedisUrl } from "@/app/redis-server/server/commands"
 import { NextResponse } from "next/server"
+import {
+    RedisConnection,
+    getRedisUrl,
+} from "@/app/redis-server/RedisConnection"
+import { buildVlinksCommand, validateVlinksRequest } from "./command"
+import { validateRequest } from "@/app/redis-server/utils"
+import { fetchEmbeddingsBatch } from "@/app/api/redis/command/vemb_multi/command"
+
+// Define the types for our links
+type LinkTuple = [string, number];
+type LinkTupleWithEmb = [string, number, number[] | null];
+type ProcessedResult = LinkTuple[][];
+type ProcessedResultWithEmb = LinkTupleWithEmb[][];
 
 export async function POST(request: Request) {
     try {
-        const body = (await request.json()) as VlinksRequestBody
-        const { keyName, element, withEmbeddings = false } = body
+        const validatedRequest = await validateRequest(
+            request,
+            validateVlinksRequest
+        )
+        console.log("Received VLINKS request")
+
+        const redisUrl = await getRedisUrl()
+        if (!redisUrl) {
+            return NextResponse.json(
+                { success: false, error: "No Redis connection available" },
+                { status: 401 }
+            )
+        }
+
+        const command = buildVlinksCommand(validatedRequest)
+
+        if (validatedRequest.returnCommandOnly) {
+            return NextResponse.json({
+                success: true,
+                executedCommand: command.join(" ")
+            })
+        }
+
+        const { keyName, element, withEmbeddings } = validatedRequest
 
         if (!keyName || !element) {
             return NextResponse.json(
@@ -15,147 +47,115 @@ export async function POST(request: Request) {
             )
         }
 
-        const redisUrl = await getRedisUrl()
+        const response = await RedisConnection.withClient(
+            redisUrl,
+            async (client) => {
+                try {
+                    const result = await client.sendCommand(command)
 
-        if (!redisUrl) {
+                    if (!result || !Array.isArray(result)) {
+                        console.error("Invalid VLINKS result:", result)
+                        throw new Error(
+                            `Failed to get links for element ${element}`
+                        )
+                    }
+
+                    // Process the result - it's an array of arrays, where each sub-array
+                    // represents the neighbors at one level
+                    const processedResult: ProcessedResult = []
+
+                    for (let i = 0; i < result.length; i++) {
+                        const levelLinks = result[i]
+                        if (!Array.isArray(levelLinks)) {
+                            console.warn(
+                                `Invalid level links at index ${i}:`,
+                                levelLinks
+                            )
+                            continue
+                        }
+
+                        // Each level is a map of element -> score
+                        const levelTuples: LinkTuple[] = []
+                        for (let j = 0; j < levelLinks.length; j += 2) {
+                            const neighbor = levelLinks[j]
+                            const score = levelLinks[j + 1]
+
+                            if (!neighbor || !score) {
+                                console.warn(
+                                    `Invalid neighbor/score pair at level ${i}, index ${j}:`,
+                                    { neighbor, score }
+                                )
+                                continue
+                            }
+
+                            const numScore = parseFloat(String(score))
+                            if (isNaN(numScore)) {
+                                console.warn(
+                                    `Invalid score for neighbor ${neighbor}:`,
+                                    score
+                                )
+                                continue
+                            }
+
+                            levelTuples.push([String(neighbor), numScore])
+                        }
+
+                        processedResult.push(levelTuples)
+                    }
+                    return processedResult
+                } catch (error) {
+                    console.error("VLINKS operation error:", error)
+                    throw new Error(
+                        `Failed to get links for element ${element}: ${error}`
+                    )
+                }
+            }
+        )
+
+        if (!response.success || !response.result) {
             return NextResponse.json(
-                { success: false, error: "No Redis connection available" },
-                { status: 401 }
-            )
-        }
-
-        const response = await redis.vlinks(redisUrl, keyName, element)
-
-        if (!response.success) {
-            return NextResponse.json(
-                { success: false, error: response.error },
+                { success: false, error: response.error || "No result returned" },
                 { status: 500 }
             )
         }
 
-        console.log("vlinks response", response)
-        let links = response.result || []
-        if (withEmbeddings) {
+        let links: ProcessedResult | ProcessedResultWithEmb = response.result
+        if (withEmbeddings && links) {
             // Collect all unique IDs across all levels
-            const allIds = Array.from(new Set(
-                links.flatMap((level: any) => level.map(([id]: [string]) => id))
-            ));
+            console.log("GET embeddings")
+            const allIds = Array.from(
+                new Set(links.flatMap((level) => level.map(([id]) => id)))
+            )
 
-            // Single batch fetch for all embeddings
-            const embResults = await redis.vemb_multi(redisUrl, keyName, allIds as string[])
+            const embResults = await fetchEmbeddingsBatch(redisUrl, keyName, allIds)
 
-            if (embResults.success) {
+            if (embResults.success && embResults.result) {
                 // Create a map of id -> embedding for quick lookup
                 const embeddingMap = new Map(
-                    allIds.map((id, index) => [id, embResults.result[index]])
-                );
+                    allIds.map((id, index) => [id, embResults.result![index]])
+                )
 
                 // Process each level using the map
-                const processedLinks = links.map((level: any) =>
-                    level.map(([id, score]: [string, number]) =>
-                        [id, score, embeddingMap.get(id)] as [string, number, number[] | null]
+                links = links.map((level) =>
+                    level.map(
+                        ([id, score]): LinkTupleWithEmb => [String(id), parseFloat(String(score)), embeddingMap.get(id) || null]
                     )
-                );
-                links = processedLinks;
-            } else {
-                console.error("EMBEDDINGS FAILURE")
+                )
             }
         }
 
         return NextResponse.json({
             success: true,
-            result: links
+            result: links,
         })
     } catch (error) {
         console.error("Error in VLINKS API:", error)
         return NextResponse.json(
-            { success: false, error: error instanceof Error ? error.message : String(error) },
-            { status: 500 }
-        )
-    }
-}
-
-// Also support GET requests for compatibility with existing code
-export async function GET(request: Request) {
-    const url = new URL(request.url)
-    const node = url.searchParams.get('node')
-    const withEmbeddings = url.searchParams.get('withembeddings') === '1'
-
-    if (!node) {
-        return NextResponse.json(
-            { success: false, error: "Node parameter is required" },
-            { status: 400 }
-        )
-    }
-
-    const redisUrl = await getRedisUrl()
-    if (!redisUrl) {
-        return NextResponse.json(
-            { success: false, error: "No Redis connection available" },
-            { status: 401 }
-        )
-    }
-
-    try {
-        // Extract key name and element from the node parameter
-        // Assuming format is "keyName:element"
-        const [keyName, element] = node.split(':')
-
-        if (!keyName || !element) {
-            return NextResponse.json(
-                { success: false, error: "Invalid node format. Expected 'keyName:element'" },
-                { status: 400 }
-            )
-        }
-
-        const response = await redis.vlinks(redisUrl, keyName, element)
-
-        if (!response.success) {
-            return NextResponse.json(
-                { success: false, error: response.error },
-                { status: 500 }
-            )
-        }
-
-        let links = response.result || []
-
-        if (withEmbeddings) {
-            // Collect all unique IDs across all levels
-            const allIds = Array.from(new Set(
-                links.flatMap((level: any) => level.map(([id]: [string]) => id))
-            ));
-
-            // Single batch fetch for all embeddings
-            const embResults = await redis.vemb_multi(redisUrl, keyName, allIds as string[])
-
-            if (embResults.success) {
-                // Create a map of id -> embedding for quick lookup
-                const embeddingMap = new Map(
-                    allIds.map((id, index) => [id, embResults.result[index]])
-                );
-
-                // Process each level using the map
-                const processedLinks = links.map((level: any) =>
-                    level.map(([id, score]: [string, number]) =>
-                        [id, score, embeddingMap.get(id)] as [string, number, number[] | null]
-                    )
-                );
-                links = processedLinks;
-            }
-        }
-
-        return NextResponse.json({
-            success: true,
-            result: links
-        })
-    } catch (error) {
-        console.error("Error in VLINKS API (GET):", error)
-        return NextResponse.json(
             {
                 success: false,
-                error: error instanceof Error ? error.message : String(error)
+                error: error instanceof Error ? error.message : String(error),
             },
             { status: 500 }
         )
     }
-} 
+}

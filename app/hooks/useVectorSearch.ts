@@ -1,8 +1,13 @@
 import { ApiError } from "@/app/api/client"
 import { embeddings } from "@/app/embeddings/client"
-import { VectorTuple, vdim, vsim } from "@/app/redis-server/api"
+import { VectorTuple, vdim, vsim, VsimResult } from "@/app/redis-server/api"
 import { useCallback, useEffect, useRef, useState } from "react"
 import { VectorSetMetadata } from "@/app/types/vectorSetMetaData"
+
+// Helper to convert VsimResult to VectorTuple array
+const convertToVectorTuple = (results: VsimResult): VectorTuple[] => {
+    return results.map(([element, score, vector, attributes]) => [element, score, vector, attributes]);
+}
 
 export interface VectorSetSearchState {
     searchType: "Vector" | "Element" | "Image"
@@ -58,8 +63,8 @@ export function useVectorSearch({
     fetchEmbeddings = false,
 }: UseVectorSearchProps): UseVectorSearchReturn {
     const [isSearching, setIsSearching] = useState(false)
-    const [error, setError] = useState<string | null>(null) // Add error state
-    const searchTimeoutRef = useRef<NodeJS.Timeout>(/* TODO FIXs */)
+    const [error, setError] = useState<string | null>(null)
+    const searchTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined)
     const initialSearchDone = useRef(false)
     const lastSearchRef = useRef<{
         query: string
@@ -119,8 +124,12 @@ export function useVectorSearch({
                 // Clear any previous errors when starting a new search
                 clearError()
 
-                const dim = await vdim({ keyName: vectorSetName! })
-                const zeroVector = Array(dim).fill(0)
+                const dimResponse = await vdim({ keyName: vectorSetName! })
+                if (!dimResponse.success || dimResponse.result === undefined) {
+                    handleError(dimResponse.error || "Failed to get vector dimensions")
+                    return
+                }
+                const zeroVector = Array(dimResponse.result).fill(0)
 
                 // Perform search using the server-side timing
                 const vsimResponse = await vsim({
@@ -132,6 +141,11 @@ export function useVectorSearch({
                     expansionFactor: internalSearchState.expansionFactor
                 })
 
+                if (!vsimResponse || !vsimResponse.success) {
+                    handleError(vsimResponse?.error || "Zero vector search failed")
+                    return
+                }
+
                 // Use the execution time from the server response
                 if (vsimResponse.executionTimeMs) {
                     const durationInSeconds = (
@@ -139,10 +153,14 @@ export function useVectorSearch({
                     ).toFixed(4)
                     updateSearchState({ searchTime: durationInSeconds })
                 }
-
                 onStatusChange("")
                 // Process results
-                onSearchResults(vsimResponse.result || [])
+                onSearchResults(convertToVectorTuple(vsimResponse.result || []))
+
+                console.log(
+                    "VSIM RETURNED",
+                    convertToVectorTuple(vsimResponse.result || [])
+                )
 
                 if (vsimResponse.executedCommand) {
                     updateSearchState({ executedCommand: vsimResponse.executedCommand })
@@ -410,7 +428,7 @@ export function useVectorSearch({
             updateSearchState({ resultsTitle: searchString })
 
             // Process results
-            onSearchResults(vsimResponse.result || [])
+            onSearchResults(convertToVectorTuple(vsimResponse.result || []))
 
             onStatusChange(searchString)
 
@@ -465,7 +483,7 @@ export function useVectorSearch({
             })
 
             // Process results
-            onSearchResults(vsimResponse.result || [])
+            onSearchResults(convertToVectorTuple(vsimResponse.result || []))
 
             if (vsimResponse.executedCommand) {
                 updateSearchState({ executedCommand: vsimResponse.executedCommand })
@@ -506,7 +524,12 @@ export function useVectorSearch({
                 }
 
                 // Check if the vector dimensions match the expected dimensions
-                const expectedDim = await vdim({ keyName: vectorSetName! }) || 0
+                const expectedDimResponse = await vdim({ keyName: vectorSetName! })
+                if (!expectedDimResponse.success || expectedDimResponse.result === undefined) {
+                    handleError(expectedDimResponse.error || "Failed to get vector dimensions")
+                    return
+                }
+                const expectedDim = expectedDimResponse.result
 
                 // Log dimensions for debugging
                 console.log(`Image embedding dimensions: ${vectorData.length}, Required: ${expectedDim}`)
@@ -546,8 +569,7 @@ export function useVectorSearch({
                 })
 
                 // Process results
-
-                onSearchResults(vsimResponse.result || [])
+                onSearchResults(convertToVectorTuple(vsimResponse.result || []))
                 onStatusChange("Image search complete")
 
                 if (vsimResponse.executedCommand) {

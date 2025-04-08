@@ -78,19 +78,14 @@ export const apiClient = {
             }
 
             // Return the result and execution time if available
-            if (responseData.executionTimeMs !== undefined || responseData.executedCommand !== undefined) {
-                return {
-                    success: true,
-                    result: responseData.result as TResponse,
-                    executionTimeMs: responseData.executionTimeMs,
-                    executedCommand: responseData.executedCommand
-                };
-            }
-
             return {
-                success: true,
+                success: responseData.success,
                 result: responseData.result as TResponse,
+                executionTimeMs: responseData.executionTimeMs,
+                executedCommand: responseData.executedCommand,
+                error: responseData.error
             };
+
         } catch (error) {
             if (error instanceof ApiError) {
                 throw error;

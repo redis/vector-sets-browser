@@ -13,9 +13,9 @@ import { Label } from "@/components/ui/label"
 import { Card } from "@/components/ui/card"
 import {
     OPENAI_MODELS,
-    TENSORFLOW_MODELS,
     OLLAMA_MODELS,
     IMAGE_MODELS,
+    CLIP_MODELS,
 } from "@/app/embeddings/types/embeddingModels"
 
 // Group models by provider for the dropdown
@@ -23,14 +23,6 @@ const GROUPED_MODELS = [
     {
         provider: "OpenAI",
         models: Object.entries(OPENAI_MODELS).map(([id, model]) => ({
-            id,
-            name: model.name,
-            dimensions: model.dimensions,
-        })),
-    },
-    {
-        provider: "TensorFlow",
-        models: Object.entries(TENSORFLOW_MODELS).map(([id, model]) => ({
             id,
             name: model.name,
             dimensions: model.dimensions,

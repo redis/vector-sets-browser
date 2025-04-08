@@ -18,7 +18,7 @@ import {
 } from "@/app/hooks/useVectorSearch"
 import { VectorSetMetadata } from "@/app/embeddings/types/embeddingModels"
 import VectorViz3D from "./VectorViz3D"
-import HNSWVizPure from "./vizualizer/HNSWVizPure"
+import HNSWVizPure from "./vizualizer/HNSW2dViz"
 
 interface VectorSetVisualizationProps {
     vectorSetName: string
@@ -101,20 +101,31 @@ export default function VectorSetVisualization({
                 keyName: vectorSetName,
                 element,
                 count,
-                withEmbeddings: true, // Always fetch embeddings
+                withEmbeddings: true, // Always fetch embeddings for visualization
             }) || []
+
+            if (!data || !data.success || data.result === undefined) {
+                console.log("[getNeighbors] No neighbors found for element:", element)
+                return []
+            }
+            const neighbors = data.result
 
             // data is an array of arrays
             // each inner array contains [element, similarity, vector]
             // we want to return an array of objects with the following structure:
             // { element: string, similarity: number, vector: number[] }
-            const response = data.flat().map((item) => ({
-                element: item[0],
-                similarity: item[1],
-                vector: item[2],
-            }))
+            const response = neighbors.flat().map((item) => {
+                if (!item[2]) {
+                    console.warn(`[getNeighbors] Missing vector for element: ${item[0]}`)
+                }
+                return {
+                    element: item[0],
+                    similarity: item[1],
+                    vector: item[2] || [],
+                }
+            })
 
-            console.log("[getNeighbors] retreived Neighbors: ", response)
+            console.log("[getNeighbors] retrieved Neighbors:", response)
             return response
         } catch (error) {
             console.error("Error fetching neighbors:", error)
@@ -204,18 +215,18 @@ export default function VectorSetVisualization({
                                     initialElement={{
                                         element: results[0][0],
                                         similarity: results[0][1],
-                                        vector: results[0][2] || [],
+                                        vector: Array.isArray(results[0][2]) ? results[0][2] : [],
                                     }}
                                     maxNodes={500}
                                     initialNodes={Number(searchCount)}
+                                    vectorSetName={vectorSetName}
                                     getNeighbors={getNeighbors}
                                 />
                             ) : (
                                 <VectorViz3D
                                     data={results.map((result) => ({
-                                        label: `${result[0]
-                                            } (${result[1].toFixed(3)})`,
-                                        vector: result[2] || [],
+                                        label: `${result[0]} (${result[1].toFixed(3)})`,
+                                        vector: Array.isArray(result[2]) ? result[2] : [],
                                     }))}
                                     onVectorSelect={handleRowClick}
                                 />

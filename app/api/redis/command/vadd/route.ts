@@ -1,68 +1,55 @@
-import { VaddRequestBody } from "@/app/redis-server/api"
-import * as redis from "@/app/redis-server/server/commands"
-import { validateVector } from "@/app/embeddings/utils/validation"
-import { NextResponse } from "next/server"
+import { RedisConnection, getRedisUrl } from '@/app/redis-server/RedisConnection'
+import { validateRequest, formatResponse, handleError } from '@/app/redis-server/utils'
+import { validateVaddRequest, buildVaddCommand } from './command'
+import { NextResponse } from 'next/server'
 
 export async function POST(request: Request) {
     try {
-        const body = await request.json() as VaddRequestBody
-        const { keyName, element, vector } = body
-
-        if (!keyName) {
-            return NextResponse.json(
-                { success: false, error: "Key name is required" },
-                { status: 400 }
-            )
-        }
-
-        if (!element) {
-            return NextResponse.json(
-                { success: false, error: "Element is required" },
-                { status: 400 }
-            )
-        }
-
-        // Validate the vector
-        const validationResult = validateVector(vector)
-        if (!validationResult.isValid) {
-            return NextResponse.json(
-                { success: false, error: `Invalid vector data: ${validationResult.error}` },
-                { status: 400 }
-            )
-        }
-
-        const redisUrl = await redis.getRedisUrl()
+        // Validate request
+        const validatedRequest = await validateRequest(request, validateVaddRequest)
+        console.log("Received VADD request")
+        
+        // Get Redis URL
+        const redisUrl = await getRedisUrl()
         if (!redisUrl) {
             return NextResponse.json(
-                { success: false, error: "No Redis connection available" },
+                { success: false, error: 'No Redis connection available' },
                 { status: 401 }
             )
         }
 
-        // Use the original vector, not the one from validationResult
-        const result = await redis.vadd(redisUrl, body)
+        // Build command
+        const command = buildVaddCommand(validatedRequest)
+        const commandStr = command.join(' ')
 
-        // If the operation failed, return the error with an appropriate status code
-        if (!result.success) {
+        // If returnCommandOnly is true, return just the command
+        if (validatedRequest.returnCommandOnly) {
             return NextResponse.json({
-                success: false,
-                error: result.error || "Failed to add vector"
-            }, { status: 400 })
+                success: true,
+                executedCommand: commandStr
+            })
         }
 
-        return NextResponse.json({
-            success: true,
-            result: result.result,
-            executedCommand: result.executedCommand
+        // Execute command
+        const redisResult = await RedisConnection.withClient(redisUrl, async (client) => {
+            return await client.sendCommand(command)
+        })
+
+        // Check if the Redis operation itself failed
+        if (!redisResult.success) {
+            return formatResponse(redisResult)
+        }
+
+        // Redis VADD returns 1 for success, 0 for failure (element exists)
+        const success = redisResult.result === 1
+        console.log("Redis VADD result", redisResult.result)
+        return formatResponse({
+            success,
+            result: redisResult.result,
+            executedCommand: commandStr,
+            error: !success ? 'Element already exists' : undefined
         })
     } catch (error) {
-        console.error("Error in VADD API:", error)
-        return NextResponse.json(
-            { 
-                success: false,
-                error: error instanceof Error ? error.message : String(error) 
-            },
-            { status: 500 }
-        )
+        return handleError(error)
     }
 } 

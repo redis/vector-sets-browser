@@ -52,8 +52,11 @@ export default function EditAttributesDialog({
     const [newKey, setNewKey] = useState("")
     const [newType, setNewType] = useState<AttributeType>("string")
     const [newValue, setNewValue] = useState<string>("")
-    const [originalAttributes, setOriginalAttributes] = useState<Attribute[]>([])
-    const [haveAttributesChanged, setHaveAttributesChanged] = useState<boolean>(false)
+    const [originalAttributes, setOriginalAttributes] = useState<Attribute[]>(
+        []
+    )
+    const [haveAttributesChanged, setHaveAttributesChanged] =
+        useState<boolean>(false)
     const [rawJson, setRawJson] = useState<string>("")
     const [activeTab, setActiveTab] = useState<string>("edit-values")
     const [isRawJsonDirty, setIsRawJsonDirty] = useState(false)
@@ -62,91 +65,88 @@ export default function EditAttributesDialog({
     // Load attributes only once when dialog opens
     useEffect(() => {
         if (isOpen && !attributesLoadedRef.current) {
-            attributesLoadedRef.current = true;
-            loadAttributes();
+            attributesLoadedRef.current = true
+            loadAttributes()
         } else if (!isOpen) {
             // Reset state when dialog closes
-            attributesLoadedRef.current = false;
-            setNewKey("");
-            setNewType("string");
-            setNewValue("");
-            setError(null);
-            setActiveTab("edit-values");
+            attributesLoadedRef.current = false
+            setNewKey("")
+            setNewType("string")
+            setNewValue("")
+            setError(null)
+            setActiveTab("edit-values")
         }
-    }, [isOpen, keyName, element]);
+    }, [isOpen, keyName, element])
 
     // Update raw JSON whenever attributes change
     useEffect(() => {
         if (!isRawJsonDirty) {
             const attributesObject = attributes.reduce(
                 (acc, { key, value }) => {
-                    acc[key] = value;
-                    return acc;
+                    acc[key] = value
+                    return acc
                 },
                 {} as Record<string, unknown>
-            );
-            setRawJson(JSON.stringify(attributesObject, null, 2));
+            )
+            setRawJson(JSON.stringify(attributesObject, null, 2))
         }
-    }, [attributes, isRawJsonDirty]);
+    }, [attributes, isRawJsonDirty])
 
     // Custom function to update attributes and check for changes
     const updateAttributes = (newAttributes: Attribute[]) => {
-        setAttributes(newAttributes);
-        const hasChanged = JSON.stringify(newAttributes) !== JSON.stringify(originalAttributes);
-        setHaveAttributesChanged(hasChanged);
-    };
+        setAttributes(newAttributes)
+        const hasChanged =
+            JSON.stringify(newAttributes) !== JSON.stringify(originalAttributes)
+        setHaveAttributesChanged(hasChanged)
+    }
 
     const loadAttributes = async () => {
         try {
-            const response = await vgetattr({
-                keyName,
-                element,
-            });
+            const response = await vgetattr({ keyName, element, returnCommandOnly: false })
 
-            console.log("Attr: ", response);
-            if (!response) {
-                setAttributes([]);
-                setOriginalAttributes([]);
-                return;
+            if (!response.success || !response.result) {
+                setAttributes([])
+                setOriginalAttributes([])
+                return
             }
 
             try {
                 // Parse the JSON string from the API response
-                const parsedAttributes = JSON.parse(response);
+                const parsedAttributes = JSON.parse(response.result)
 
                 // Convert the flat JSON object into our Attribute[] format
                 const attributeArray = Object.entries(parsedAttributes).map(
                     ([key, value]) => {
                         // Ensure we handle all possible types correctly
-                        let type: AttributeType = "string";
-                        if (typeof value === "number") type = "number";
-                        if (typeof value === "boolean") type = "boolean";
+                        let type: AttributeType = "string"
+                        if (typeof value === "number") type = "number"
+                        if (typeof value === "boolean") type = "boolean"
 
                         return {
                             key,
                             type,
                             value,
-                        };
+                        }
                     }
-                ) as Attribute[];
+                ) as Attribute[]
 
                 // Set both original and current attributes
-                setAttributes(attributeArray);
-                setOriginalAttributes(attributeArray);
-                setHaveAttributesChanged(false);
+                setAttributes(attributeArray)
+                setOriginalAttributes(attributeArray)
+                setHaveAttributesChanged(false)
             } catch (parseError) {
-                console.error("Error parsing attributes:", parseError);
-                setError("Invalid attribute data received");
-                setAttributes([]);
-                setOriginalAttributes([]);
+                console.error("Error parsing attributes:", parseError)
+                setError("Invalid attribute data received")
+                setAttributes([])
+                setOriginalAttributes([])
             }
         } catch (err) {
-            console.error("Error loading attributes:", err);
-            setError("Failed to load attributes");
-            setAttributes([]);
-            setOriginalAttributes([]);
+            console.error("Error loading attributes:", err)
+            setError("Failed to load attributes")
+            setAttributes([])
+            setOriginalAttributes([])
         }
-    };
+    }
 
     const handleAddAttribute = () => {
         if (!newKey.trim()) {
@@ -186,67 +186,66 @@ export default function EditAttributesDialog({
     // Handle saving attributes
     const handleSave = async () => {
         try {
-            let attributesToSave = attributes;
+            let attributesToSave = attributes
 
             // Handle raw JSON mode
             if (activeTab === "raw-json" && isRawJsonDirty) {
                 try {
-                    const parsed = JSON.parse(rawJson);
+                    const parsed = JSON.parse(rawJson)
                     attributesToSave = Object.entries(parsed).map(
                         ([key, value]) => {
-                            let type: AttributeType = "string";
-                            let typedValue: string | number | boolean = String(value);
+                            let type: AttributeType = "string"
+                            let typedValue: string | number | boolean =
+                                String(value)
 
                             if (typeof value === "number") {
-                                type = "number";
-                                typedValue = value;
+                                type = "number"
+                                typedValue = value
                             } else if (typeof value === "boolean") {
-                                type = "boolean";
-                                typedValue = value;
+                                type = "boolean"
+                                typedValue = value
                             }
 
                             return {
                                 key,
                                 type,
                                 value: typedValue,
-                            };
+                            }
                         }
-                    );
-                } catch (_err) {
-                    setError("Invalid JSON format");
-                    return;
+                    )
+                } catch (err) {
+                    setError("Invalid JSON format")
+                    return
                 }
             }
 
             // Convert attributes to JSON object
             const attributesObject = attributesToSave.reduce(
                 (acc, { key, value }) => {
-                    acc[key] = value;
-                    return acc;
+                    acc[key] = value
+                    return acc
                 },
                 {} as Record<string, unknown>
-            );
+            )
 
             // Save to server
-            const attributesJson = JSON.stringify(attributesObject);
+            const attributesJson = JSON.stringify(attributesObject)
             await vsetattr({
-                keyName,
-                element,
-                attributes: attributesJson,
-            });
+                keyName, element, attributes: attributesJson
+            })
 
             // Close dialog and pass the updated attributes back
-            onClose(attributesJson);
+            onClose(attributesJson)
         } catch (err) {
-            setError("Failed to save attributes");
-            console.error("Error saving attributes:", err);
+            setError("Failed to save attributes")
+            console.error("Error saving attributes:", err)
         }
-    };
+    }
 
     // Handle dialog close without saving
     const handleClose = () => {
-        onClose();
-    };
+        onClose()
+    }
 
     const handleKeyPress = (event: React.KeyboardEvent<HTMLInputElement>) => {
         if (event.key === "Enter") {

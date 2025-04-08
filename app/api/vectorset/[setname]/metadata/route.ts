@@ -1,6 +1,8 @@
 import { SetMetadataRequestBody } from "@/app/api/vector-sets"
-import * as redis from "@/app/redis-server/server/commands"
-import { getRedisUrl } from "@/app/redis-server/server/commands"
+import {
+    RedisConnection,
+    getRedisUrl,
+} from "@/app/redis-server/RedisConnection"
 import { NextRequest, NextResponse } from "next/server"
 
 // type Params = { params: { setname: string } }
@@ -11,17 +13,17 @@ export async function GET(
     { params }: any
 ) {
     try {
-        const setname = params.setname
+        const parsedParams = await params
 
-        if (!setname) {
-            console.error("Missing setname parameter:", params)
+        if (!parsedParams || !parsedParams.setname) {
+            console.error("Missing setname parameter:", parsedParams)
             return NextResponse.json(
                 { success: false, error: "Key name is required" },
                 { status: 400 }
             )
         }
 
-        const keyName = setname
+        const keyName = parsedParams.setname
 
         const redisUrl = await getRedisUrl()
         if (!redisUrl) {
@@ -31,22 +33,58 @@ export async function GET(
             )
         }
 
-        const response = await redis.getMetadata(redisUrl, keyName)
-        console.log("getMetadata returned", response)
-        if (!response.success) {
+        const response = await RedisConnection.withClient(
+            redisUrl,
+            async (client) => {
+                const configKey = "vector-set-browser:config"
+                const hashKey = `vset:${keyName}:metadata`
+
+                let storedData = await client.hGet(configKey, hashKey)
+
+                try {
+                    // Parse the stored data
+                    const parsedData = storedData
+                        ? JSON.parse(storedData)
+                        : null
+
+                    // If the metadata needed correction, write it back to Redis
+                    if (
+                        parsedData &&
+                        JSON.stringify(parsedData) !==
+                        JSON.stringify(parsedData)
+                    ) {
+                        await client.hSet(configKey, {
+                            [hashKey]: JSON.stringify(parsedData),
+                        })
+                    }
+                    return parsedData
+                } catch (error) {
+                    console.error(
+                        `Error processing metadata for ${keyName}:`,
+                        error
+                    )
+                    throw error
+                }
+            }
+        )
+
+        if (!response || !response.success) {
             return NextResponse.json(
-                { success: false, error: response.error },
+                { success: false, error: "Error calling getMetadata" },
                 { status: 500 }
             )
         }
 
-        return NextResponse.json(response)
+        return NextResponse.json({
+            success: true,
+            result: response.result,
+        })
     } catch (error) {
         console.error("Error in getMetadata API (GET):", error)
         return NextResponse.json(
             {
                 success: false,
-                error: error instanceof Error ? error.message : String(error)
+                error: error instanceof Error ? error.message : String(error),
             },
             { status: 500 }
         )
@@ -61,18 +99,18 @@ export async function PUT(
     try {
         console.log("PUT /api/vectorset/[setname]/metadata", params)
 
-        const setname = params.setname
+        const parsedParams = params
 
-        if (!setname) {
-            console.error("Missing setname parameter:", params)
+        if (!parsedParams || !parsedParams.setname) {
+            console.error("Missing setname parameter:", parsedParams)
             return NextResponse.json(
                 { success: false, error: "Key name is required" },
                 { status: 400 }
             )
         }
 
-        const keyName = setname
-        const body = await request.json() as SetMetadataRequestBody
+        const keyName = parsedParams.setname
+        const body = (await request.json()) as SetMetadataRequestBody
         const { metadata } = body
 
         if (!metadata) {
@@ -90,22 +128,35 @@ export async function PUT(
             )
         }
 
-        const result = await redis.setMetadata(redisUrl, keyName, metadata)
+        const response = await RedisConnection.withClient(
+            redisUrl,
+            async (client) => {
+                const configKey = "vector-set-browser:config"
+                const hashKey = `vset:${keyName}:metadata`
+                await client.hSet(configKey, {
+                    [hashKey]: JSON.stringify(metadata),
+                })
+                return true
+            }
+        )
 
-        if (!result.success) {
+        if (!response.success) {
             return NextResponse.json(
                 { success: false, error: result.error },
                 { status: 500 }
             )
         }
 
-        return NextResponse.json(result)
+        return NextResponse.json({
+            success: true,
+            result: response.result,
+        })
     } catch (error) {
         console.error("Error in setMetadata API (PUT):", error)
         return NextResponse.json(
             {
                 success: false,
-                error: error instanceof Error ? error.message : String(error)
+                error: error instanceof Error ? error.message : String(error),
             },
             { status: 500 }
         )
@@ -118,4 +169,4 @@ export async function POST(
     { params }: any
 ) {
     return PUT(request, { params })
-} 
+}

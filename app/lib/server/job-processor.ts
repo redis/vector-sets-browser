@@ -5,7 +5,10 @@ import {
     CSVRow,
 } from "@/app/types/job-queue"
 import { JobQueueService } from "./job-queue"
-import RedisClient from "../../redis-server/server/commands"
+import { RedisConnection, getRedisUrl } from "@/app/redis-server/RedisConnection"
+import { Job, JobStatus } from "./types"
+import { EmbeddingService } from "@/app/embeddings/service"
+import { VectorSetService } from "@/app/vectorset/service"
 import { registerCompletedJob } from "@/app/api/jobs/completed/route"
 import { buildVectorElement, saveVectorData } from "@/app/lib/importUtils"
 
@@ -121,7 +124,7 @@ export class JobProcessor {
             command.push(attributesJson)
         }
 
-        const result = await RedisClient.withConnection(
+        const result = await RedisConnection.withClient(
             this.url,
             async (client) => {
                 await client.sendCommand(command)
@@ -258,7 +261,7 @@ export class JobProcessor {
                 }
 
                 // Check if job status exists and if the job itself still exists
-                const statusExists = await RedisClient.withConnection(
+                const statusExists = await RedisConnection.withClient(
                     this.url,
                     async (client) => {
                         const statusKey = getJobStatusKey(this.jobId)
@@ -282,7 +285,7 @@ export class JobProcessor {
                     console.log(
                         `[JobProcessor] Job ${this.jobId} metadata no longer exists but status does, cleaning up orphaned status`
                     )
-                    await RedisClient.withConnection(
+                    await RedisConnection.withClient(
                         this.url,
                         async (client) => {
                             const statusKey = getJobStatusKey(this.jobId)
@@ -510,7 +513,7 @@ export class JobProcessor {
                 status: "completed",
             }
 
-            await RedisClient.withConnection(this.url, async (client) => {
+            await RedisConnection.withClient(this.url, async (client) => {
                 // Only store in the global import log
                 await client.rPush("global:importlog", JSON.stringify(logEntry))
 

@@ -34,10 +34,9 @@ const textDatasetProvider = new TextDatasetProvider([
         dataType: "text",
         embeddingType: "text",
         recommendedEmbedding: {
-            provider: "ollama",
-            ollama: {
-                modelName: "mxbai-embed-large",
-                apiUrl: "http://localhost:11434"
+            provider: "clip",
+            clip: {
+                model: "clip-vit-base-patch32"
             }
         }
     },
@@ -78,9 +77,9 @@ const textDatasetProvider = new TextDatasetProvider([
         dataType: "text",
         embeddingType: "text",
         recommendedEmbedding: {
-            provider: "tensorflow",
-            tensorflow: {
-                model: "universal-sentence-encoder"
+            provider: "clip",
+            clip: {
+                model: "clip-vit-base-patch32"
             }
         }
     }
@@ -100,9 +99,9 @@ const imageDatasetProvider = new ImageDatasetProvider([
         dataType: "image",
         embeddingType: "image",
         recommendedEmbedding: {
-            provider: "image",
-            image: {
-                model: "mobilenet"
+            provider: "clip",
+            clip: {
+                model: "clip-vit-base-patch32"
             }
         }
     }

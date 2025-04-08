@@ -13,7 +13,6 @@ export function useNodeManager(
     getNeighbors: (
         element: string,
         count: number,
-        withEmbeddings?: boolean
     ) => Promise<SimilarityItem[]>
 ) {
     const [errorMessage, setErrorMessage] = useState<string | null>(null)
@@ -27,7 +26,7 @@ export function useNodeManager(
                     return { success: false, result: [], error }
                 }
 
-                const response = await getNeighbors(element, maxNodes, true)
+                const response = await getNeighbors(element, maxNodes)
 
                 if (!Array.isArray(response)) {
                     const error = "Invalid response format from getNeighbors"

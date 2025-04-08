@@ -19,6 +19,7 @@ import {
     useVisualizationState,
 } from "./hooks"
 import type { HNSWVizPureProps } from "./types"
+import { vemb } from "@/app/redis-server/api"
 
 // Comment out the old implementation
 /* Original implementation...
@@ -36,6 +37,7 @@ const HNSWVizPure: React.FC<HNSWVizPureProps> = ({
     initialElement,
     maxNodes = 100,
     initialNodes = 20,
+    vectorSetName,
     getNeighbors,
 }) => {
     // Refs for hover and selection effects
@@ -204,9 +206,6 @@ const HNSWVizPure: React.FC<HNSWVizPureProps> = ({
         }
         return mesh
     }
-
-    // Function to create a label for a node
-    const createLabel = () => null
 
     // Function to update hover label
     const updateHoverLabel = (
@@ -388,15 +387,6 @@ const HNSWVizPure: React.FC<HNSWVizPureProps> = ({
                 newMesh.userData.similarity = item.similarity
                 scene.add(newMesh)
                 const newNode = addNode(newMesh)
-
-                // Create label if needed
-                if (nodesRef.current.length <= MAX_LABELED_NODES) {
-                    const label = createLabel(item.element, newMesh)
-                    if (label) {
-                        scene.add(label)
-                        newNode.label = label
-                    }
-                }
 
                 // Create edge
                 const points = [mesh.position, newMesh.position]
@@ -605,21 +595,33 @@ const HNSWVizPure: React.FC<HNSWVizPureProps> = ({
             // Clean up existing visualization
             cleanup()
 
+            // Check if we have a vector, if not fetch it
+            let vector = initialElement.vector
+            if (!vector || vector.length === 0) {
+                try {
+                    const response = await vemb({
+                        keyName: vectorSetName,
+                        element: initialElement.element,
+                        returnCommandOnly: false
+                    })
+                    if (response.success && response.result) {
+                        vector = response.result
+                    } else {
+                        console.error("Failed to fetch vector:", response.error)
+                    }
+                } catch (error) {
+                    console.error("Error fetching vector:", error)
+                }
+            }
+
             // Creating initial node with complete similarity item data
             const initialMesh = createNodeMesh(
                 initialElement.element,
-                initialElement.vector
+                vector
             )
             initialMesh.userData.similarity = initialElement.similarity
             scene.add(initialMesh)
             const initialNode = addNode(initialMesh)
-
-            // Create label for initial node
-            const label = createLabel(initialElement.element, initialMesh)
-            if (label) {
-                scene.add(label)
-                initialNode.label = label
-            }
 
             // Delay the initial node click to ensure proper initialization
             setTimeout(() => {
@@ -632,7 +634,7 @@ const HNSWVizPure: React.FC<HNSWVizPureProps> = ({
         }
 
         initializeVisualization()
-    }, [scene, initialElement?.element]) // Only depend on scene and initialElement.element
+    }, [scene, initialElement?.element, vectorSetName]) // Add vectorSetName to dependencies
 
     // Update colors when dark mode changes
     useEffect(() => {
@@ -948,13 +950,6 @@ const HNSWVizPure: React.FC<HNSWVizPureProps> = ({
         scene.add(initialMesh)
         const initialNode = addNode(initialMesh)
 
-        // Create label for initial node
-        const label = createLabel(initialElement.element, initialMesh)
-        if (label) {
-            scene.add(label)
-            initialNode.label = label
-        }
-
         // Fit camera to the initial node
         fitCameraToNodes()
 
@@ -970,7 +965,6 @@ const HNSWVizPure: React.FC<HNSWVizPureProps> = ({
         initialElement,
         createNodeMesh,
         addNode,
-        createLabel,
         fitCameraToNodes,
         handleNodeClick,
         initialNodes,

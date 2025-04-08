@@ -4,8 +4,8 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { useState } from "react"
 
 interface ImageModelSelectorProps {
-    value: string
-    onChange: (value: string) => void
+    value: ImageModelName
+    onChange: (value: ImageModelName) => void
 }
 
 interface ModelInfo {
@@ -30,13 +30,14 @@ export default function ImageModelSelector({
     value,
     onChange,
 }: ImageModelSelectorProps) {
-    const [selectedModel, setSelectedModel] = useState<string>(
+    const [selectedModel, setSelectedModel] = useState<ImageModelName>(
         value || imageModels[0].id
     )
 
     const handleChange = (newValue: string) => {
-        setSelectedModel(newValue)
-        onChange(newValue)
+        const modelValue = newValue as ImageModelName
+        setSelectedModel(modelValue)
+        onChange(modelValue)
     }
 
     return (

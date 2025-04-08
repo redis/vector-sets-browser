@@ -1,4 +1,4 @@
-import { RedisClient } from '@/app/redis-server/server/commands';
+import { RedisConnection } from '@/app/redis-server/RedisConnection';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 
@@ -12,9 +12,11 @@ const COOKIE_OPTIONS = {
 
 // Test connection without storing state
 async function testConnection(url: string): Promise<boolean> {
-    return RedisClient.withConnection(url, async () => true)
-        .then(result => result.success)
-        .catch(() => false);
+    const result = await RedisConnection.withClient(url, async (client) => {
+        await client.ping();
+        return true;
+    });
+    return result.success;
 }
 
 export async function POST(request: Request) {

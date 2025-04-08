@@ -43,10 +43,10 @@ export interface HNSWVizPureProps {
     initialElement: SimilarityItem
     maxNodes?: number
     initialNodes?: number
+    vectorSetName: string
     getNeighbors: (
         element: string,
         count: number,
-        withEmbeddings?: boolean
     ) => Promise<SimilarityItem[]>
 }
 
