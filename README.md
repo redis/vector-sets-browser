@@ -66,7 +66,7 @@ npm run dev
 - Next.js 14
 - React 18
 - Three.js for 3D visualization
-- TensorFlow.js
+- Transformers.js (for built-in embedding models)
 - Redis vector-sets module
 - Tailwind CSS for styling
 - Various data visualization libraries (D3.js, UMAP, PCA)

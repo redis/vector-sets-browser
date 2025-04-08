@@ -210,9 +210,6 @@ export function SampleDataImporter({
                                                 {currentEmbeddingConfig?.provider === "openai" &&
                                                     currentEmbeddingConfig.openai?.model &&
                                                     `: ${currentEmbeddingConfig.openai.model}`}
-                                                {currentEmbeddingConfig?.provider === "tensorflow" &&
-                                                    currentEmbeddingConfig.tensorflow?.model &&
-                                                    `: ${currentEmbeddingConfig.tensorflow.model}`}
                                                 {currentEmbeddingConfig?.provider === "image" &&
                                                     currentEmbeddingConfig.image?.model &&
                                                     `: ${currentEmbeddingConfig.image.model}`}
@@ -408,19 +405,6 @@ export function SampleDataImporter({
                                     </div>
                                 )}
                                 {embeddingMismatch.currentEmbedding?.embedding
-                                    .provider === "tensorflow" && (
-                                    <div className="flex items-center gap-2 mt-1">
-                                        <Badge className="text-xs">Model</Badge>
-                                        <span className="text-sm">
-                                            {
-                                                embeddingMismatch
-                                                    .currentEmbedding.embedding
-                                                    .tensorflow?.model
-                                            }
-                                        </span>
-                                    </div>
-                                )}
-                                {embeddingMismatch.currentEmbedding?.embedding
                                     .provider === "image" && (
                                     <div className="flex items-center gap-2 mt-1">
                                         <Badge className="text-xs">Model</Badge>
@@ -457,20 +441,6 @@ export function SampleDataImporter({
                                             {
                                                 dataset.recommendedEmbedding
                                                     .openai?.model
-                                            }
-                                        </span>
-                                    </div>
-                                )}
-                                {dataset.recommendedEmbedding.provider ===
-                                    "tensorflow" && (
-                                    <div className="flex items-center gap-2 mt-1">
-                                        <Badge className="text-xs bg-green-100 text-green-800 hover:bg-green-100">
-                                            Model
-                                        </Badge>
-                                        <span className="text-sm">
-                                            {
-                                                dataset.recommendedEmbedding
-                                                    .tensorflow?.model
                                             }
                                         </span>
                                     </div>
