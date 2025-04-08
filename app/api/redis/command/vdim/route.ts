@@ -1,93 +1,52 @@
-import { VdimRequestBody } from "@/app/redis-server/api"
-import * as redis from "@/app/redis-server/server/commands"
-import { NextResponse } from "next/server"
+import { RedisConnection, getRedisUrl } from '@/app/redis-server/RedisConnection'
+import { validateRequest, formatResponse, handleError } from '@/app/redis-server/utils'
+import { validateVdimRequest, buildVdimCommand } from './command'
+import { NextResponse } from 'next/server'
 
 export async function POST(request: Request) {
     try {
-        const body = await request.json() as VdimRequestBody
-        const { keyName } = body
-
-        if (!keyName) {
-            return NextResponse.json(
-                { success: false, error: "Key name is required" },
-                { status: 400 }
-            )
-        }
-
-        const redisUrl = await redis.getRedisUrl()
+        // Validate request
+        const validatedRequest = await validateRequest(request, validateVdimRequest)
+        console.log("Received VDIM request")
+        
+        // Get Redis URL
+        const redisUrl = await getRedisUrl()
         if (!redisUrl) {
             return NextResponse.json(
-                { success: false, error: "No Redis connection available" },
+                { success: false, error: 'No Redis connection available' },
                 { status: 401 }
             )
         }
 
-        const result = await redis.vdim(redisUrl, keyName)
+        // Build command
+        const command = buildVdimCommand(validatedRequest)
+        const commandStr = command.join(' ')
 
-        if (!result.success) {
-            return NextResponse.json(
-                { success: false, error: result.error },
-                { status: 500 }
-            )
+        // If returnCommandOnly is true, return just the command
+        if (validatedRequest.returnCommandOnly) {
+            return NextResponse.json({
+                success: true,
+                executedCommand: commandStr
+            })
         }
-        return NextResponse.json({
+
+        // Execute command
+        const redisResult = await RedisConnection.withClient(redisUrl, async (client) => {
+            return await client.sendCommand(command)
+        })
+
+        // Check if the Redis operation itself failed
+        if (!redisResult.success) {
+            return formatResponse(redisResult)
+        }
+
+        // VDIM returns the dimensionality as a number
+        return formatResponse({
             success: true,
-            result: result.result
+            result: redisResult.result,
+            executedCommand: commandStr
         })
     } catch (error) {
-        console.error("Error in VDIM API:", error)
-        return NextResponse.json(
-            { 
-                success: false,
-                error: error instanceof Error ? error.message : String(error) 
-            },
-            { status: 500 }
-        )
+        return handleError(error)
     }
 }
-
-// Also support GET requests for compatibility
-export async function GET(request: Request) {
-    const url = new URL(request.url)
-    const keyName = url.searchParams.get('key')
-    
-    if (!keyName) {
-        return NextResponse.json(
-            { success: false, error: "Key parameter is required" },
-            { status: 400 }
-        )
-    }
-    
-    const redisUrl = await redis.getRedisUrl()
-    if (!redisUrl) {
-        return NextResponse.json(
-            { success: false, error: "No Redis connection available" },
-            { status: 401 }
-        )
-    }
-    
-    try {
-        const result = await redis.vdim(redisUrl, keyName)
-        
-        if (!result.success) {
-            return NextResponse.json(
-                { success: false, error: result.error },
-                { status: 500 }
-            )
-        }
-        
-        return NextResponse.json({
-            success: true,
-            result: result.result
-        })
-    } catch (error) {
-        console.error("Error in VDIM API (GET):", error)
-        return NextResponse.json(
-            { 
-                success: false,
-                error: error instanceof Error ? error.message : String(error) 
-            },
-            { status: 500 }
-        )
-    }
-} 

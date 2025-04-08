@@ -1,69 +1,63 @@
-import { VaddMultiRequestBody } from "@/app/redis-server/api"
-import * as redis from "@/app/redis-server/server/commands"
-import { NextResponse } from "next/server"
+import { RedisConnection, getRedisUrl } from '@/app/redis-server/RedisConnection'
+import { validateRequest, handleError } from '@/app/redis-server/utils'
+import { validateVaddMultiRequest, buildVaddMultiCommand } from './command'
+import { NextResponse } from 'next/server'
 
 export async function POST(request: Request) {
     try {
-        const body = await request.json() as VaddMultiRequestBody
+        // Validate request
+        const validatedRequest = await validateRequest(request, validateVaddMultiRequest)
+        console.log("Received VADD_MULTI request")
         
-        // Validate input
-        if (!body.keyName) {
-            return NextResponse.json(
-                { success: false, error: "Key name is required" },
-                { status: 400 }
-            )
-        }
-
-        if (!body.elements || !Array.isArray(body.elements) || body.elements.length === 0) {
-            return NextResponse.json(
-                { success: false, error: "Elements array is required and must not be empty" },
-                { status: 400 }
-            )
-        }
-
-        if (!body.vectors || !Array.isArray(body.vectors) || body.vectors.length === 0) {
-            return NextResponse.json(
-                { success: false, error: "Vectors array is required and must not be empty" },
-                { status: 400 }
-            )
-        }
-
-        if (body.elements.length !== body.vectors.length) {
-            return NextResponse.json(
-                { success: false, error: `Mismatch between elements (${body.elements.length}) and vectors (${body.vectors.length})` },
-                { status: 400 }
-            )
-        }
-
-        const redisUrl = await redis.getRedisUrl()
+        // Get Redis URL
+        const redisUrl = await getRedisUrl()
         if (!redisUrl) {
             return NextResponse.json(
-                { success: false, error: "No Redis connection available" },
+                { success: false, error: 'No Redis connection available' },
                 { status: 401 }
             )
         }
 
-        const result = await redis.vadd_multi(redisUrl, body)
+        // Build commands
+        const commands = buildVaddMultiCommand(validatedRequest)
+        const commandStrs = commands.map(cmd => cmd.join(' '))
 
-        if (!result.success) {
-            return NextResponse.json(
-                { success: false, error: result.error },
-                { status: 500 }
-            )
+        // If returnCommandOnly is true, return just the commands
+        if (validatedRequest.returnCommandOnly) {
+            return NextResponse.json({
+                success: true,
+                executedCommands: commandStrs
+            })
         }
 
+        // Execute commands in a transaction
+        const response = await RedisConnection.withClient(redisUrl, async (client) => {
+            const multi = client.multi()
+            
+            commands.forEach(command => {
+                multi.addCommand(command)
+            })
+
+            return await multi.exec()
+        })
+
+        if (!response.success || !response.result) {
+            return NextResponse.json({
+                success: false,
+                error: response.error
+            })
+        }
+
+        // Process results
+        // Each result will be either 1 (success) or 0 (element exists)
+        const results = response.result as number[]
+        
         return NextResponse.json({
             success: true,
-            result: result.result
+            result: results,
+            executedCommands: commandStrs
         })
     } catch (error) {
-        console.error("Error in VADD_MULTI API:", error)
-        return NextResponse.json(
-            { 
-                success: false,
-                error: error instanceof Error ? error.message : String(error) 
-            },
-            { status: 500 }
-        )
+        return handleError(error)
     }
 } 

@@ -1,6 +1,6 @@
 import { ApiError } from "@/app/api/client"
 import { vectorSets } from "@/app/api/vector-sets"
-import { vinfo } from "@/app/redis-server/api"
+import { vinfo, vinfo_multi } from "@/app/redis-server/api"
 import { VectorSetMetadata } from "@/app/types/vectorSetMetaData"
 import eventBus,{ AppEvents } from "@/app/utils/eventEmitter"
 import {
@@ -76,69 +76,66 @@ export default function VectorSetNav({
 
         setLoading(true)
         setError(null)
+
         try {
             const sets = await vectorSets.list() || []
-            console.log("sets", sets)
-
-            setVectorSetList(sets)
 
             const info: Record<string, VectorSetInfo> = {}
 
-            const fetchVectorSetInfo = async (
-                set: string,
-                retryCount = 0
-            ): Promise<void> => {
-                try {
-                    const vinfoData = await vinfo({ keyName: set }).catch((err) => {
-                        console.error(
-                            `Error fetching vector info for ${set}:`,
-                            err
-                        )
-                        return null
-                    })
+            // Create default info object for a vector set
+            const createDefaultInfo = (set: string): VectorSetInfo => ({
+                name: set,
+                memoryBytes: 0,
+                dimensions: 0,
+                vectorCount: 0,
+            })
 
-                    if (!vinfoData) {
-                        throw new Error(`Failed to fetch vector info for ${set}`)
-                    }
+            // Fetch info for all vector sets at once
+            const vinfoResponse = await vinfo_multi({ keyNames: sets }).catch(err => {
+                console.error("Error fetching vector set info:", err)
+                return null
+            })
 
-                    const dimensions = Number(vinfoData["vector-dim"])
-                    const vectorCount = Number(vinfoData["size"])
-
-                    const memoryBytes = estimateVectorSetMemoryUsage(
-                        dimensions,
-                        vectorCount
-                    )
-
-                    info[set] = {
-                        name: set,
-                        memoryBytes,
-                        dimensions,
-                        vectorCount,
-                    }
-                } catch (error) {
-                    console.error(
-                        `Error fetching info for vector set ${set}:`,
-                        error
-                    )
-                    if (retryCount < 2) {
-                        await new Promise((resolve) =>
-                            setTimeout(resolve, 1000)
-                        )
-                        return fetchVectorSetInfo(set, retryCount + 1)
-                    }
-                    info[set] = {
-                        name: set,
-                        memoryBytes: 0,
-                        dimensions: 0,
-                        vectorCount: 0,
-                    }
-                }
+            // If the entire request failed, set default values for all sets
+            if (!vinfoResponse?.success || !vinfoResponse?.result) {
+                console.error(`Failed to fetch vector info: ${vinfoResponse?.error || 'Unknown error'}`)
+                sets.forEach(set => {
+                    info[set] = createDefaultInfo(set)
+                })
+                setVectorSetInfo(info)
+                return
             }
 
-            await Promise.all(
-                sets.map((set) => fetchVectorSetInfo(set))
-            )
+            // Process results for each vector set
+            vinfoResponse.result.forEach((result, index) => {
+                const set = sets[index]
+                
+                // Skip if the result is null or undefined (vector set may have been deleted)
+                if (!result) {
+                    return
+                }
+                
+                // Handle error case or invalid result
+                if (typeof result !== 'object' || 'error' in result) {
+                    console.debug(`Skipping info for vector set ${set}:`, result)
+                    return
+                }
 
+                const dimensions = Number(result["vector-dim"])
+                const vectorCount = Number(result["size"])
+                const memoryBytes = estimateVectorSetMemoryUsage(dimensions, vectorCount)
+
+                info[set] = {
+                    name: set,
+                    memoryBytes,
+                    dimensions,
+                    vectorCount,
+                }
+            })
+
+            // Only include vector sets that we successfully got info for
+            const validSets = sets.filter(set => info[set])
+            setVectorSetList(validSets)
             setVectorSetInfo(info)
         } catch (error) {
             console.error("Error fetching vector sets:", error)

@@ -1,4 +1,4 @@
-import { RedisClient, getRedisUrl } from "@/app/redis-server/server/commands"
+import { RedisConnection, getRedisUrl } from "@/app/redis-server/RedisConnection"
 import { NextResponse } from "next/server"
 import { EmbeddingConfig } from "@/app/embeddings/types/embeddingModels"
 
@@ -38,7 +38,7 @@ export async function GET() {
             )
         }
 
-        const result = await RedisClient.withConnection(
+        const result = await RedisConnection.withClient(
             redisUrl,
             async (client) => {
                 const configJson = await client.hGet(
@@ -114,7 +114,7 @@ export async function POST(request: Request) {
             )
         }
 
-        const result = await RedisClient.withConnection(
+        const result = await RedisConnection.withClient(
             redisUrl,
             async (client) => {
                 // Store the configuration as JSON

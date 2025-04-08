@@ -84,10 +84,16 @@ export default function SmartFilterInput({
                 )
 
                 // Fetch attributes using vgetattr_multi
-                const attributesResults = await vgetattr_multi({
+                const response = await vgetattr_multi({
                     keyName: vectorSetName,
-                    elements: elements,
+                    elements,
+                    returnCommandOnly: false,
                 })
+                if (!response || !response.success) { 
+                    return 
+                }
+                const attributesResults = response.result 
+
                 if (attributesResults && attributesResults.length > 0) {
                     // Process each attribute JSON string
                     attributesResults.forEach((attributeJson, index) => {

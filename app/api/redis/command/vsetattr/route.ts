@@ -1,54 +1,55 @@
-import { VsetAttrRequestBody } from "@/app/redis-server/api"
-import { getRedisUrl, RedisClient } from "@/app/redis-server/server/commands"
-import { NextRequest, NextResponse } from "next/server"
+import { RedisConnection, getRedisUrl } from '@/app/redis-server/RedisConnection'
+import { validateRequest, formatResponse, handleError } from '@/app/redis-server/utils'
+import { validateVsetattrRequest, buildVsetattrCommand } from './command'
+import { NextResponse } from 'next/server'
 
-export async function POST(request: NextRequest) {
+export async function POST(request: Request) {
     try {
-        const { keyName, element, attributes } = (await request.json()) as VsetAttrRequestBody
+        // Validate request
+        console.log("Received VSETATTR request", request)
+        const validatedRequest = await validateRequest(request, validateVsetattrRequest)
+        console.log("Received VSETATTR request", validatedRequest)
+        
+        // Get Redis URL
         const redisUrl = await getRedisUrl()
         if (!redisUrl) {
             return NextResponse.json(
-                { success: false, error: "No Redis connection available" },
+                { success: false, error: 'No Redis connection available' },
                 { status: 401 }
             )
         }
 
-        const redisResult = await RedisClient.withConnection(
-            redisUrl,
-            async (client) => {
-                const command = ["VSETATTR", keyName, element, attributes]
-                return await client.sendCommand(command)
-            }
-        )
+        // Build command
+        const command = buildVsetattrCommand(validatedRequest)
+        const commandStr = command.join(' ')
 
-        if (!redisResult.success) {
+        // If returnCommandOnly is true, return just the command
+        if (validatedRequest.returnCommandOnly) {
             return NextResponse.json({
-                success: false,
-                error: redisResult.error || "Failed to set vector attributes"
-            }, { status: 500 })
-        }
-
-        const result = redisResult.result
-
-        return NextResponse.json({
-            success: true,
-            result: result === 1  // Redis returns 1 for success
-        })
-    } catch (error: unknown) {
-        console.error("Error in VSETATTR:", error)
-        if (error instanceof Error) {
-            console.error("Error details:", {
-                name: error.name,
-                message: error.message,
-                stack: error.stack
+                success: true,
+                executedCommand: commandStr
             })
         }
-        return NextResponse.json(
-            { 
-                success: false, 
-                error: error instanceof Error ? error.message : String(error)
-            },
-            { status: 500 }
-        )
+
+        // Execute command
+        const redisResult = await RedisConnection.withClient(redisUrl, async (client) => {
+            return await client.sendCommand(command)
+        })
+
+        // Check if the Redis operation itself failed
+        if (!redisResult.success) {
+            return formatResponse(redisResult)
+        }
+
+        // VSETATTR returns 1 if the attributes were set, 0 if the element doesn't exist
+        const success = redisResult.result === 1
+        return formatResponse({
+            success,
+            result: redisResult.result,
+            executedCommand: commandStr,
+            error: !success ? 'Element does not exist' : undefined
+        })
+    } catch (error) {
+        return handleError(error)
     }
 }

@@ -25,7 +25,6 @@ export interface SetMetadataRequestBody {
 export const vectorSets = {
     async list(): Promise<VectorSetListResponse> {
         const response = await apiClient.get<VectorSetListResponse>("/api/vectorset");
-        console.log("response", response)
         return response.result || null
     },
 
@@ -53,9 +52,4 @@ export const vectorSets = {
         apiClient.post(`/api/vectorset/${encodedName}/metadata`, request)
     },
 
-    async getMemoryUsage(name: string): Promise<MemoryUsageResponse | null> {
-        const encodedName = encodeURIComponent(name)
-        const response = await apiClient.get<MemoryUsageResponse>(`/api/vectorset/${encodedName}/memory`)
-        return response.result || null
-    },
 } 

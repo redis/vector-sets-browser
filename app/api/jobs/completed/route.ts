@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server"
-import RedisClient, * as redis from "@/app/redis-server/server/commands"
 
 // Store last completed job IDs in memory with timestamp
 interface CompletedJob {

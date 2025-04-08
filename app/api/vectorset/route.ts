@@ -1,8 +1,11 @@
-import * as redis from "@/app/redis-server/server/commands"
-import { getRedisUrl } from "@/app/redis-server/server/commands"
 import { NextResponse } from "next/server"
+import {
+    RedisConnection,
+    getRedisUrl,
+} from "@/app/redis-server/RedisConnection"
 
 // GET /api/vectorset - List all vector sets (scanVectorSets)
+
 export async function GET() {
     const redisUrl = await getRedisUrl()
     if (!redisUrl) {
@@ -11,29 +14,52 @@ export async function GET() {
             { status: 401 }
         )
     }
-    
+
     try {
-        const result = await redis.scanVectorSets(redisUrl)
-        
-        if (!result.success) {
+        const response = await RedisConnection.withClient(redisUrl, async (client) => {
+            try {
+                let cursor = "0"
+                const vectorSets = new Set<string>()
+
+                do {
+                    const [nextCursor, keys] = (await client.sendCommand([
+                        "SCAN",
+                        cursor,
+                        "TYPE",
+                        "vectorset",
+                    ])) as [string, string[]]
+
+                    keys.forEach((key) => vectorSets.add(key))
+                    cursor = nextCursor
+                } while (cursor !== "0")
+
+                return Array.from(vectorSets)
+            } catch (error) {
+                return []
+            }
+        })
+
+        if (!response || !response.success) {
             return NextResponse.json(
-                { success: false, error: result.error },
-                { status: 500 }
+                { success: false, error: "Error calling scanVectorSets" },
+                { status: 404 }
             )
         }
-        
+
         return NextResponse.json({
             success: true,
-            result: result.result
+            result: response.result,
+            executionTimeMs: response.executionTimeMs,
         })
+
     } catch (error) {
         console.error("Error in scanVectorSets API (GET):", error)
         return NextResponse.json(
-            { 
+            {
                 success: false,
-                error: error instanceof Error ? error.message : String(error) 
+                error: error instanceof Error ? error.message : String(error),
             },
             { status: 500 }
         )
     }
-} 
+}

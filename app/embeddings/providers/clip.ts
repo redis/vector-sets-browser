@@ -98,7 +98,6 @@ export class CLIPProvider implements EmbeddingProvider {
             }
 
             console.log("Generated embedding dimensions:", embedding.length)
-            console.log("First few values:", embedding.slice(0, 5))
 
             return embedding
         } catch (error) {

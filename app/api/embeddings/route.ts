@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
             const startTime = performance.now()
             const embedding = await embeddingService.getEmbedding(body.text, body.config, false)
             const endTime = performance.now()
-            
+            console.log("Embedding length:", embedding.length)
             return NextResponse.json({
                 success: true,
                 result: embedding,
@@ -56,12 +56,3 @@ export async function POST(request: NextRequest) {
         )
     }
 }
-
-export async function GET() {
-    return NextResponse.json(
-        { 
-            message: "Embedding API is running. Use POST to get embeddings." 
-        },
-        { status: 200 }
-    )
-} 

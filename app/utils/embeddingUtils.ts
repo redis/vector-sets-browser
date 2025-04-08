@@ -22,7 +22,7 @@ export async function isOllamaAvailable(): Promise<boolean> {
 
 /**
  * Gets the best available text embedding configuration
- * Prioritizes: 1. CLIP 2. Ollama (if available) 3. TensorFlow
+ * Prioritizes: 1. CLIP 2. Ollama (if available) 3. OpenAI
  * @returns Promise<EmbeddingConfig> - the best available embedding config
  */
 export async function getDefaultTextEmbeddingConfig(): Promise<EmbeddingConfig> {
@@ -53,18 +53,19 @@ export async function getDefaultTextEmbeddingConfig(): Promise<EmbeddingConfig> 
     };
   }
   
-  // Fall back to TensorFlow
+  // Fall back to OpenAI
   return {
-    provider: "tensorflow",
-    tensorflow: {
-      model: "universal-sentence-encoder",
+    provider: "openai",
+    openai: {
+      model: "text-embedding-3-small",
+      batchSize: 100,
     },
   };
 }
 
 /**
  * Gets the default image embedding configuration
- * Prioritizes: 1. CLIP 2. MobileNet
+ * Prioritizes: 1. CLIP 2. OpenAI
  * @returns EmbeddingConfig - the default image embedding config
  */
 export function getDefaultImageEmbeddingConfig(): EmbeddingConfig {
@@ -77,12 +78,13 @@ export function getDefaultImageEmbeddingConfig(): EmbeddingConfig {
       }
     }
   } catch (e) {
-    console.log("CLIP not available, falling back to MobileNet")
-    // Fall back to MobileNet
+    console.log("CLIP not available, falling back to OpenAI")
+    // Fall back to OpenAI
     return {
-      provider: "image",
-      image: {
-        model: "mobilenet",
+      provider: "openai",
+      openai: {
+        model: "text-embedding-3-small",
+        batchSize: 100,
       },
     }
   }

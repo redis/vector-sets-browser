@@ -1,24 +1,21 @@
-import { VsimRequestBody } from "@/app/redis-server/api"
-import * as redis from "@/app/redis-server/server/commands"
-import { getRedisUrl } from "@/app/redis-server/server/commands"
-import { NextResponse } from "next/server"
+import { NextResponse } from 'next/server'
+import { RedisConnection, getRedisUrl } from '@/app/redis-server/RedisConnection'
+import { validateVsimRequest, buildVsimCommand } from './command'
+import { formatResponse } from '@/app/redis-server/utils'
+import { fetchEmbeddingsBatch } from '@/app/api/redis/command/vemb_multi/command'
+
+type SimPair = [string, number];
+type SimPairWithEmb = [string, number, number[] | null];
 
 export async function POST(request: Request) {
     try {
-        const body = (await request.json()) as VsimRequestBody
-        const { 
-            keyName, 
-            searchVector, 
-            searchElement, 
-            count, 
-            withEmbeddings = false, 
-            filter = "",
-            expansionFactor 
-        } = body
+        const body = await request.json()
 
-        if (!keyName || (!searchVector && !searchElement)) {
+        const validationResult = validateVsimRequest(body)
+        if (!validationResult.isValid || !validationResult.value) {
+            console.error('Validation error:', validationResult.error)
             return NextResponse.json(
-                { success: false, error: "Key name and either searchVector or searchElement are required" },
+                { error: validationResult.error },
                 { status: 400 }
             )
         }
@@ -26,68 +23,58 @@ export async function POST(request: Request) {
         const redisUrl = await getRedisUrl()
         if (!redisUrl) {
             return NextResponse.json(
-                { success: false, error: "No Redis connection available" },
+                { error: 'Redis connection not available' },
                 { status: 401 }
             )
         }
 
-        const params = {
-            searchVector,
-            searchElement,
-            count: count || 10,
-            filter,
-            expansionFactor
+        const command = buildVsimCommand(validationResult.value)
+        if (validationResult.value.returnCommandOnly) {
+            return NextResponse.json({ command })
         }
 
-        const response = await redis.vsim(redisUrl, keyName, params)
-
-        if (!response.success) {
-            return NextResponse.json(
-                { success: false, error: response.error },
-                { status: 500 }
-            )
-        }
-        // Validate the result format
-        if (!Array.isArray(response.result.result)) {
-            console.error(
-                "Expected array result from Redis, got:",
-                typeof response.result.result
-            )
-            return NextResponse.json(
-                {
-                    success: false,
-                    error: "Invalid response format from Redis",
-                },
-                { status: 500 }
-            )
-        }
-
-        // Type assertion for the result array
-        let validResults = response.result.result as [
-            string,
-            number,
-            number[]
-        ][]
-
-        // If embeddings are requested, fetch them
-        if (withEmbeddings && validResults.length > 0) {
-            const embeddingsPromises = validResults.map(async ([id, score]) => {
-                const embResult = await redis.vemb(redisUrl, keyName, id)
-                return [id, score, embResult.success ? embResult.result.result : []] as [string, number, number[]]
-            })
-
-            validResults = await Promise.all(embeddingsPromises)
-        }
-        return NextResponse.json({
-            success: true,
-            result: validResults,
-            executionTimeMs: response.result.executionTimeMs,
-            executedCommand: response.result.executedCommand,
+        const commandStr = command[0].join(' ')
+        const redisResult = await RedisConnection.withClient(redisUrl, async (client) => {
+            return await client.sendCommand(command[0])
         })
+
+        // Check if the Redis operation failed
+        if (!redisResult.success) {
+            return formatResponse(redisResult)
+        }
+
+        // Process the result into pairs of [element, score]
+        const pairs: SimPair[] = []
+        const resultArray = redisResult.result as string[]
+        for (let i = 0; i < resultArray.length; i += 2) {
+            pairs.push([resultArray[i], parseFloat(resultArray[i + 1])])
+        }
+
+        // If withEmbeddings is requested, fetch them for all elements
+        let finalResult: SimPair[] | SimPairWithEmb[] = pairs
+        if (validationResult.value.withEmbeddings) {
+            console.log("VSIM GET embeddings")
+            const elements = pairs.map(([id]) => id)
+            const embResults = await fetchEmbeddingsBatch(redisUrl, validationResult.value.keyName, elements)
+
+            if (embResults.success && embResults.result) {
+                finalResult = pairs.map(([id, score], index): SimPairWithEmb => 
+                    [id, score, embResults.result![index]]
+                )
+            }
+        }
+
+        return formatResponse({
+            success: true,
+            result: finalResult,
+            executedCommand: commandStr,
+            executionTimeMs: redisResult.executionTimeMs
+        })
+
     } catch (error) {
-        console.error("Error in VSIM route:", error)
+        console.error('Error in VSIM route:', error)
         return NextResponse.json(
-            { success: false, error: String(error) },
+            { error: 'Internal server error' },
             { status: 500 }
         )
     }

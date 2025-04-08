@@ -43,25 +43,22 @@ export default function InfoPanel({
     useEffect(() => {
         async function fetchVInfo() {
             try {
-                console.log("Fetching vinfo for:", vectorSetName)
-                console.log("Metadata:", metadata)
-                const vInfoData = await vinfo({ keyName: vectorSetName })
+                const vInfoResponse = await vinfo({ keyName: vectorSetName })
 
-                if (!vInfoData) {
-                    console.error("Failed to fetch vinfo:", vInfoData)
+                if (!vInfoResponse.success || !vInfoResponse.result) {
+                    console.error("Failed to fetch vinfo:", vInfoResponse.error)
                     return
                 }
-                console.log("VINFO data:", vInfoData)
 
                 setVInfo({
-                    attributesCount: Number(vInfoData["attributes-count"]),
-                    hnswM: Number(vInfoData["hnsw-m"]),
-                    hnswMaxNodeUid: Number(vInfoData["hnsw-max-node-uid"]),
-                    maxLevel: Number(vInfoData["max-level"]),
-                    quantType: String(vInfoData["quant-type"]),
-                    size: Number(vInfoData["size"]),
-                    vectorDim: Number(vInfoData["vector-dim"]),
-                    vsetUid: Number(vInfoData["vset-uid"]),
+                    attributesCount: Number(vInfoResponse.result["attributes-count"]),
+                    hnswM: Number(vInfoResponse.result["hnsw-m"]),
+                    hnswMaxNodeUid: Number(vInfoResponse.result["hnsw-max-node-uid"]),
+                    maxLevel: Number(vInfoResponse.result["max-level"]),
+                    quantType: String(vInfoResponse.result["quant-type"]),
+                    size: Number(vInfoResponse.result["size"]),
+                    vectorDim: Number(vInfoResponse.result["vector-dim"]),
+                    vsetUid: Number(vInfoResponse.result["vset-uid"]),
                 })
             } catch (error) {
                 console.error("Failed to fetch vinfo:", error)

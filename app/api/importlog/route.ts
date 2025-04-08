@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { RedisClient, getRedisUrl } from "@/app/redis-server/server/commands";
+import { RedisConnection, getRedisUrl } from "@/app/redis-server/RedisConnection";
 
 // GET /api/importlog - Get import logs
 export async function GET(req: NextRequest) {
@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
     }
 
     try {
-        const result = await RedisClient.withConnection(redisUrl, async (client) => {
+        const result = await RedisConnection.withClient(redisUrl, async (client) => {
             // Always get from global import log
             const logs = await client.lRange('global:importlog', -500, -1);
             

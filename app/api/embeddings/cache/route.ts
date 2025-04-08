@@ -1,4 +1,4 @@
-import { RedisClient, getRedisUrl } from "@/app/redis-server/server/commands"
+import { RedisConnection, getRedisUrl } from "@/app/redis-server/RedisConnection"
 import { NextResponse } from "next/server"
 import { EMBEDDING_CACHE_KEY, EMBEDDING_CACHE_LOG_KEY } from "@/app/embeddings/cache/redis-cache"
 
@@ -12,7 +12,7 @@ export async function GET() {
             )
         }
 
-        const result = await RedisClient.withConnection(
+        const result = await RedisConnection.withClient(
             redisUrl,
             async (client) => {
                 // Get the total number of cached embeddings
@@ -51,7 +51,7 @@ export async function DELETE() {
             )
         }
 
-        const result = await RedisClient.withConnection(
+        const result = await RedisConnection.withClient(
             redisUrl,
             async (client) => {
                 // Delete both the cache and the log

@@ -1,8 +1,9 @@
 import { JobProcessor } from "@/app/lib/server/job-processor"
 import { JobQueueService } from "@/app/lib/server/job-queue"
-import RedisClient, * as redis from "@/app/redis-server/server/commands"
 import { NextRequest, NextResponse } from "next/server"
 import { CreateImportJobRequestBody } from "../jobs"
+import { RedisConnection, getRedisUrl } from "@/app/redis-server/RedisConnection"
+import { VectorSetMetadata } from "@/app/types/vectorSetMetaData"
 
 // Map to store active job processors
 const activeProcessors = new Map<string, JobProcessor>()
@@ -24,7 +25,7 @@ export async function GET(req: NextRequest) {
         }, { status: 400 });
     }
 
-    const redisUrl = await redis.getRedisUrl()
+    const redisUrl = await getRedisUrl()
 
     if (!redisUrl) {
         return NextResponse.json({ success: false, error: "No Redis URL configured" }, { status: 400 })
@@ -57,7 +58,7 @@ export async function GET(req: NextRequest) {
         }
 
         // Otherwise, list all jobs
-        const result = await RedisClient.withConnection(
+        const result = await RedisConnection.withClient(
             redisUrl,
             async (client) => {
                 console.log("Listing jobs from Redis")
@@ -114,10 +115,12 @@ export async function GET(req: NextRequest) {
         }, { status: 500 })
     }
 }
+// Redis key for storing cache configuration
+const CONFIG_KEY = "vector-set-browser:config"
 
 // Create a new job
 export async function POST(req: NextRequest) {
-    const redisUrl = await redis.getRedisUrl()
+    const redisUrl = await getRedisUrl()
     if (!redisUrl) {
         return NextResponse.json({ success: false, error: "No Redis URL configured" }, { status: 400 })
     }
@@ -131,16 +134,32 @@ export async function POST(req: NextRequest) {
             type: 'application/octet-stream'
         });
 
-        const response = await redis.getMetadata(redisUrl, vectorSetName)
+        const response = await RedisConnection.withClient(
+            redisUrl,
+            async (client) => {
+                const metadata = await client.hGet(CONFIG_KEY, `vset:${vectorSetName}:metadata`)
+                if (!metadata) {
+                    return null
+                }
+                return JSON.parse(metadata) as VectorSetMetadata
+            }
+        )
         
-        if (!response || !response.success) {
+        if (!response ||!response.success) {
             return NextResponse.json(
-                { error: "Vector set not found" },
+                { success: false, error: "Vector set not found" },
                 { status: 404 }
             )
         }
 
-        const metadata = response.result 
+        const metadata = response.result
+        
+        if (!metadata || !metadata.embedding) {
+            return NextResponse.json(
+                { success: false, error: "Vector set has no embedding configuration" },
+                { status: 400 }
+            )
+        }
         
         try {
             const jobId = await JobQueueService.createJob(redisUrl, file, vectorSetName, metadata.embedding, config)
@@ -155,18 +174,18 @@ export async function POST(req: NextRequest) {
                 activeProcessors.delete(jobId)
             })
 
-            return NextResponse.json({ success: true, jobId })
+            return NextResponse.json({ success: true, result: { jobId } })
         } catch (error) {
             console.error("[Jobs API] Error creating job:", error)
             return NextResponse.json(
-                { error: "Failed to create job" },
+                { success: false, error: "Failed to create job: " + (error instanceof Error ? error.message : String(error)) },
                 { status: 500 }
             )
         }
     } catch (error) {
         console.error("[Jobs API] Error parsing request:", error)
         return NextResponse.json(
-            { error: "Invalid request format" },
+            { success: false, error: "Invalid request format: " + (error instanceof Error ? error.message : String(error)) },
             { status: 400 }
         )
     }
@@ -204,7 +223,7 @@ export async function PATCH(req: NextRequest) {
         )
     }
 
-    const redisUrl = await redis.getRedisUrl()
+    const redisUrl = await getRedisUrl()
     if (!redisUrl) {
         return NextResponse.json({ success: false, error: "No Redis URL configured" }, { status: 400 })
     }
@@ -263,7 +282,7 @@ export async function DELETE(req: NextRequest) {
         )
     }
 
-    const redisUrl = await redis.getRedisUrl()
+    const redisUrl = await getRedisUrl()
     if (!redisUrl) {
         return NextResponse.json({ success: false, error: "No Redis URL configured" }, { status: 400 })
     }

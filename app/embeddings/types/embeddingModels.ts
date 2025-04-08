@@ -1,7 +1,6 @@
 export type EmbeddingProvider =
     | "openai"
     | "ollama"
-    | "tensorflow"
     | "image"
     | "clip"
     | "none"
@@ -31,25 +30,6 @@ export const OPENAI_MODELS: Record<string, ModelData> = {
     "text-embedding-ada-002": {
         name: "text-embedding-ada-002",
         dimensions: 1536,
-        dataFormat: "text",
-    },
-}
-
-// Define model data for TensorFlow models
-export const TENSORFLOW_MODELS: Record<string, ModelData> = {
-    "universal-sentence-encoder": {
-        name: "universal-sentence-encoder",
-        dimensions: 512,
-        dataFormat: "text",
-    },
-    "universal-sentence-encoder-lite": {
-        name: "universal-sentence-encoder-lite",
-        dimensions: 512,
-        dataFormat: "text",
-    },
-    "universal-sentence-encoder-multilingual": {
-        name: "universal-sentence-encoder-multilingual",
-        dimensions: 512,
         dataFormat: "text",
     },
 }
@@ -103,9 +83,6 @@ export const OLLAMA_MODELS: Record<string, ModelData> = {
 // Type for OpenAI model names
 export type OpenAIModelName = keyof typeof OPENAI_MODELS
 
-// Type for TensorFlow model names
-export type TensorFlowModelName = keyof typeof TENSORFLOW_MODELS
-
 // Update the ImageModelName type to include CLIP
 export type ImageModelName = "mobilenet" | "clip"
 
@@ -123,10 +100,6 @@ export interface OllamaConfig {
     promptTemplate?: string
 }
 
-export interface TensorFlowConfig {
-    model: TensorFlowModelName
-}
-
 export interface ImageConfig {
     model: ImageModelName
     inputSize?: number // Optional - size to resize images to before embedding
@@ -141,7 +114,6 @@ export interface EmbeddingConfig {
     provider: EmbeddingProvider
     openai?: OpenAIConfig
     ollama?: OllamaConfig
-    tensorflow?: TensorFlowConfig
     image?: ImageConfig
     clip?: ClipConfig
     none?: NoEmbeddingConfig
@@ -154,15 +126,12 @@ export interface NoEmbeddingConfig {
 
 // Helper function to get model data for any model
 export function getModelData(config: EmbeddingConfig): ModelData | undefined {
-    // Check if config is null/undefined or if provider property doesn't exist
     if (!config || !("provider" in config)) {
         return undefined
     }
 
     if (config.provider === "openai" && config.openai?.model) {
         return OPENAI_MODELS[config.openai.model]
-    } else if (config.provider === "tensorflow" && config.tensorflow?.model) {
-        return TENSORFLOW_MODELS[config.tensorflow.model]
     } else if (config.provider === "image" && config.image?.model) {
         return IMAGE_MODELS[config.image.model]
     } else if (config.provider === "clip" && config.clip?.model) {
@@ -275,12 +244,6 @@ export function getExpectedDimensions(config: EmbeddingConfig): number {
             // console.log(`[getExpectedDimensions] Ollama model name: ${ollamaModelName}`)
             return ollamaModelName && 
                 OLLAMA_MODELS[ollamaModelName as keyof typeof OLLAMA_MODELS]?.dimensions || 0;
-        case "tensorflow":
-            // For TensorFlow, check if the model name is in our known models
-            const tfModelName = config.tensorflow?.model;
-            // console.log(`[getExpectedDimensions] TensorFlow model name: ${tfModelName}`)
-            return tfModelName && 
-                TENSORFLOW_MODELS[tfModelName]?.dimensions || 0;
         case "image":
             // For Image models, check if the model name is in our known models
             const imageModelName = config.image?.model;

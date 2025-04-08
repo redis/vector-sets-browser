@@ -1,6 +1,6 @@
 import { ImportJobConfig } from "@/app/api/jobs"
 import { EmbeddingConfig } from "@/app/embeddings/types/embeddingModels"
-import RedisClient from "@/app/redis-server/server/commands"
+
 import {
     CSVJobMetadata,
     CSVRow,
@@ -12,6 +12,7 @@ import {
 } from "@/app/types/job-queue"
 import { parse } from "csv-parse/sync"
 import { v4 as uuidv4 } from "uuid"
+import { RedisConnection } from "@/app/redis-server/RedisConnection"
 
 export class JobQueueService {
     public static async updateJobProgress(
@@ -19,7 +20,7 @@ export class JobQueueService {
         jobId: string,
         progress: Partial<JobProgress>
     ): Promise<JobProgress> {
-        const result = await RedisClient.withConnection(url, async (client) => {
+        const result = await RedisConnection.withClient(url, async (client) => {
             const statusKey = getJobStatusKey(jobId)
             let currentProgress: JobProgress = {
                 status: "pending",
@@ -199,63 +200,66 @@ export class JobQueueService {
                 ? availableColumns[1]
                 : "plot_synopsis")
 
-        const result = await RedisClient.withConnection(url, async (client) => {
-            // Create job metadata
-            const metadata: CSVJobMetadata = {
-                jobId,
-                filename: file.name,
-                vectorSetName,
-                embedding: embeddingConfig,
-                elementColumn,
-                textColumn,
-                elementTemplate: options?.elementTemplate,
-                textTemplate: options?.textTemplate,
-                attributeColumns: options?.attributeColumns || [],
-                total: records.length,
-                delimiter,
-                hasHeader,
-                skipRows,
-                fileType,
-                exportType,
-                outputFilename: options?.outputFilename,
-            }
-            await client.hSet(getJobMetadataKey(jobId), {
-                data: JSON.stringify(metadata),
-            })
-
-            // Initialize job status
-            const initialProgress: JobProgress = {
-                current: 0,
-                total: records.length,
-                status: "pending",
-                message: "Job created",
-            }
-            await client.hSet(getJobStatusKey(jobId), {
-                data: JSON.stringify(initialProgress),
-            })
-
-            // Add records to job queue
-            const queueKey = getJobQueueKey(jobId)
-            for (let i = 0; i < records.length; i++) {
-                const item: JobQueueItem = {
+        const response = await RedisConnection.withClient(
+            url,
+            async (client) => {
+                // Create job metadata
+                const metadata: CSVJobMetadata = {
                     jobId,
-                    rowData: records[i],
-                    index: i,
+                    filename: file.name,
+                    vectorSetName,
+                    embedding: embeddingConfig,
+                    elementColumn,
+                    textColumn,
+                    elementTemplate: options?.elementTemplate,
+                    textTemplate: options?.textTemplate,
+                    attributeColumns: options?.attributeColumns || [],
+                    total: records.length,
+                    delimiter,
+                    hasHeader,
+                    skipRows,
+                    fileType,
+                    exportType,
+                    outputFilename: options?.outputFilename,
                 }
-                await client.rPush(queueKey, JSON.stringify(item))
+                await client.hSet(getJobMetadataKey(jobId), {
+                    data: JSON.stringify(metadata),
+                })
+
+                // Initialize job status
+                const initialProgress: JobProgress = {
+                    current: 0,
+                    total: records.length,
+                    status: "pending",
+                    message: "Job created",
+                }
+                await client.hSet(getJobStatusKey(jobId), {
+                    data: JSON.stringify(initialProgress),
+                })
+
+                // Add records to job queue
+                const queueKey = getJobQueueKey(jobId)
+                for (let i = 0; i < records.length; i++) {
+                    const item: JobQueueItem = {
+                        jobId,
+                        rowData: records[i],
+                        index: i,
+                    }
+                    await client.rPush(queueKey, JSON.stringify(item))
+                }
+
+                return jobId
             }
+        )
 
-            return jobId
-        })
-
-        if (!result.success) {
+        if (!response.success) {
             console.error(
                 `[JobQueue] Failed to create job ${jobId}:`,
-                result.error
+                response.error
             )
             throw new Error(result.error)
         }
-        return result.result
+        return response.result
     }
 
     public static async getJobProgress(
@@ -263,34 +267,43 @@ export class JobQueueService {
         jobId: string
     ): Promise<JobProgress | null> {
         // console.log(`[JobQueue] Getting progress for job ${jobId}`);
-        const result = await RedisClient.withConnection(url, async (client) => {
-            const statusKey = getJobStatusKey(jobId)
-            const status = await client.hGetAll(statusKey)
-            
-            if (!status || !status.data) return null
-            
-            // Handle the case where data might already be an object
-            try {
-                if (typeof status.data === 'object' && status.data !== null) {
-                    return status.data as JobProgress;
-                } else {
-                    return JSON.parse(status.data) as JobProgress;
+        const response = await RedisConnection.withClient(
+            url,
+            async (client) => {
+                const statusKey = getJobStatusKey(jobId)
+                const status = await client.hGetAll(statusKey)
+
+                if (!status || !status.data) return null
+
+                // Handle the case where data might already be an object
+                try {
+                    if (
+                        typeof status.data === "object" &&
+                        status.data !== null
+                    ) {
+                        return status.data as JobProgress
+                    } else {
+                        return JSON.parse(status.data) as JobProgress
+                    }
+                } catch (error) {
+                    console.error(
+                        `[JobQueue] Error parsing job progress for ${jobId}:`,
+                        error
+                    )
+                    return null
                 }
-            } catch (error) {
-                console.error(`[JobQueue] Error parsing job progress for ${jobId}:`, error);
-                return null;
             }
-        })
+        )
         
-        if (!result.success) {
+        if (!response.success) {
             console.error(
                 `[JobQueue] Failed to get progress for job ${jobId}:`,
-                result.error
+                response.error
             )
-            throw new Error(result.error)
+            throw new Error(response.error)
         }
         
-        return result.result
+        return response.result
     }
 
     public static async pauseJob(url: string, jobId: string): Promise<void> {
@@ -319,44 +332,47 @@ export class JobQueueService {
         jobId: string
     ): Promise<CSVJobMetadata | null> {
         //console.log(`[JobQueue] Getting metadata for job ${jobId}`);
-        const result = await RedisClient.withConnection(url, async (client) => {
-            const metadataKey = getJobMetadataKey(jobId)
-            const metadata = await client.hGetAll(metadataKey)
-            if (!metadata || !metadata.data) return null
-            return JSON.parse(metadata.data) as CSVJobMetadata
-        })
-        if (!result.success) {
+        const response = await RedisConnection.withClient(
+            url,
+            async (client) => {
+                const metadataKey = getJobMetadataKey(jobId)
+                const metadata = await client.hGetAll(metadataKey)
+                if (!metadata || !metadata.data) return null
+                return JSON.parse(metadata.data) as CSVJobMetadata
+            }
+        )
+        if (!response.success) {
             console.error(
                 `[JobQueue] Failed to get metadata for job ${jobId}:`,
-                result.error
+                response.error
             )
-            throw new Error(result.error)
+            throw new Error(response.error)
         }
         //console.log(`[JobQueue] Metadata for job ${jobId}:`, result.result);
-        return result.result
+        return response.result
     }
 
     public static async getNextQueueItem(
         url: string,
         jobId: string
     ): Promise<JobQueueItem | null> {
-        const result = await RedisClient.withConnection(url, async (client) => {
+        const response = await RedisConnection.withClient(url, async (client) => {
             const queueKey = getJobQueueKey(jobId)
             const item = await client.lPop(queueKey)
             return item ? (JSON.parse(item) as JobQueueItem) : null
         })
-        if (!result.success) {
+        if (!response.success) {
             console.error(
                 `[JobQueue] Failed to get next queue item for job ${jobId}:`,
-                result.error
+                response.error
             )
-            throw new Error(result.error)
+            throw new Error(response.error)
         }
-        return result.result
+        return response.result
     }
 
     public static async cleanupJob(url: string, jobId: string): Promise<void> {
-        const result = await RedisClient.withConnection(url, async (client) => {
+        const result = await RedisConnection.withClient(url, async (client) => {
             const keys = [
                 getJobQueueKey(jobId),
                 getJobStatusKey(jobId),
