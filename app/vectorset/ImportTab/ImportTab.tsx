@@ -18,6 +18,7 @@ import {
     FileSpreadsheet
 } from "lucide-react"
 import { useCallback, useEffect, useState, useRef } from "react"
+import eventBus, { AppEvents } from "@/app/utils/eventEmitter"
 import ActiveJobs from "./ActiveJobs"
 import ImportFromCSV from "./ImportFromCSV"
 import ImportHistory from "./ImportHistory"
@@ -81,6 +82,8 @@ export default function ImportTab({
                     setShowImportSuccessDialog(true)
                     // Refresh import logs when a job completes
                     fetchImportLogs()
+                    // Emit the VECTORS_IMPORTED event to refresh counts
+                    eventBus.emit(AppEvents.VECTORS_IMPORTED, { vectorSetName })
                 } catch (error) {
                     console.error("Error fetching completed job details:", error)
                 }
@@ -184,6 +187,9 @@ export default function ImportTab({
             if (jsonFileInputRef.current) {
                 jsonFileInputRef.current.value = '';
             }
+
+            // Emit the VECTORS_IMPORTED event
+            eventBus.emit(AppEvents.VECTORS_IMPORTED, { vectorSetName });
 
             // Fetch jobs to update the UI
             await fetchJobs();
