@@ -81,9 +81,6 @@ export class EmbeddingCache {
             case "ollama":
                 modelIdentifier = config.ollama?.modelName || ""
                 break
-            case "tensorflow":
-                modelIdentifier = config.tensorflow?.model || ""
-                break
             case "image":
                 modelIdentifier = config.image?.model || ""
                 break
