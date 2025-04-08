@@ -40,7 +40,6 @@ export default function ImportTab({
     const [showImportSuccessDialog, setShowImportSuccessDialog] = useState(false)
     const [dismissedJobIds, setDismissedJobIds] = useState<Set<string>>(new Set())
     const [importLogs, setImportLogs] = useState<ImportLogEntry[]>([])
-    const [successJob, setSuccessJob] = useState<Job | null>(null)
     const jsonFileInputRef = useRef<HTMLInputElement>(null)
 
     // Fetch jobs periodically to show current state
@@ -60,37 +59,8 @@ export default function ImportTab({
 
     // Listen for job status changes
     useEffect(() => {
-        const handleJobStatusChange = async (data: {
-            vectorSetName: string
-            status: string
-            jobId: string
-        }) => {
-            // Only handle events for our vector set
-            if (data.vectorSetName !== vectorSetName) return
-
-            console.log(`Job status changed:`, data)
-
-            // Show success dialog when a job completes
-            if (data.status === "completed") {
-                try {
-                    // Fetch the completed job details
-                    const jobDetails = await jobs.getJob(data.jobId)
-                    setSuccessJob(jobDetails)
-                    setShowImportSuccessDialog(true)
-                    // Refresh import logs when a job completes
-                    fetchImportLogs()
-                } catch (error) {
-                    console.error("Error fetching completed job details:", error)
-                }
-            }
-
-            // Refresh job list to show current state
-            fetchJobs()
-        }
-
         // Initial fetch
         fetchJobs()
-
     }, [vectorSetName, fetchJobs])
 
     const fetchImportLogs = useCallback(async () => {
@@ -159,9 +129,6 @@ export default function ImportTab({
 
         const file = event.target.files[0];
         try {
-            // Read and parse the JSON to validate it and extract vectors
-            const jsonContent = await file.text();
-
             // Create an import job with the JSON file
             const importJobConfig: ImportJobConfig = {
                 fileType: 'json',
@@ -296,7 +263,6 @@ export default function ImportTab({
                                                                 console.log("Found completed job:", completedJob);
 
                                                                 if (completedJob) {
-                                                                    setSuccessJob(completedJob);
                                                                     setShowImportSuccessDialog(true);
                                                                     console.log("Success dialog should now be visible");
                                                                 }

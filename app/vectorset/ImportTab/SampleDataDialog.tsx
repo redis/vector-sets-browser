@@ -4,7 +4,6 @@ import { useState } from "react"
 import {
     Dialog,
     DialogContent,
-    DialogFooter,
     DialogHeader,
     DialogTitle,
 } from "@/components/ui/dialog"
@@ -41,11 +40,11 @@ export function SampleDataDialog({
 
     const handleClose = () => {
         console.log("handleClose called with importSuccess:", importSuccess)
-        
+
         // Check if we need to signal import completion before closing
         const wasInImportStep = step === "import"
         const successState = importSuccess; // Capture current success state
-        
+
         // Reset state when dialog closes
         onOpenChange(false)
 
@@ -65,17 +64,6 @@ export function SampleDataDialog({
                 onImportComplete(successState)
             }, 500)
         }
-    }
-
-    const handleCancel = () => {
-        // If in import step, go back to select
-        if (step === "import" && selectedDataset) {
-            setStep("select")
-            return
-        }
-
-        // Otherwise close the dialog
-        handleClose()
     }
 
     // Determine dialog title based on current step
@@ -117,7 +105,7 @@ export function SampleDataDialog({
                         />
                     )}
                 </div>
-                
+
             </DialogContent>
         </Dialog>
     )

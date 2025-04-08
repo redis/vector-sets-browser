@@ -24,7 +24,7 @@ export default function EmptyVectorSet({ onAddVector, onChangeTab }: EmptyVector
                     Vector Set is Empty
                 </h2>
                 <p className="text-sm text-gray-500 max-w-md">
-                    This vector set doesn{'`'}t contain any vectors yet. You can add
+                    This vector set doesn{`'`}t contain any vectors yet. You can add
                     vectors in several ways:
                 </p>
             </div>

@@ -289,7 +289,7 @@ export default function EditEmbeddingConfigModal({
                                                 CLIP - Text & Image Embeddings
                                             </div>
                                             <div className="text-gray-500">
-                                                OpenAI{'\''}s CLIP model for text-to-image and image-to-image search
+                                                OpenAI{`'`}s CLIP model for text-to-image and image-to-image search
                                             </div>
                                         </div>
                                     </SelectItem>

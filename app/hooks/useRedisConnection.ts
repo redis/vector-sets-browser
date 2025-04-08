@@ -162,7 +162,11 @@ export function useRedisConnection(
         async (newState: Partial<StoredConnectionState>) => {
             setState((prev) => {
                 const updated = { ...prev, ...newState }
-                userSettings.set(STORAGE_KEY, updated).catch(console.error)
+                try {
+                    userSettings.set(STORAGE_KEY, updated)
+                } catch (error) {
+                    console.error("Error updating Redis connection state:", error)
+                }
                 return updated
             })
         },

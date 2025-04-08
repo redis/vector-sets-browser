@@ -15,7 +15,6 @@ import { Shuffle } from "lucide-react"
 import { useEffect, useMemo, useState } from "react"
 import ImageUploader from "../components/ImageUploader"
 import RedisCommandBox from "../components/RedisCommandBox"
-import { CLIP_MODELS } from "@/app/embeddings/types/embeddingModels"
 
 // Import ImageFileInfo type 
 import type { ImageFileInfo } from "../components/ImageUploader"
@@ -49,7 +48,6 @@ export default function AddVectorModal({
     const [isRawVectorDetected, setIsRawVectorDetected] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const [isAdding, setIsAdding] = useState(false)
-    const [status, setStatus] = useState("")
     const [useCAS, setUseCAS] = useState(false)
     const [attemptedSubmit, setAttemptedSubmit] = useState(false)
     const [showRedisCommand, setShowRedisCommand] = useState(true)
@@ -207,7 +205,6 @@ export default function AddVectorModal({
         }
 
         setIsAdding(true);
-        setStatus(`Adding ${uploadImages.length} vectors...`);
         setError(null);
 
         try {
@@ -216,8 +213,6 @@ export default function AddVectorModal({
                 const img = uploadImages[i];
                 const imgElement = img.fileName.replace(/\.[^/.]+$/, "").replace(/[^a-zA-Z0-9]/g, "_");
 
-                setStatus(`Adding vector ${i + 1} of ${uploadImages.length}: ${imgElement}`);
-
                 // Use embedding if available, otherwise use base64 data
                 if (img.embedding) {
                     await onAdd(imgElement, img.embedding, useCAS);
@@ -225,8 +220,6 @@ export default function AddVectorModal({
                     await onAdd(imgElement, img.base64Data, useCAS);
                 }
             }
-
-            setStatus(`Successfully added ${uploadImages.length} vectors!`);
 
             // Reset form
             setElement("");
@@ -261,7 +254,6 @@ export default function AddVectorModal({
             }
 
             setError(errorMessage);
-            setStatus("Error adding vectors");
         } finally {
             setIsAdding(false);
         }
@@ -275,7 +267,6 @@ export default function AddVectorModal({
 
     const handleEmbeddingGenerated = (embedding: number[]) => {
         setImageEmbedding(embedding)
-        setStatus(`Embedding generated: ${embedding.length} dimensions`)
     }
 
     // Handle changes to the collection of images
@@ -337,7 +328,6 @@ export default function AddVectorModal({
 
         try {
             setIsAdding(true);
-            setStatus("Adding vector...");
             setError(null);
 
             // Use the pre-generated embedding if available for images
@@ -347,7 +337,6 @@ export default function AddVectorModal({
                 }
                 console.log("Adding image embedding:", imageEmbedding.length);
                 await onAdd(element, imageEmbedding, useCAS);
-                setStatus("Vector added successfully!");
             } else if (activeTab === "rawVector") {
                 // Convert string of numbers to an actual number array
                 const vectorValues = elementData
@@ -356,7 +345,6 @@ export default function AddVectorModal({
                     .filter((v) => !isNaN(v));
 
                 await onAdd(element, vectorValues, useCAS);
-                setStatus("Vector added successfully!");
             } else {
                 // Check if elementData contains comma-separated numbers
                 const isRawVector = checkForVectorData(elementData);
@@ -373,7 +361,6 @@ export default function AddVectorModal({
                     // It's text to be embedded
                     await onAdd(element, elementData, useCAS);
                 }
-                setStatus("Vector added successfully!");
             }
 
             // Reset form
@@ -410,7 +397,6 @@ export default function AddVectorModal({
             }
 
             setError(errorMessage);
-            setStatus("Error adding vector");
             // Keep the modal open so the user can see the error
         } finally {
             setIsAdding(false);
@@ -619,7 +605,7 @@ export default function AddVectorModal({
 
                                         {isRawVectorDetected && (
                                             <div className="mt-2 text-xs p-2 bg-yellow-100 border border-yellow-400 text-yellow-700 rounded">
-                                                The text you{'\''}ve entered looks
+                                                The text you{`'`}ve entered looks
                                                 like vector data. Do you want
                                                 to:
                                                 <div className="mt-2 flex space-x-2">
@@ -691,9 +677,9 @@ export default function AddVectorModal({
                                         {elementData.trim() !== "" && (
                                             <div
                                                 className={`mt-2 text-sm ${getRawVectorValidationStatus()
-                                                        .isValid
-                                                        ? "text-green-600"
-                                                        : "text-yellow-600"
+                                                    .isValid
+                                                    ? "text-green-600"
+                                                    : "text-yellow-600"
                                                     }`}
                                             >
                                                 {
@@ -767,12 +753,6 @@ export default function AddVectorModal({
                                 {error}
                             </div>
                         )}
-
-                        {/* {status && !error && (
-                            <div className="mb-4 p-2 bg-blue-100 border border-blue-400 text-blue-700 rounded">
-                                {status}
-                            </div>
-                        )} */}
 
                         {attemptedSubmit && !isFormValid && !error && (
                             <div className="mb-4 p-2 bg-yellow-50 border border-yellow-200 text-yellow-700 rounded text-sm">

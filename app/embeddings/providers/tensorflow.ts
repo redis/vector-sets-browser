@@ -86,7 +86,7 @@ export class TensorFlowProvider implements EmbeddingProvider {
 
         try {
             // Dynamically import TensorFlow.js and Universal Sentence Encoder
-            // const tf = await import('@tensorflow/tfjs')
+            await import('@tensorflow/tfjs')
             const use = await import('@tensorflow-models/universal-sentence-encoder')
 
             // Load the model

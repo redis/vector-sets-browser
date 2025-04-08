@@ -65,6 +65,7 @@ interface SearchBoxProps {
     setExpansionFactor?: (value: number | undefined) => void
     filterExpansionFactor?: number
     setFilterExpansionFactor?: (value: number | undefined) => void
+    executedCommand?: string
     results?: VectorTuple[]
 }
 
@@ -85,6 +86,7 @@ export default function SearchBox({
     setExpansionFactor,
     filterExpansionFactor,
     setFilterExpansionFactor,
+    executedCommand,
     results = [],
 }: SearchBoxProps) {
     const [showFilters, setShowFilters] = useState(() => {
@@ -227,21 +229,23 @@ export default function SearchBox({
         return true
     })
 
-    // Compute the placeholder text based on current searchType
+    // Compute the placeholder text based on current searchType and metadata
     const searchBoxPlaceholder = useMemo(() => {
+        if (!metadata?.embedding) return ""
+
         switch (searchType) {
             case "Element":
                 return "Enter Element"
             case "Image":
                 return "Enter image data"
             case "Vector":
-                return supportsEmbeddings && isTextEmbedding(metadata?.embedding)
+                return supportsEmbeddings && isTextEmbedding(metadata.embedding)
                     ? "Enter search text or vector data (0.1, 0.2, ...)"
                     : "Enter vector data (0.1, 0.2, ...)"
             default:
                 return ""
         }
-    }, [searchType, supportsEmbeddings, isTextEmbedding])
+    }, [searchType, supportsEmbeddings, metadata?.embedding])
 
     // set default searchType only when metadata changes
     useEffect(() => {
@@ -252,11 +256,11 @@ export default function SearchBox({
             // Choose appropriate default search type based on embedding format
             let newSearchType: "Vector" | "Element" | "Image"
 
-            if (isImageEmbedding(metadata?.embedding)) {
+            if (isImageEmbedding(metadata.embedding)) {
                 newSearchType = "Image"
-            } else if (isTextEmbedding(metadata?.embedding)) {
+            } else if (isTextEmbedding(metadata.embedding)) {
                 newSearchType = "Vector"
-            } else if (isMultiModalEmbedding(metadata?.embedding)) {
+            } else if (isMultiModalEmbedding(metadata.embedding)) {
                 newSearchType = "Vector"
             } else {
                 newSearchType = "Element"
@@ -265,13 +269,7 @@ export default function SearchBox({
             setSearchType(newSearchType)
             initialSearchTypeSetRef.current = true
         }
-    }, [
-        metadata,
-        isImageEmbedding,
-        isTextEmbedding,
-        setSearchType,
-        supportsEmbeddings,
-    ])
+    }, [metadata, setSearchType, supportsEmbeddings])
 
     // Save settings when they change
     useEffect(() => {
@@ -281,6 +279,11 @@ export default function SearchBox({
     useEffect(() => {
         userSettings.set("showRedisCommand", showRedisCommand)
     }, [showRedisCommand])
+
+    // Add a useEffect to log when the executedCommand changes
+    useEffect(() => {
+        //console.log("Executed command updated:", executedCommand);
+    }, [executedCommand])
 
     // Handle image embedding generation
     const handleImageSelect = (base64Data: string) => {

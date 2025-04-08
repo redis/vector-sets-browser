@@ -206,9 +206,7 @@ const HNSWVizPure: React.FC<HNSWVizPureProps> = ({
     }
 
     // Function to create a label for a node
-    const createLabel = (text: string, mesh: THREE.Mesh) => {
-        return null
-    }
+    const createLabel = () => null
 
     // Function to update hover label
     const updateHoverLabel = (
@@ -645,7 +643,7 @@ const HNSWVizPure: React.FC<HNSWVizPureProps> = ({
 
         // Update node colors
         nodesRef.current.forEach((node) => {
-            ;(node.mesh.material as THREE.MeshBasicMaterial).color.set(
+            ; (node.mesh.material as THREE.MeshBasicMaterial).color.set(
                 isDarkMode ? 0xffffff : 0x1a3b4c
             )
         })
@@ -782,10 +780,6 @@ const HNSWVizPure: React.FC<HNSWVizPureProps> = ({
                         continue
                     }
 
-                    const angle = Math.random() * Math.PI * 2
-                    const radius = 1 + Math.random() * 2
-                    const x = node.position.x + Math.cos(angle) * radius
-                    const y = node.position.y + Math.sin(angle) * radius
                     const neighbor = createNodeMesh(item.element, item.vector)
                     if (neighbor && scene) {
                         neighbor.userData.similarity = item.similarity

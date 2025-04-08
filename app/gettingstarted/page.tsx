@@ -1,5 +1,7 @@
 "use client"
 
+import Link from 'next/link'
+
 export default function DocsPage() {
     return (
 
@@ -47,13 +49,13 @@ export default function DocsPage() {
                     <p className="text-gray-700 mb-4">
                         Verify the module is loaded correctly:
                     </p>
-                    <pre className="bg-gray-100 p-4 rounded-lg mb-4 font-mono">127.0.0.1:6379&gt; MODULE LIST</pre>
+                    <pre className="bg-gray-100 p-4 rounded-lg mb-4 font-mono">127.0.0.1:6379{`>`} MODULE LIST</pre>
                 </div>
 
                 <div>
                     <h3 className="text-xl font-medium mb-2">Next Steps</h3>
                     <p className="text-gray-700 mb-4">
-                        Return to the <a href="/" className="text-blue-600 hover:underline">home page</a> to connect to your Redis server and start using Vector Sets.
+                        Return to the <Link href="/" className="text-blue-600 hover:underline">home page</Link> to connect to your Redis server and start using Vector Sets.
                     </p>
                     <p className="text-gray-700 mb-4">
                         Check the <a href="#" className="text-blue-600 hover:underline">Available Commands</a> section above to learn how to use Vector Sets.

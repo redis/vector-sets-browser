@@ -34,14 +34,12 @@ import { toast } from "sonner"
 
 interface ImportFromCSVProps {
     onImportSuccess: () => void
-    onClose: () => void
     metadata: VectorSetMetadata | null
     vectorSetName?: string | null
 }
 
 export default function ImportFromCSV({
     onImportSuccess,
-    onClose,
     metadata,
     vectorSetName,
 }: ImportFromCSVProps) {
@@ -85,7 +83,6 @@ export default function ImportFromCSV({
     >(null)
     const [isCheckingOpenAIKey, setIsCheckingOpenAIKey] = useState(false)
     const [showSampleData, setShowSampleData] = useState(false)
-    const dialogRef = useRef<HTMLDivElement>(null)
     const [showImportSuccessDialog, setShowImportSuccessDialog] =
         useState(false)
 
@@ -1143,13 +1140,13 @@ export default function ImportFromCSV({
                                                                             className={`px-6 py-4 text-sm ${typeof row[header] === "number" ? "font-semibold text-blue-600" : "text-gray-500"} max-w-[300px] truncate`}
                                                                             title={getValueTypeInfo(
                                                                                 row[
-                                                                                    header
+                                                                                header
                                                                                 ]
                                                                             )}
                                                                         >
                                                                             {
                                                                                 row[
-                                                                                    header
+                                                                                header
                                                                                 ]
                                                                             }
                                                                         </td>
@@ -1259,8 +1256,8 @@ export default function ImportFromCSV({
                         {isImporting
                             ? "Starting Import..."
                             : exportToJson
-                              ? "Export to JSON"
-                              : "Start Import"}
+                                ? "Export to JSON"
+                                : "Start Import"}
                     </Button>
                 )}
             </div>

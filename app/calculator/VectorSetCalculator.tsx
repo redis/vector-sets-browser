@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect } from "react"
 import { Input } from "@/components/ui/input"
 import {
     Select,
@@ -61,16 +61,6 @@ interface CalculationResult {
     redisCommand: string
 }
 
-interface Field {
-    name: string
-    type: string
-    dim?: number
-    algorithm?: string
-    distance?: string
-    M?: number
-    efConstruction?: number
-}
-
 export default function VectorSetCalculator() {
     const [config, setConfig] = useState({
         modelDim: 1536, // Default to OpenAI's text-embedding-ada-002
@@ -89,52 +79,86 @@ export default function VectorSetCalculator() {
     })
 
     // HNSW parameters (kept constant as in original calculator)
+    const p = 0.25
     const M = 16
+    const M0 = 32
+    const maxThreads = 128
+    const MAX_LEVELS = 16
 
-    // Index parameters
-    const indexName = "myindex"
-    const keyPrefix = "doc"
-    const fields: Field[] = [
-        {
-            name: "vector",
-            type: "VECTOR",
-            dim: config.modelDim,
-            algorithm: "HNSW",
-            distance: "COSINE",
-            M: M,
-            efConstruction: 200
+    function generateRedisCommand(modelDim: number, storeDim: number | null, quantization: string) {
+        let cmd = "VADD myindex"
+        
+        if (storeDim && storeDim < modelDim) {
+            cmd += ` REDUCE ${storeDim}`
         }
-    ]
-
-    const generateRedisCommand = useCallback(() => {
-        const command = `FT.CREATE ${indexName} ON HASH PREFIX 1 ${keyPrefix}: SCHEMA ${fields
-            .map((field: Field) => {
-                if (field.type === "VECTOR") {
-                    return `${field.name} ${field.type} ${field.dim} ${field.algorithm === "FLAT"
-                        ? "TYPE FLOAT32 DIM"
-                        : `TYPE FLOAT32 DIM DISTANCE_METRIC ${field.distance} TYPE FLOAT32 DIM M ${field.M} EF_CONSTRUCTION ${field.efConstruction}`
-                        }`
-                }
-                return `${field.name} ${field.type}`
-            })
-            .join(" ")}`
-        return command
-    }, [fields])
-
-    const estimateHNSWMemoryUsageBytes = useCallback(() => {
-        const hnsw_fields = fields.filter(
-            (field: Field) => field.type === "VECTOR" && field.algorithm === "HNSW"
-        )
-        let total_bytes = 0
-        for (const field of hnsw_fields) {
-            // Base memory per vector
-            const bytes_per_vector = (field.dim || 0) * 4 // 4 bytes per float32
-            // Memory for graph structure
-            const graph_memory = (field.M || 0) * 8 * (field.dim || 0) // Assuming 8 bytes per edge
-            total_bytes += (bytes_per_vector + graph_memory) * config.numVectors
+        
+        cmd += ` VALUES ${modelDim} <vector_values...> my_element`
+        
+        if (quantization === "NOQUANT") {
+            cmd += " NOQUANT"
+        } else if (quantization === "BIN") {
+            cmd += " BIN"
         }
-        return total_bytes
-    }, [fields, config.numVectors])
+        // Q8 is default, so no need to add a flag
+        
+        return cmd
+    }
+
+    function estimateHNSWMemoryUsagePerNode(storeDim: number, quantType: string) {
+        // Node struct base overhead
+        const nodeStructOverhead =
+            4 * maxThreads + // visited_epoch array
+            4 + // uid
+            4 + // level
+            4 * MAX_LEVELS + // num_neighbors array
+            8 * MAX_LEVELS // neighbors pointer array
+
+        // Average number of levels and pointers
+        const avgLevels = 1.0 + p / (1.0 - p)
+        const effectiveUpperLayers = Math.max(avgLevels - 1.0, 0.0)
+        const avgPointers = M0 + effectiveUpperLayers * M
+        const pointerBytes = avgPointers * 8.0
+
+        // Vector storage based on quantization
+        let vectorBytes = 0.0
+        switch (quantType) {
+            case "NOQUANT": // FP32
+                vectorBytes = 4.0 * storeDim
+                break
+            case "Q8": // Q8
+                vectorBytes = storeDim + 8.0 // 1 byte per dim + 8 bytes for range
+                break
+            case "BIN": // BIN
+                vectorBytes = Math.ceil(storeDim / 8.0)
+                break
+            default:
+                vectorBytes = 4.0 * storeDim
+        }
+
+        return Math.floor(nodeStructOverhead + pointerBytes + vectorBytes + 0.5)
+    }
+
+    function estimateHNSWMemoryUsage(
+        N: number,
+        originalDim: number,
+        storeDim: number,
+        quantType: string,
+        useProjection: boolean
+    ) {
+        // Per-node usage
+        const perNode = estimateHNSWMemoryUsagePerNode(storeDim, quantType)
+
+        // Total for all N nodes
+        let total = perNode * N
+
+        // If we keep the projection matrix in memory, add it
+        if (useProjection && storeDim < originalDim) {
+            const matrixBytes = originalDim * storeDim * 4
+            total += matrixBytes
+        }
+
+        return total
+    }
 
     function formatBytes(bytes: number) {
         if (bytes < 1024) return bytes + " B"
@@ -145,19 +169,36 @@ export default function VectorSetCalculator() {
     }
 
     useEffect(() => {
+        // Calculate memory usage whenever config changes
+        const storeDim = config.reduceDimensions
+            ? parseInt(config.reduceDimensions)
+            : config.modelDim
+        const useProjection = config.reduceDimensions !== ""
+
         const rawVectorBytesPerVec = 4 * config.modelDim
         const totalRawBytes = rawVectorBytesPerVec * config.numVectors
-        const estimatedBytes = estimateHNSWMemoryUsageBytes()
 
-        const redisCommand = generateRedisCommand()
+        const estimateBytes = estimateHNSWMemoryUsage(
+            config.numVectors,
+            config.modelDim,
+            storeDim,
+            config.quantization,
+            useProjection
+        )
+
+        const redisCommand = generateRedisCommand(
+            config.modelDim,
+            config.reduceDimensions ? parseInt(config.reduceDimensions) : null,
+            config.quantization
+        )
 
         setResult({
             rawBytes: totalRawBytes,
-            estimatedBytes,
-            expansionFactor: estimatedBytes / totalRawBytes,
+            estimatedBytes: estimateBytes,
+            expansionFactor: estimateBytes / totalRawBytes,
             redisCommand,
         })
-    }, [config, estimateHNSWMemoryUsageBytes, generateRedisCommand])
+    }, [config])
 
     return (
         <div className="space-y-8">
@@ -181,7 +222,7 @@ export default function VectorSetCalculator() {
                                                 const model = GROUPED_MODELS
                                                     .flatMap(g => g.models)
                                                     .find(m => m.id === value)
-
+                                                
                                                 setConfig({
                                                     ...config,
                                                     modelType: value,
@@ -364,7 +405,7 @@ export default function VectorSetCalculator() {
 
             <div className="space-y-6">
                 <h3 className="text-lg font-semibold">Memory Usage Comparison</h3>
-
+                
                 <div className="space-y-6">
                     {/* Raw Vector Data Bar */}
                     <div className="space-y-2">

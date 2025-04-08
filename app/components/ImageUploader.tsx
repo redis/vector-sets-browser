@@ -87,12 +87,12 @@ export default function ImageUploader({
             return
         }
 
-
         // Process each file and add it to our collection
         const newImages: ImageFileInfo[] = []
 
         for (let i = 0; i < imageFiles.length; i++) {
             const file = imageFiles[i]
+
             try {
                 // Convert to base64
                 const base64Data = await fileToBase64(file)
@@ -148,6 +148,7 @@ export default function ImageUploader({
                 onEmbeddingGenerated(lastImage.embedding)
             }
         }
+
     }
 
     const processFile = async (file: File) => {
@@ -158,6 +159,7 @@ export default function ImageUploader({
 
         try {
             setIsLoading(true)
+
             // Create preview URL
             const objectUrl = URL.createObjectURL(file)
             setPreviewUrl(objectUrl)
@@ -274,8 +276,8 @@ export default function ImageUploader({
                     : "Xenova/clip-vit-base-patch32"
 
                 embedding = await clipProvider.getImageEmbedding(
-                    data,
-                    modelPath
+                    data as string,
+                    modelPath as string
                 )
             } else if (config.provider === "image") {
                 // For MobileNet, continue with existing flow
@@ -288,7 +290,7 @@ export default function ImageUploader({
                     "Generating embedding using TensorFlow MobileNet..."
                 )
                 // Get the internal model to access the penultimate layer
-                // @ts-expect-error - accessing internal property
+                // @ts-ignore - accessing internal property
                 const internalModel = model.model
 
                 // Execute the model up to the penultimate layer

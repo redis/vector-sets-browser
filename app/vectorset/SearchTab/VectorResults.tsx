@@ -1,16 +1,11 @@
-import { useEffect, useMemo, useState } from "react"
-import { AttributeValue } from "@/app/types/attributes"
-import { EditAttributesDialog } from "./EditAttributesDialog"
-import { Button } from "@/components/ui/button"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import SearchTimeIndicator from "@/app/components/SearchTimeIndicator"
 import {
     ColumnConfig,
     useVectorResultsSettings,
 } from "@/app/hooks/useVectorResultsSettings"
-import { VectorTuple, vgetattr } from "@/app/redis-server/api"
+import { VectorTuple, vgetattr, vgetattr_multi } from "@/app/redis-server/api"
 import { parseFieldFilters } from "@/app/utils/filterParser"
+import { Button } from "@/components/ui/button"
 import {
     Dialog,
     DialogContent,
@@ -28,7 +23,16 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Label } from "@/components/ui/label"
+import { ScrollArea } from "@/components/ui/scroll-area"
 import { Switch } from "@/components/ui/switch"
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from "@/components/ui/table"
 import {
     ArrowDownUp,
     ArrowDownWideNarrow,
@@ -36,6 +40,8 @@ import {
     CheckSquare,
     Settings,
 } from "lucide-react"
+import { useEffect, useMemo, useRef, useState } from "react"
+import EditAttributesDialog from "./EditAttributesDialog"
 import EmptyVectorSet from "./EmptyVectorSet"
 
 interface VectorResultsProps {
@@ -63,6 +69,7 @@ type AttributeCache = {
     [key: string]: string | null
 }
 
+type AttributeValue = string | number | boolean | any[]
 type ParsedAttributes = Record<string, AttributeValue>
 
 // Add this new component for the attribute columns dialog
@@ -171,14 +178,6 @@ function AttributeColumnsDialog({
     )
 }
 
-// Add a new interface to pass updated attributes back from the dialog
-interface EditAttributesDialogProps {
-    isOpen: boolean
-    onClose: (updatedAttributes?: string) => void
-    keyName: string
-    element: string
-}
-
 export default function VectorResults({
     results,
     onRowClick,
@@ -202,7 +201,6 @@ export default function VectorResults({
         setShowAttributes,
         showOnlyFilteredAttributes,
         setShowOnlyFilteredAttributes,
-        attributeColumns: savedAttributeColumns,
         updateAttributeColumnVisibility,
         getColumnVisibility,
         isLoaded,
@@ -317,32 +315,73 @@ export default function VectorResults({
 
     // Fetch attributes when showAttributes is enabled
     useEffect(() => {
+        // skip if showAttributes is off or there are no results
+        if (!showAttributes || results.length === 0) {
+            return
+        }
+
+        // skip if attributes are already loaded
+        if (isLoadingAttributes) {
+            return
+        }
+
         const fetchAttributes = async () => {
-            // Skip if we're already loading or have no results
-            if (isLoadingAttributes || !results.length) return
-
             setIsLoadingAttributes(true)
-            try {
-                // Only fetch attributes for elements we don't already have
-                const elementsToFetch = results
-                    .map((r) => r.element)
-                    .filter((element) => !attributeCache[element])
+            const newCache: AttributeCache = { ...attributeCache }
+            let hasChanges = false
 
-                if (elementsToFetch.length === 0) {
-                    setIsLoadingAttributes(false)
-                    return
+            const supportMultiCommand = true
+
+            if (supportMultiCommand) {
+                const elements = results.map((row) => row[0])
+                let attributes: string[] | null = []
+                try {
+                    attributes = await vgetattr_multi({
+                        keyName,
+                        elements,
+                    })
+                } catch (error) {
+                    console.error(`Error fetching attributes`, error)
                 }
 
-                // ... rest of the fetch logic ...
-            } catch (error) {
-                console.error("Error fetching attributes:", error)
-            } finally {
-                setIsLoadingAttributes(false)
+                if (attributes) {
+                    for (let i = 0; i < elements.length; i++) {
+                        const element = elements[i]
+                        const attribute = attributes[i]
+                        newCache[element] = attribute
+                        hasChanges = true
+                    }
+                }
+            } else {
+                for (const row of results) {
+                    const element = row[0]
+                    if (attributeCache[element] === undefined) {
+                        try {
+                            const attributes = await vgetattr({
+                                keyName,
+                                element,
+                            })
+                            newCache[element] = attributes
+                            hasChanges = true
+                        } catch (error) {
+                            console.error(
+                                `Error fetching attributes for ${element}:`,
+                                error
+                            )
+                            newCache[element] = null
+                            hasChanges = true
+                        }
+                    }
+                }
             }
+            if (hasChanges) {
+                setAttributeCache(newCache)
+            }
+            setIsLoadingAttributes(false)
         }
 
         fetchAttributes()
-    }, [results, attributeCache, isLoadingAttributes])
+    }, [showAttributes, results, keyName])
 
     // Extract field names from searchFilter
     const filteredFields = useMemo(() => {
@@ -610,20 +649,6 @@ export default function VectorResults({
 
         // Persist the change to user settings
         updateAttributeColumnVisibility(columnName, visible)
-    }
-
-    // Fetch attributes for a single result
-    const fetchAttributes = async (keyName: string, element: string) => {
-        try {
-            const attributes = await vgetattr({
-                keyName,
-                element,
-            })
-            return attributes
-        } catch (error) {
-            console.error("Error fetching attributes:", error)
-            return null
-        }
     }
 
     // Check if the only result is the default first vector

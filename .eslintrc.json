@@ -17,6 +17,15 @@
       }
     ],
     "@typescript-eslint/no-explicit-any": "off",
-    "@typescript-eslint/no-any": "off"
+    "@typescript-eslint/no-any": "off",
+    "@typescript-eslint/ban-ts-comment": [
+      "error",
+      {
+        "ts-ignore": "allow-with-description",
+        "ts-expect-error": true,
+        "ts-nocheck": true,
+        "ts-check": false
+      }
+    ]
   }
 }

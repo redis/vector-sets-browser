@@ -300,7 +300,6 @@ const ConnectionLines = ({
                                 count={2}
                                 array={new Float32Array([...start, ...end])}
                                 itemSize={3}
-                                args={[new Float32Array([...start, ...end]), 3]}
                             />
                         </bufferGeometry>
                         <lineBasicMaterial
@@ -377,7 +376,7 @@ export default function VectorViz3D({
     const [showAllLabels, setShowAllLabels] = useState<boolean>(true)
     const [zoomLevel, setZoomLevel] = useState<number>(0.6)
     const [cameraResetTrigger, setCameraResetTrigger] = useState<number>(0)
-    const [browsing] = useState<boolean>(false)
+    const [browsing, setBrowsing] = useState<boolean>(false)
 
     // Filter out invalid data
     const validData = React.useMemo(() => {
@@ -484,7 +483,7 @@ export default function VectorViz3D({
                 isProcessingClickRef.current = false
             }, 100)
         },
-        [selectedPoint]
+        [selectedPoint, validData]
     )
 
     // Add an effect to log state updates
@@ -492,11 +491,22 @@ export default function VectorViz3D({
     }, [selectedPoint, validData])
 
     // Add the handler function
-    const handleVectorSelect = useCallback((element: string) => {
-        if (onVectorSelect) {
-            onVectorSelect(element)
+    const handleSearchSimilar = useCallback(() => {
+        if (selectedPoint !== null && selectedPoint < validData.length) {
+
+            setBrowsing(true)
+            // Call the onVectorSelect callback with the selected vector
+            if (onVectorSelect) {
+                try {
+                    // Make sure we're passing a valid vector
+                    onVectorSelect(validData[selectedPoint].label)
+                } catch (error) {
+                    console.error("Error triggering vector search:", error)
+                    setBrowsing(false)
+                }
+            }
         }
-    }, [onVectorSelect])
+    }, [selectedPoint, validData, onVectorSelect])
 
     return (
         <div style={{ width: "100%", height: "500px", position: "relative" }}>
@@ -524,9 +534,10 @@ export default function VectorViz3D({
                             <bufferAttribute
                                 attach="attributes-position"
                                 count={2}
-                                array={new Float32Array([0, 0, 0, maxDim, 0, 0])}
+                                array={
+                                    new Float32Array([0, 0, 0, maxDim, 0, 0])
+                                }
                                 itemSize={3}
-                                args={[new Float32Array([0, 0, 0, maxDim, 0, 0]), 3]}
                             />
                         </bufferGeometry>
                         <lineBasicMaterial color="#cc0000" />
@@ -536,9 +547,10 @@ export default function VectorViz3D({
                             <bufferAttribute
                                 attach="attributes-position"
                                 count={2}
-                                array={new Float32Array([0, 0, 0, 0, maxDim, 0])}
+                                array={
+                                    new Float32Array([0, 0, 0, 0, maxDim, 0])
+                                }
                                 itemSize={3}
-                                args={[new Float32Array([0, 0, 0, 0, maxDim, 0]), 3]}
                             />
                         </bufferGeometry>
                         <lineBasicMaterial color="#00cc00" />
@@ -548,9 +560,10 @@ export default function VectorViz3D({
                             <bufferAttribute
                                 attach="attributes-position"
                                 count={2}
-                                array={new Float32Array([0, 0, 0, 0, 0, maxDim])}
+                                array={
+                                    new Float32Array([0, 0, 0, 0, 0, maxDim])
+                                }
                                 itemSize={3}
-                                args={[new Float32Array([0, 0, 0, 0, 0, maxDim]), 3]}
                             />
                         </bufferGeometry>
                         <lineBasicMaterial color="#0000cc" />
@@ -832,42 +845,55 @@ export default function VectorViz3D({
             >
                 <div>Vectors: {pointsData.length}</div>
                 <div>Click on a point to select it</div>
-                {selectedPoint !== null && selectedPoint < pointsData.length && (
-                    <>
-                        <div>
-                            <strong>Selected:</strong>{" "}
-                            {pointsData[selectedPoint].label}
-                        </div>
-                        {browsing ? (
-                            <div style={{ marginTop: "5px", color: "#4285F4" }}>
-                                Searching for similar vectors...
+                {selectedPoint !== null &&
+                    selectedPoint < pointsData.length && (
+                        <>
+                            <div>
+                                <strong>Selected:</strong>{" "}
+                                {pointsData[selectedPoint].label}
                             </div>
-                        ) : (
-                            onVectorSelect && (
-                                <div>
-                                    <div style={{ fontSize: "11px", marginTop: "3px", color: "#666" }}>
-                                        Click &quot;Search Similar&quot; to find related vectors
-                                    </div>
-                                    <button
-                                        onClick={() => handleVectorSelect(pointsData[selectedPoint].label)}
-                                        style={{
-                                            marginTop: "5px",
-                                            background: "#4285F4",
-                                            color: "white",
-                                            border: "none",
-                                            borderRadius: "4px",
-                                            padding: "4px 8px",
-                                            cursor: "pointer",
-                                            fontSize: "11px",
-                                        }}
-                                    >
-                                        Search Similar
-                                    </button>
+                            {browsing ? (
+                                <div
+                                    style={{
+                                        marginTop: "5px",
+                                        color: "#4285F4",
+                                    }}
+                                >
+                                    Searching for similar vectors...
                                 </div>
-                            )
-                        )}
-                    </>
-                )}
+                            ) : (
+                                onVectorSelect && (
+                                    <div>
+                                        <div
+                                            style={{
+                                                fontSize: "11px",
+                                                marginTop: "3px",
+                                                color: "#666",
+                                            }}
+                                        >
+                                            Click {`"`}Search Similar{`"`} to find
+                                            related vectors
+                                        </div>
+                                        <button
+                                            onClick={handleSearchSimilar}
+                                            style={{
+                                                marginTop: "5px",
+                                                background: "#4285F4",
+                                                color: "white",
+                                                border: "none",
+                                                borderRadius: "4px",
+                                                padding: "4px 8px",
+                                                cursor: "pointer",
+                                                fontSize: "11px",
+                                            }}
+                                        >
+                                            Search Similar
+                                        </button>
+                                    </div>
+                                )
+                            )}
+                        </>
+                    )}
             </div>
         </div>
     )

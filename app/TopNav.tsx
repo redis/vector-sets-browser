@@ -1,6 +1,5 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import Image from "next/image"
 
 export default function TopNav() {
     const pathname = usePathname()
@@ -23,9 +22,16 @@ export default function TopNav() {
     return (
         <header className="bg-[white] border-b sticky top-0 z-10">
             <div className="flex items-center p-2 space-x-4 pr-4">
-                <Link href="/" className="flex items-center gap-2">
-                    <Image src="/logo.png" width={32} height={32} alt="Logo" />
-                    <span className="font-semibold">Vector Sets Browser</span>
+                <Link href="/" className="ml-2 flex items-center">
+                    {/* Image with proper aspect ratio handling */}
+                    <span
+                        className="w-20 h-10 mr-2 flex items-center justify-center bg-contain bg-no-repeat bg-center"
+                        style={{ backgroundImage: "url('/Redis_logo.png')" }}
+                        aria-label="Redis Logo"
+                    ></span>
+                    <div>
+                        <h1 className="text-xl font-bold">VectorSet</h1>
+                    </div>
                 </Link>
                 <div className="grow"></div>
                 <nav className="flex items-center gap-4 pl-8">

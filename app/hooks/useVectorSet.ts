@@ -15,7 +15,7 @@ import { VectorSetMetadata } from "@/app/types/vectorSetMetaData"
 
 import { validateVector } from "@/app/embeddings/utils/validation"
 import eventBus, { AppEvents } from "@/app/utils/eventEmitter"
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useRef, useState, useCallback } from "react"
 
 interface UseVectorSetReturn {
     vectorSetName: string | null
@@ -59,7 +59,7 @@ export function useVectorSet(): UseVectorSetReturn {
     const vectorSetCacheRef = useRef<Record<string, VectorSetCache>>({})
 
     // Load metadata when vector set changes
-    const loadMetadata = async () => {
+    const loadMetadata = useCallback(async () => {
         if (!vectorSetName) return null
 
         // Check if metadata is already cached
@@ -85,10 +85,10 @@ export function useVectorSet(): UseVectorSetReturn {
             setMetadata(null)
             return null
         }
-    }
+    }, [vectorSetName, setMetadata, vectorSetCacheRef])
 
     // Load vector set data when name changes
-    const loadVectorSet = async () => {
+    const loadVectorSet = useCallback(async () => {
         console.log("[loadVectorSet] Loading vector set", vectorSetName)
         if (!vectorSetName) return
 
@@ -128,7 +128,20 @@ export function useVectorSet(): UseVectorSetReturn {
                     : "Error loading vector set"
             )
         }
-    }
+    }, [vectorSetName, setResults, setDim, setRecordCount, setStatusMessage, loadMetadata, vectorSetCacheRef])
+
+    // Load vector set data when name changes
+    useEffect(() => {
+        if (vectorSetName) {
+            loadVectorSet()
+        } else {
+            setDim(null)
+            setRecordCount(null)
+            setMetadata(null)
+            setStatusMessage("")
+            setResults([])
+        }
+    }, [vectorSetName, loadVectorSet, setDim, setRecordCount, setMetadata, setStatusMessage, setResults])
 
     // Handle adding a new vector
     const handleAddVector = async (
@@ -201,7 +214,7 @@ export function useVectorSet(): UseVectorSetReturn {
                 quantization: metadata?.redisConfig?.quantization,
             })
 
-            if (!result.success) {
+            if (!result?.success) {
                 throw new Error(
                     `Element "${element}" already exists in vector set "${vectorSetName}"`
                 )
@@ -432,19 +445,6 @@ export function useVectorSet(): UseVectorSetReturn {
             return null
         }
     }
-
-    // Load vector set data when name changes
-    useEffect(() => {
-        if (vectorSetName) {
-            loadVectorSet()
-        } else {
-            setDim(null)
-            setRecordCount(null)
-            setMetadata(null)
-            setStatusMessage("")
-            setResults([])
-        }
-    }, [vectorSetName])
 
     // Add a new method specifically for metadata updates
     const updateMetadata = async (newMetadata: VectorSetMetadata) => {

@@ -95,7 +95,6 @@ export default function VectorSetVisualization({
     const getNeighbors = async (
         element: string,
         count: number,
-        withEmbeddings?: boolean
     ) => {
         try {
             const data = await vlinks({
@@ -214,9 +213,8 @@ export default function VectorSetVisualization({
                             ) : (
                                 <VectorViz3D
                                     data={results.map((result) => ({
-                                        label: `${
-                                            result[0]
-                                        } (${result[1].toFixed(3)})`,
+                                        label: `${result[0]
+                                            } (${result[1].toFixed(3)})`,
                                         vector: result[2] || [],
                                     }))}
                                     onVectorSelect={handleRowClick}

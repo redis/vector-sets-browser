@@ -9,8 +9,6 @@ import {
     SelectValue,
 } from "@/components/ui/select"
 import { useState } from "react"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { AlertTriangle } from "lucide-react"
 
 interface AdvancedConfigEditProps {
     redisConfig: VectorSetMetadata

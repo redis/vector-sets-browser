@@ -127,13 +127,7 @@ export default function OllamaModelSelector({
         if (isCustom) {
             setCustomModel(value)
         }
-    }, [value, isCustom])
-
-    React.useEffect(() => {
-        if (!isCustom) {
-            setCustomModel("")
-        }
-    }, [isCustom, setCustomModel])
+    }, [value])
 
     return (
         <div className="space-y-4">

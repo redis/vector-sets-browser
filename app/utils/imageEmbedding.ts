@@ -12,14 +12,15 @@ let tfInitialized = false
 // Check if code is running in browser environment
 const isBrowser = typeof window !== "undefined"
 
+// Import node-specific packages conditionally
+
 // Don't try to load tfjs-node directly, as it causes webpack issues
 // We'll use dynamic imports instead when needed
 
 if (!isBrowser) {
     try {
         // Dynamic import for node-canvas in server environment
-        const canvas = require("canvas")
-        Image = canvas.Image
+        await import('canvas')
     } catch (error) {
         console.error("[TensorFlow.js] Failed to load canvas package:", error)
     }
@@ -115,7 +116,6 @@ export async function loadImageModel(config: ImageConfig): Promise<any> {
  */
 export async function preprocessImage(
     imageData: string,
-    config: ImageConfig
 ): Promise<any> {
     try {
         // Ensure TensorFlow.js is loaded
@@ -230,7 +230,7 @@ export async function getImageEmbedding(
         const model = await loadImageModel(config)
 
         // Preprocess the image
-        const tensor = await preprocessImage(imageData, config)
+        const tensor = await preprocessImage(imageData)
 
         console.log(
             "[TensorFlow.js] Generating embedding with model:",
@@ -238,7 +238,7 @@ export async function getImageEmbedding(
         )
 
         // Get the internal model to access the penultimate layer
-        // @ts-expect-error - accessing internal property
+        // @ts-ignore - accessing internal property
         const internalModel = model.model
 
         // Add batch dimension [1, height, width, channels]
@@ -278,7 +278,8 @@ export async function getImageEmbedding(
         )
 
         // Convert to array
-        const embedding = Array.from(await activationLayer.data())
+        const rawData = await activationLayer.data();
+        const embedding = Array.from(rawData).map(val => Number(val));
 
         // Debug the embedding
         console.log(
