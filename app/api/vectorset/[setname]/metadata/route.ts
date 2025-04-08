@@ -39,7 +39,7 @@ export async function GET(
                 const configKey = "vector-set-browser:config"
                 const hashKey = `vset:${keyName}:metadata`
 
-                let storedData = await client.hGet(configKey, hashKey)
+                const storedData = await client.hGet(configKey, hashKey)
 
                 try {
                     // Parse the stored data

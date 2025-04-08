@@ -5,10 +5,7 @@ import {
     CSVRow,
 } from "@/app/types/job-queue"
 import { JobQueueService } from "./job-queue"
-import { RedisConnection, getRedisUrl } from "@/app/redis-server/RedisConnection"
-import { Job, JobStatus } from "./types"
-import { EmbeddingService } from "@/app/embeddings/service"
-import { VectorSetService } from "@/app/vectorset/service"
+import { RedisConnection } from "@/app/redis-server/RedisConnection"
 import { registerCompletedJob } from "@/app/api/jobs/completed/route"
 import { buildVectorElement, saveVectorData } from "@/app/lib/importUtils"
 

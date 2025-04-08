@@ -15,7 +15,6 @@ import {
     OPENAI_MODELS,
     OLLAMA_MODELS,
     IMAGE_MODELS,
-    CLIP_MODELS,
 } from "@/app/embeddings/types/embeddingModels"
 
 // Group models by provider for the dropdown
@@ -79,20 +78,20 @@ export default function VectorSetCalculator() {
 
     function generateRedisCommand(modelDim: number, storeDim: number | null, quantization: string) {
         let cmd = "VADD myindex"
-        
+
         if (storeDim && storeDim < modelDim) {
             cmd += ` REDUCE ${storeDim}`
         }
-        
+
         cmd += ` VALUES ${modelDim} <vector_values...> my_element`
-        
+
         if (quantization === "NOQUANT") {
             cmd += " NOQUANT"
         } else if (quantization === "BIN") {
             cmd += " BIN"
         }
         // Q8 is default, so no need to add a flag
-        
+
         return cmd
     }
 
@@ -214,7 +213,7 @@ export default function VectorSetCalculator() {
                                                 const model = GROUPED_MODELS
                                                     .flatMap(g => g.models)
                                                     .find(m => m.id === value)
-                                                
+
                                                 setConfig({
                                                     ...config,
                                                     modelType: value,
@@ -397,7 +396,7 @@ export default function VectorSetCalculator() {
 
             <div className="space-y-6">
                 <h3 className="text-lg font-semibold">Memory Usage Comparison</h3>
-                
+
                 <div className="space-y-6">
                     {/* Raw Vector Data Bar */}
                     <div className="space-y-2">

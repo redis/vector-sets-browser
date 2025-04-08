@@ -9,7 +9,6 @@ import {
     LoadingOverlay,
     ZoomControls,
 } from "./components"
-import { MAX_LABELED_NODES } from "./constants"
 import {
     useCanvasEvents,
     useForceSimulator,
@@ -621,7 +620,7 @@ const HNSWVizPure: React.FC<HNSWVizPureProps> = ({
             )
             initialMesh.userData.similarity = initialElement.similarity
             scene.add(initialMesh)
-            const initialNode = addNode(initialMesh)
+            addNode(initialMesh)
 
             // Delay the initial node click to ensure proper initialization
             setTimeout(() => {
@@ -948,7 +947,6 @@ const HNSWVizPure: React.FC<HNSWVizPureProps> = ({
         )
         initialMesh.userData.similarity = initialElement.similarity
         scene.add(initialMesh)
-        const initialNode = addNode(initialMesh)
 
         // Fit camera to the initial node
         fitCameraToNodes()

@@ -213,7 +213,7 @@ export default function EditAttributesDialog({
                             }
                         }
                     )
-                } catch (err) {
+                } catch (_err) {
                     setError("Invalid JSON format")
                     return
                 }

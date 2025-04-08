@@ -1,4 +1,3 @@
-import { Command } from './../../../../../node_modules/commander/typings/index.d';
 import { validateKeyName } from "@/app/redis-server/utils"
 
 export interface VlinksRequest {

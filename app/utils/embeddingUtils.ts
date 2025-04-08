@@ -77,7 +77,7 @@ export function getDefaultImageEmbeddingConfig(): EmbeddingConfig {
         model: "clip-vit-base-patch32"
       }
     }
-  } catch (e) {
+  } catch (_e) {
     console.log("CLIP not available, falling back to OpenAI")
     // Fall back to OpenAI
     return {

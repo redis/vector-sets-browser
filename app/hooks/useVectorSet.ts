@@ -6,7 +6,6 @@ import {
     VectorTuple,
     vadd,
     vcard,
-    vdim,
     vemb,
     vgetattr,
     vinfo,

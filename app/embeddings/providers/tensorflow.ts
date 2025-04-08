@@ -1,4 +1,4 @@
-import { EmbeddingConfig, getModelData } from "../types/embeddingModels"
+import { EmbeddingConfig } from "../types/embeddingModels"
 import { EmbeddingProvider } from "./base"
 
 // Text-related TensorFlow functionality is commented out
@@ -36,7 +36,7 @@ export class TensorFlowProvider implements EmbeddingProvider {
         }
 
         try {
-            const tf = await import('@tensorflow/tfjs')
+            await import('@tensorflow/tfjs')
             const mobilenet = await import('@tensorflow-models/mobilenet')
 
             // Load the mobilenet model
