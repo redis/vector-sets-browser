@@ -44,12 +44,32 @@ export const embeddings = {
         config: EmbeddingConfig,
         texts: string[]
     ): Promise<ApiResponse<number[][]>> {
-        return apiClient.post<
-            ApiResponse<number[][]>,
-            { texts: string[]; config: EmbeddingConfig }
-        >("/api/embeddings/batch", {
-            texts,
-            config,
-        })
+        try {
+            const response = await apiClient.post<ApiResponse<number[][]>, { texts: string[]; config: EmbeddingConfig }>(
+                "/api/embeddings/batch",
+                {
+                    texts,
+                    config,
+                }
+            );
+
+            // Manually construct the ApiResponse object
+            return {
+                success: true,
+                result: response.result as any,
+                executionTimeMs: response.executionTimeMs || undefined
+            };
+        } catch (error) {
+            if (error instanceof Error) {
+                return {
+                    success: false,
+                    error: error.message
+                };
+            }
+            return {
+                success: false,
+                error: 'Unknown error'
+            };
+        }
     },
 }

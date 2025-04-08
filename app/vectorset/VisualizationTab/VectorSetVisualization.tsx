@@ -16,9 +16,9 @@ import {
     useVectorSearch,
     VectorSetSearchState,
 } from "@/app/hooks/useVectorSearch"
-import { VectorSetMetadata } from "@/app/embeddings/types/embeddingModels"
 import VectorViz3D from "./VectorViz3D"
 import HNSWVizPure from "./vizualizer/HNSW2dViz"
+import { VectorSetMetadata } from "@/app/types/vectorSetMetaData"
 
 interface VectorSetVisualizationProps {
     vectorSetName: string
@@ -153,7 +153,6 @@ export default function VectorSetVisualization({
                 searchCount={searchCount}
                 setSearchCount={setSearchCount}
                 error={fileOperationStatus}
-                clearError={() => setFileOperationStatus("")}
                 expansionFactor={searchState.expansionFactor}
                 setExpansionFactor={(factor) =>
                     setSearchState({ ...searchState, expansionFactor: factor })

@@ -1,6 +1,7 @@
 export type EmbeddingProvider =
     | "openai"
     | "ollama"
+    | "tensorflow"
     | "image"
     | "clip"
     | "none"
@@ -110,8 +111,13 @@ export interface ClipConfig {
     model: ClipModelName
 }
 
+export interface TensorFlowConfig {
+    model: string
+}
+
 export interface EmbeddingConfig {
     provider: EmbeddingProvider
+    tensorflow?: TensorFlowConfig
     openai?: OpenAIConfig
     ollama?: OllamaConfig
     image?: ImageConfig
@@ -139,7 +145,7 @@ export function getModelData(config: EmbeddingConfig): ModelData | undefined {
     } else if (config.provider === "ollama" && config.ollama?.modelName) {
         return (
             OLLAMA_MODELS[
-                config.ollama.modelName as keyof typeof OLLAMA_MODELS
+            config.ollama.modelName as keyof typeof OLLAMA_MODELS
             ] || {
                 name: config.ollama.modelName,
                 dimensions: 1024,
@@ -178,13 +184,13 @@ export function getEmbeddingDataFormat(config?: EmbeddingConfig): EmbeddingDataF
         // console.log(`[getEmbeddingDataFormat] CLIP model - returning text-and-image`)
         return "text-and-image";
     }
-    
+
     // Check for image provider or model
     if (config.provider === "image" || config.image?.model) {
         // console.log(`[getEmbeddingDataFormat] Image model - returning image`)
         return "image";
     }
-    
+
     // console.log(`[getEmbeddingDataFormat] No CLIP or image - returning text`, config)
     return "text";
 }
@@ -225,7 +231,7 @@ export function getExpectedDimensions(config: EmbeddingConfig): number {
         // console.log(`[getExpectedDimensions] Model data: ${JSON.stringify(modelData)}`)
         return modelData.dimensions;
     }
-    
+
     // If no model data is available, try to get dimensions directly from the provider config
     switch (config.provider) {
         case "clip":
@@ -242,13 +248,13 @@ export function getExpectedDimensions(config: EmbeddingConfig): number {
             // For Ollama, check if the model name is in our known models
             const ollamaModelName = config.ollama?.modelName;
             // console.log(`[getExpectedDimensions] Ollama model name: ${ollamaModelName}`)
-            return ollamaModelName && 
+            return ollamaModelName &&
                 OLLAMA_MODELS[ollamaModelName as keyof typeof OLLAMA_MODELS]?.dimensions || 0;
         case "image":
             // For Image models, check if the model name is in our known models
             const imageModelName = config.image?.model;
             // console.log(`[getExpectedDimensions] Image model name: ${imageModelName}`)
-            return imageModelName && 
+            return imageModelName &&
                 IMAGE_MODELS[imageModelName]?.dimensions || 0;
         default:
             return 0;

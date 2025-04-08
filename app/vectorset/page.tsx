@@ -2,7 +2,7 @@
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useRouter, useSearchParams } from "next/navigation"
-import { useEffect, useState } from "react"
+import { Suspense, useEffect, useState } from "react"
 import { useRedisConnection } from "../hooks/useRedisConnection"
 import { useVectorSet } from "../hooks/useVectorSet"
 import { getConnection, removeConnection } from "../redis-server/connectionManager"
@@ -32,6 +32,18 @@ import VectorSettings from "./SettingsTab/VectorSettings"
  */
 
 export default function VectorSetPage() {
+    return (
+        <Suspense fallback={
+            <div className="flex items-center justify-center w-full h-screen">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+            </div>
+        }>
+            <VectorSetPageContent />
+        </Suspense>
+    )
+}
+
+function VectorSetPageContent() {
     const router = useRouter()
     const searchParams = useSearchParams()
     const connectionId = searchParams.get("cid")

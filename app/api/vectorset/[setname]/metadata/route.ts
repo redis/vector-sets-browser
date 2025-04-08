@@ -142,7 +142,7 @@ export async function PUT(
 
         if (!response.success) {
             return NextResponse.json(
-                { success: false, error: result.error },
+                { success: false, error: response.error },
                 { status: 500 }
             )
         }

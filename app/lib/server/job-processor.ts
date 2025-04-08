@@ -6,7 +6,7 @@ import {
 } from "@/app/types/job-queue"
 import { JobQueueService } from "./job-queue"
 import { RedisConnection } from "@/app/redis-server/RedisConnection"
-import { registerCompletedJob } from "@/app/api/jobs/completed/route"
+import { registerCompletedJob } from "@/app/lib/completedJobs"
 import { buildVectorElement, saveVectorData } from "@/app/lib/importUtils"
 
 export class JobProcessor {

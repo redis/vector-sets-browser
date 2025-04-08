@@ -91,6 +91,9 @@ const HNSWVizPure: React.FC<HNSWVizPureProps> = ({
         handleZoom: originalHandleZoom,
     } = useThreeScene()
 
+    // Cast the ref to the required non-null type for compatibility with other hooks
+    const typedCanvasRef = canvasRef as React.RefObject<HTMLCanvasElement>;
+
     // Function to update label scales based on camera distance
     const updateLabelScales = useCallback(() => {
         if (!camera) return
@@ -139,7 +142,7 @@ const HNSWVizPure: React.FC<HNSWVizPureProps> = ({
     )
 
     // Animation loop ref
-    const animationFrameRef = useRef<number>()
+    const animationFrameRef = useRef<number>(null)
 
     // Set up animation loop
     useEffect(() => {
@@ -180,7 +183,7 @@ const HNSWVizPure: React.FC<HNSWVizPureProps> = ({
         camera,
         renderer,
         fitCameraToNodes,
-        canvasRef
+        typedCanvasRef
     )
 
     // Initialize node management
@@ -490,7 +493,7 @@ const HNSWVizPure: React.FC<HNSWVizPureProps> = ({
 
     // Initialize canvas events
     useCanvasEvents(
-        canvasRef,
+        typedCanvasRef,
         camera,
         scene,
         handleNodeClick,

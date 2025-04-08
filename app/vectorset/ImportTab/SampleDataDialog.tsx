@@ -7,9 +7,10 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@/components/ui/dialog"
-import { SampleDataSelect, SampleDataset } from "./SampleDataSelect"
+import { SampleDataSelect } from "./SampleDataSelect"
 import { SampleDataImporter } from "./SampleDataImporter"
-import { VectorSetMetadata } from "@/app/embeddings/types/embeddingModels"
+import { VectorSetMetadata } from "@/app/types/vectorSetMetaData"
+import { Dataset } from "./types/DatasetProvider"
 
 interface SampleDataDialogProps {
     open: boolean
@@ -30,10 +31,10 @@ export function SampleDataDialog({
 }: SampleDataDialogProps) {
     const [step, setStep] = useState<"select" | "import">("select")
     const [selectedDataset, setSelectedDataset] =
-        useState<SampleDataset | null>(null)
+        useState<Dataset | null>(null)
     const [importSuccess, setImportSuccess] = useState(false)
 
-    const handleSelectDataset = (dataset: SampleDataset) => {
+    const handleSelectDataset = (dataset: Dataset) => {
         setSelectedDataset(dataset)
         setStep("import")
     }

@@ -1,4 +1,4 @@
-import { createClient, RedisClientType } from "redis"
+import { createClient } from "redis"
 import { cookies } from "next/headers"
 
 export interface RedisOperationResult<T> {
@@ -13,13 +13,16 @@ export interface RedisOperationResult<T> {
 export async function getRedisUrl(): Promise<string | null> {
     const url = (await cookies()).get("redis_url")?.value
     return url || null
-} 
+}
+
+// Define a type alias for our Redis client to avoid type mismatches
+type RedisClient = ReturnType<typeof createClient>
 
 export class RedisConnection {
     private static connectionPool: Map<
         string,
         {
-            client: RedisClientType
+            client: RedisClient
             lastUsed: number
             isConnecting: boolean
         }
@@ -28,7 +31,7 @@ export class RedisConnection {
     private static readonly CONNECTION_TIMEOUT = 60000 // 1 minute timeout
     private static cleanupInterval: NodeJS.Timeout | null = null
 
-    private static async getClient(url: string): Promise<RedisClientType> {
+    private static async getClient(url: string): Promise<RedisClient> {
         // Check if we have an existing connection
         const existingConnection = this.connectionPool.get(url)
 
@@ -57,7 +60,7 @@ export class RedisConnection {
 
         // Create a new connection
         const connectionInfo = {
-            client: null as unknown as RedisClientType,
+            client: null as unknown as RedisClient,
             lastUsed: Date.now(),
             isConnecting: true,
         }
@@ -75,7 +78,7 @@ export class RedisConnection {
             client.on("error", (err) => console.error("Redis Client Error:", err))
             await client.connect()
 
-            connectionInfo.client = client
+            connectionInfo.client = client as RedisClient
             connectionInfo.isConnecting = false
 
             // Start cleanup interval if not already running
@@ -86,7 +89,7 @@ export class RedisConnection {
                 )
             }
 
-            return client
+            return client as RedisClient
         } catch (error) {
             connectionInfo.isConnecting = false
             this.connectionPool.delete(url)
@@ -130,7 +133,7 @@ export class RedisConnection {
 
     public static async withClient<T>(
         url: string,
-        operation: (client: RedisClientType) => Promise<T>
+        operation: (client: RedisClient) => Promise<T>
     ): Promise<RedisOperationResult<T>> {
         try {
             const startTime = performance.now()

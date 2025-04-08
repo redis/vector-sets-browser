@@ -23,7 +23,7 @@
       {
         "ts-ignore": "allow-with-description",
         "ts-expect-error": true,
-        "ts-nocheck": true,
+        "ts-nocheck": false,
         "ts-check": false
       }
     ]

@@ -210,7 +210,6 @@ export default function ImportTab({
                                             </Button>
                                         </div>
                                         <ImportFromCSV
-                                            onClose={() => setShowImportCSV(false)}
                                             onImportSuccess={handleImportSuccess}
                                             metadata={metadata}
                                             vectorSetName={vectorSetName}

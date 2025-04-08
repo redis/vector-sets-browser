@@ -296,6 +296,7 @@ const ConnectionLines = ({
                     >
                         <bufferGeometry attach="geometry">
                             <bufferAttribute
+                                args={[new Float32Array([...start, ...end]), 3]}
                                 attach="attributes-position"
                                 count={2}
                                 array={new Float32Array([...start, ...end])}
@@ -532,6 +533,7 @@ export default function VectorViz3D({
                     <line>
                         <bufferGeometry>
                             <bufferAttribute
+                                args={[new Float32Array([0, 0, 0, maxDim, 0, 0]), 3]}
                                 attach="attributes-position"
                                 count={2}
                                 array={
@@ -545,6 +547,7 @@ export default function VectorViz3D({
                     <line>
                         <bufferGeometry>
                             <bufferAttribute
+                                args={[new Float32Array([0, 0, 0, 0, maxDim, 0]), 3]}
                                 attach="attributes-position"
                                 count={2}
                                 array={
@@ -558,6 +561,7 @@ export default function VectorViz3D({
                     <line>
                         <bufferGeometry>
                             <bufferAttribute
+                                args={[new Float32Array([0, 0, 0, 0, 0, maxDim]), 3]}
                                 attach="attributes-position"
                                 count={2}
                                 array={

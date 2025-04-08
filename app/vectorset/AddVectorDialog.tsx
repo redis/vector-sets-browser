@@ -50,7 +50,6 @@ export default function AddVectorModal({
     const [isAdding, setIsAdding] = useState(false)
     const [useCAS, setUseCAS] = useState(false)
     const [attemptedSubmit, setAttemptedSubmit] = useState(false)
-    const [showRedisCommand, setShowRedisCommand] = useState(true)
     const [uploadImages, setUploadImages] = useState<ImageFileInfo[]>([])
 
     // Check if form is valid and button should be enabled
@@ -781,8 +780,7 @@ export default function AddVectorModal({
                                 executedCommand={vaddCommand}
                                 searchQuery={elementData}
                                 searchFilter=""
-                                showRedisCommand={showRedisCommand}
-                                setShowRedisCommand={setShowRedisCommand}
+                                showRedisCommand={true}
                             />
                         </div>
 

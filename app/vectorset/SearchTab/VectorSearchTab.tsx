@@ -94,10 +94,8 @@ export default function VectorSearchTab({
         searchFilter,
         setSearchFilter,
         error,
-        clearError,
         expansionFactor,
         setExpansionFactor,
-        lastTextEmbedding,
         executedCommand,
     } = useVectorSearch({
         vectorSetName,
@@ -193,10 +191,8 @@ export default function VectorSearchTab({
                 dim={dim}
                 metadata={metadata}
                 error={error}
-                clearError={clearError}
                 expansionFactor={expansionFactor}
                 setExpansionFactor={setExpansionFactor}
-                lastTextEmbedding={lastTextEmbedding}
                 executedCommand={executedCommand}
                 results={results}
             />
