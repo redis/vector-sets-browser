@@ -467,7 +467,6 @@ export default function SearchBox({
                                             )
                                             : false
                                     }
-                                    onHelp={() => setShowFilterHelp(true)}
                                     vectorSetName={vectorSetName}
                                 />
                             </div>
@@ -504,7 +503,6 @@ export default function SearchBox({
                             searchQuery={searchQuery}
                             searchFilter={localFilter}
                             showRedisCommand={showRedisCommand}
-                            setShowRedisCommand={setShowRedisCommand}
                         />
                     </div>
                 )}

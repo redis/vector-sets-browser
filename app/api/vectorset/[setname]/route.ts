@@ -6,7 +6,7 @@ import { NextRequest, NextResponse } from "next/server"
 // POST /api/vectorset/[setname] - Create a new vector set
 export async function POST(
     request: NextRequest,
-    { params }: { params: { setname: string } }
+    { params }: any //{ params: { setname: string } }
 ) {
     try {
         console.log("POST /api/vectorset/[setname]", params)
@@ -76,8 +76,8 @@ export async function POST(
 
 // DELETE /api/vectorset/[setname] - Delete a vector set
 export async function DELETE(
-    request: NextRequest,
-    { params }: { params: { setname: string } }
+    _request: NextRequest,
+    { params }: any //{ params: { setname: string } }
 ) {
     try {
         console.log("DELETE /api/vectorset/[setname]", params)

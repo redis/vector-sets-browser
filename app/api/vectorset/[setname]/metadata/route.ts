@@ -3,16 +3,18 @@ import * as redis from "@/app/redis-server/server/commands"
 import { getRedisUrl } from "@/app/redis-server/server/commands"
 import { NextRequest, NextResponse } from "next/server"
 
+// type Params = { params: { setname: string } }
+
 // GET /api/vectorset/[setname]/metadata - Get metadata for a vector set
 export async function GET(
-    request: NextRequest,
-    context: { params: { setname: string } }
+    _request: NextRequest,
+    { params }: any
 ) {
     try {
-        const { setname } = context.params;
+        const setname = params.setname
 
         if (!setname) {
-            console.error("Missing setname parameter:", context.params)
+            console.error("Missing setname parameter:", params)
             return NextResponse.json(
                 { success: false, error: "Key name is required" },
                 { status: 400 }
@@ -54,15 +56,15 @@ export async function GET(
 // PUT /api/vectorset/[setname]/metadata - Set metadata for a vector set
 export async function PUT(
     request: NextRequest,
-    context: { params: { setname: string } }
+    { params }: any
 ) {
     try {
-        console.log("PUT /api/vectorset/[setname]/metadata", context.params)
+        console.log("PUT /api/vectorset/[setname]/metadata", params)
 
-        const { setname } = context.params;
+        const setname = params.setname
 
         if (!setname) {
-            console.error("Missing setname parameter:", context.params)
+            console.error("Missing setname parameter:", params)
             return NextResponse.json(
                 { success: false, error: "Key name is required" },
                 { status: 400 }
@@ -113,7 +115,7 @@ export async function PUT(
 // Also support POST for backward compatibility
 export async function POST(
     request: NextRequest,
-    context: { params: { setname: string } }
+    { params }: any
 ) {
-    return PUT(request, context)
+    return PUT(request, { params })
 } 

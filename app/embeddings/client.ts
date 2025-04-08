@@ -18,12 +18,12 @@ export const embeddings = {
                     config,
                 }
             );
-            
+
             // Manually construct the ApiResponse object
             console.log("[getEmbedding] Response:", response)
             return {
                 success: true,
-                result: response.result,
+                result: response.result as any,
                 executionTimeMs: response.executionTimeMs || undefined
             };
         } catch (error) {

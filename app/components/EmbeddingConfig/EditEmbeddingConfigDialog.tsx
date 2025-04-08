@@ -504,7 +504,7 @@ export default function EditEmbeddingConfigModal({
                                         onChange={(value) =>
                                             setImageConfig({
                                                 ...imageConfig,
-                                                model: value,
+                                                model: value as ImageModelName,
                                             })
                                         }
                                     />

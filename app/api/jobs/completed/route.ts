@@ -2,7 +2,8 @@ import { JobProcessor } from "@/app/lib/server/job-processor"
 import { JobQueueService } from "@/app/lib/server/job-queue"
 import RedisClient, * as redis from "@/app/redis-server/server/commands"
 import { NextRequest, NextResponse } from "next/server"
-import { CreateImportJobRequestBody } from "../jobs"
+import { CreateImportJobRequestBody } from "../../jobs"
+
 
 // Map to store active job processors
 const activeProcessors = new Map<string, JobProcessor>()

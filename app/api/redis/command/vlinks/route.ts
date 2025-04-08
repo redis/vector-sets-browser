@@ -6,7 +6,7 @@ import { NextResponse } from "next/server"
 export async function POST(request: Request) {
     try {
         const body = (await request.json()) as VlinksRequestBody
-        const { keyName, element, count = 10, withEmbeddings = false } = body
+        const { keyName, element, withEmbeddings = false } = body
 
         if (!keyName || !element) {
             return NextResponse.json(
@@ -16,7 +16,7 @@ export async function POST(request: Request) {
         }
 
         const redisUrl = await getRedisUrl()
-        
+
         if (!redisUrl) {
             return NextResponse.json(
                 { success: false, error: "No Redis connection available" },
@@ -24,7 +24,7 @@ export async function POST(request: Request) {
             )
         }
 
-        const response = await redis.vlinks(redisUrl, keyName, element, count)
+        const response = await redis.vlinks(redisUrl, keyName, element)
 
         if (!response.success) {
             return NextResponse.json(
@@ -38,21 +38,21 @@ export async function POST(request: Request) {
         if (withEmbeddings) {
             // Collect all unique IDs across all levels
             const allIds = Array.from(new Set(
-                links.flatMap(level => level.map(([id]) => id))
+                links.flatMap((level: any) => level.map(([id]: [string]) => id))
             ));
-            
+
             // Single batch fetch for all embeddings
-            const embResults = await redis.vemb_multi(redisUrl, keyName, allIds)
-            
+            const embResults = await redis.vemb_multi(redisUrl, keyName, allIds as string[])
+
             if (embResults.success) {
                 // Create a map of id -> embedding for quick lookup
                 const embeddingMap = new Map(
                     allIds.map((id, index) => [id, embResults.result[index]])
                 );
-                
+
                 // Process each level using the map
-                const processedLinks = links.map(level => 
-                    level.map(([id, score]) => 
+                const processedLinks = links.map((level: any) =>
+                    level.map(([id, score]: [string, number]) =>
                         [id, score, embeddingMap.get(id)] as [string, number, number[] | null]
                     )
                 );
@@ -80,15 +80,14 @@ export async function GET(request: Request) {
     const url = new URL(request.url)
     const node = url.searchParams.get('node')
     const withEmbeddings = url.searchParams.get('withembeddings') === '1'
-    const count = parseInt(url.searchParams.get('count') || '10', 10)
-    
+
     if (!node) {
         return NextResponse.json(
             { success: false, error: "Node parameter is required" },
             { status: 400 }
         )
     }
-    
+
     const redisUrl = await getRedisUrl()
     if (!redisUrl) {
         return NextResponse.json(
@@ -96,21 +95,21 @@ export async function GET(request: Request) {
             { status: 401 }
         )
     }
-    
+
     try {
         // Extract key name and element from the node parameter
         // Assuming format is "keyName:element"
         const [keyName, element] = node.split(':')
-        
+
         if (!keyName || !element) {
             return NextResponse.json(
                 { success: false, error: "Invalid node format. Expected 'keyName:element'" },
                 { status: 400 }
             )
         }
-        
-        const response = await redis.vlinks(redisUrl, keyName, element, count)
-        
+
+        const response = await redis.vlinks(redisUrl, keyName, element)
+
         if (!response.success) {
             return NextResponse.json(
                 { success: false, error: response.error },
@@ -123,28 +122,28 @@ export async function GET(request: Request) {
         if (withEmbeddings) {
             // Collect all unique IDs across all levels
             const allIds = Array.from(new Set(
-                links.flatMap(level => level.map(([id]) => id))
+                links.flatMap((level: any) => level.map(([id]: [string]) => id))
             ));
-            
+
             // Single batch fetch for all embeddings
-            const embResults = await redis.vemb_multi(redisUrl, keyName, allIds)
-            
+            const embResults = await redis.vemb_multi(redisUrl, keyName, allIds as string[])
+
             if (embResults.success) {
                 // Create a map of id -> embedding for quick lookup
                 const embeddingMap = new Map(
                     allIds.map((id, index) => [id, embResults.result[index]])
                 );
-                
+
                 // Process each level using the map
-                const processedLinks = links.map(level => 
-                    level.map(([id, score]) => 
+                const processedLinks = links.map((level: any) =>
+                    level.map(([id, score]: [string, number]) =>
                         [id, score, embeddingMap.get(id)] as [string, number, number[] | null]
                     )
                 );
                 links = processedLinks;
             }
         }
-        
+
         return NextResponse.json({
             success: true,
             result: links
@@ -152,9 +151,9 @@ export async function GET(request: Request) {
     } catch (error) {
         console.error("Error in VLINKS API (GET):", error)
         return NextResponse.json(
-            { 
+            {
                 success: false,
-                error: error instanceof Error ? error.message : String(error) 
+                error: error instanceof Error ? error.message : String(error)
             },
             { status: 500 }
         )

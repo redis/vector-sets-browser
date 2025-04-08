@@ -14,7 +14,7 @@ export async function POST(request: Request) {
             )
         }
 
-        const redisUrl = redis.getRedisUrl()
+        const redisUrl = await redis.getRedisUrl()
         if (!redisUrl) {
             return NextResponse.json(
                 { success: false, error: "No Redis connection available" },
@@ -55,21 +55,21 @@ export async function GET(request: Request) {
     const url = new URL(request.url)
     const keyName = url.searchParams.get('key')
     const element = url.searchParams.get('element')
-    
+
     if (!keyName) {
         return NextResponse.json(
             { success: false, error: "Key parameter is required" },
             { status: 400 }
         )
     }
-    
+
     if (!element) {
         return NextResponse.json(
             { success: false, error: "Element parameter is required" },
             { status: 400 }
         )
     }
-    
+
     const redisUrl = await redis.getRedisUrl()
     if (!redisUrl) {
         return NextResponse.json(
@@ -77,17 +77,17 @@ export async function GET(request: Request) {
             { status: 401 }
         )
     }
-    
+
     try {
         const result = await redis.vemb(redisUrl, keyName, element)
-        
+
         if (!result.success) {
             return NextResponse.json(
                 { success: false, error: result.error },
                 { status: 500 }
             )
         }
-        
+
         return NextResponse.json({
             success: true,
             result: result.result
@@ -95,9 +95,9 @@ export async function GET(request: Request) {
     } catch (error) {
         console.error("Error in VEMB API (GET):", error)
         return NextResponse.json(
-            { 
+            {
                 success: false,
-                error: error instanceof Error ? error.message : String(error) 
+                error: error instanceof Error ? error.message : String(error)
             },
             { status: 500 }
         )
