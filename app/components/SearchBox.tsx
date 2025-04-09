@@ -486,6 +486,7 @@ export default function SearchBox({
                                     }
                                     onHelp={() => setShowFilterHelp(true)}
                                     vectorSetName={vectorSetName}
+                                    clearError={clearError}
                                 />
                             </div>
                         </div>

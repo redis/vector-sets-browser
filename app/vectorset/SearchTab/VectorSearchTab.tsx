@@ -94,7 +94,7 @@ export default function VectorSearchTab({
         searchFilter,
         setSearchFilter,
         error,
-        clearError,
+        clearError: hookClearError,
         expansionFactor,
         setExpansionFactor,
         lastTextEmbedding,
@@ -109,6 +109,12 @@ export default function VectorSearchTab({
         onSearchStateChange: handleSearchStateChange,
         fetchEmbeddings: false, // Always fetch embeddings for visualization
     })
+
+    const clearError = useCallback(() => {
+        if (error && hookClearError) {
+            hookClearError();
+        }
+    }, [error, hookClearError]);
 
     const handleSearchQueryChange = (query: string) => {
         setSearchQuery(query)
@@ -164,7 +170,7 @@ export default function VectorSearchTab({
             })
             console.log("vlink DATA", response)
             if (!response || !response.result) return []
-            
+
             // data is an array of arrays
             // each inner array contains [element, similarity, vector]
             return response.result.flat().map((item) => ({

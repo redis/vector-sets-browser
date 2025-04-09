@@ -33,6 +33,7 @@ interface SmartFilterInputProps {
     error?: boolean
     onHelp?: () => void
     vectorSetName?: string
+    clearError?: () => void
 }
 
 export default function SmartFilterInput({
@@ -44,6 +45,7 @@ export default function SmartFilterInput({
     error: propError,
     onHelp,
     vectorSetName,
+    clearError,
 }: SmartFilterInputProps) {
     const [inputValue, setInputValue] = useState(value)
     const [cursorPosition, setCursorPosition] = useState(0)
@@ -89,10 +91,10 @@ export default function SmartFilterInput({
                     elements,
                     returnCommandOnly: false,
                 })
-                if (!response || !response.success) { 
-                    return 
+                if (!response || !response.success) {
+                    return
                 }
-                const attributesResults = response.result 
+                const attributesResults = response.result
 
                 if (attributesResults && attributesResults.length > 0) {
                     // Process each attribute JSON string
@@ -387,6 +389,14 @@ export default function SmartFilterInput({
         }
     }
 
+    const updateTab = (value: string) => {
+        setActiveTab(value)
+        setError(null)
+        if (clearError) {
+            clearError()
+        }
+    }
+
     // Effect to scroll selected item into view when it changes
     useEffect(() => {
         if (showDropdown && selectedItemRef.current) {
@@ -406,7 +416,7 @@ export default function SmartFilterInput({
         <div className="relative w-full">
             <Tabs
                 value={activeTab}
-                onValueChange={setActiveTab}
+                onValueChange={updateTab}
                 className="w-full"
             >
                 <div className="flex items-center space-x-2 mb-2">
@@ -638,7 +648,7 @@ export default function SmartFilterInput({
 
             {/* Debug information - remove in production */}
             {/* <div className="mt-2 p-2 border rounded bg-gray-50 text-xs whitespace-pre-wrap max-h-40 overflow-auto">
-                <strong>Debug:</strong> 
+                <strong>Debug:</strong>
                 <br/>
                 {debugInfo || "No debug info available"}
             </div> */}
