@@ -1,4 +1,3 @@
-import { ApiError } from "@/app/api/client"
 import { ImportJobConfig, jobs } from "@/app/api/jobs"
 import { generateEmbeddingTemplate } from "@/app/api/openai"
 import { VectorSetMetadata } from "@/app/types/vectorSetMetaData"
@@ -100,11 +99,8 @@ export default function CSVImportConfigurator({
     hideImportButton = false,
     showAttributesSection = false,
 }: CSVImportConfiguratorProps) {
-    const [error, setError] = useState<string | null>(null)
     const [isImporting, setIsImporting] = useState(false)
     const [importStarted, setImportStarted] = useState(false)
-    const [exportToJson, setExportToJson] = useState(false)
-    const [jsonFilename, setJsonFilename] = useState("")
     const [selectedAttributeColumns, setSelectedAttributeColumns] = useState<
         string[]
     >([])
@@ -149,7 +145,7 @@ export default function CSVImportConfigurator({
             await userSettings.set("openai_api_key", openAIKey)
             setIsOpenAIKeyAvailable(true)
             setOpenAIKeyError(null)
-        } catch (error) {
+        } catch (_error) {
             setOpenAIKeyError("Failed to save API key")
         }
     }
@@ -186,9 +182,6 @@ export default function CSVImportConfigurator({
             }
         } catch (error) {
             console.error("Error generating templates:", error)
-            setError(
-                "Failed to generate AI templates. You can still create them manually."
-            )
         }
         setIsGeneratingTemplates(false)
     }
@@ -301,39 +294,14 @@ export default function CSVImportConfigurator({
         )
     }
 
-    const getValueTypeInfo = (value: string | number) => {
-        const type = typeof value
-        if (type === "number") {
-            return `Number: ${value}`
-        } else {
-            if (/^[\d,]+(\.\d+)?$/.test(value as string)) {
-                return `String: "${value}" (Could be converted to number)`
-            }
-            const numberWithUnitsMatch = (value as string).match(
-                /^(\d+(?:,\d+)?(?:\.\d+)?)\s+\w+/
-            )
-            if (numberWithUnitsMatch) {
-                return `String: "${value}" (Contains number: ${numberWithUnitsMatch[1]})`
-            }
-            return `String: "${value}"`
-        }
-    }
-
     const handleImport = async () => {
         if (!vectorSetName) return
 
         if (!elementTemplate) {
-            setError("Please provide a template for the element identifier")
             return
         }
 
         if (!vectorTemplate) {
-            setError("Please provide a template for the vector content")
-            return
-        }
-
-        if (exportToJson && !jsonFilename) {
-            setError("Please provide a filename for the JSON export")
             return
         }
 
@@ -359,8 +327,8 @@ export default function CSVImportConfigurator({
                     ? selectedAttributeColumns
                     : undefined,
             metadata: metadata || undefined,
-            exportType: exportToJson ? "json" : "redis",
-            outputFilename: exportToJson ? jsonFilename : undefined,
+            exportType: "redis",
+            outputFilename: undefined,
         }
 
         try {
@@ -387,17 +355,16 @@ export default function CSVImportConfigurator({
             const checkJobStatus = async (retries = 5) => {
                 try {
                     const job = await jobs.getJob(jobId)
-                    
+
                     if (!job && retries > 0) {
                         // If job not found and we have retries left, wait and try again
                         console.log(`[ImportTab] Job ${jobId} not found, retrying... (${retries} retries left)`)
                         await new Promise(resolve => setTimeout(resolve, 1000))
                         return checkJobStatus(retries - 1)
                     }
-                    
+
                     if (!job) {
                         console.error(`[ImportTab] Job ${jobId} not found after ${5 - retries} retries`)
-                        setError("Failed to get job status after multiple attempts")
                         setIsImporting(false)
                         return
                     }
@@ -413,7 +380,6 @@ export default function CSVImportConfigurator({
                             setIsImporting(false)
                             break
                         case "failed":
-                            setError(job.status.error || "Import job failed")
                             setIsImporting(false)
                             break
                         default:
@@ -428,11 +394,6 @@ export default function CSVImportConfigurator({
                         return checkJobStatus(retries - 1)
                     }
                     console.error("Error checking job status:", error)
-                    setError(
-                        error instanceof ApiError
-                            ? error.message
-                            : "Error checking job status"
-                    )
                     setIsImporting(false)
                 }
             }
@@ -441,11 +402,6 @@ export default function CSVImportConfigurator({
             checkJobStatus()
         } catch (error) {
             console.error("Error importing file:", error)
-            setError(
-                error instanceof ApiError
-                    ? error.message
-                    : "Error importing file"
-            )
             setIsImporting(false)
         }
     }
@@ -505,7 +461,6 @@ export default function CSVImportConfigurator({
         const isValid = Boolean(
             elementTemplate &&
             vectorTemplate &&
-            (!exportToJson || (exportToJson && jsonFilename)) &&
             metadata?.embedding
         )
         onValidityChange?.(isValid)
@@ -517,7 +472,7 @@ export default function CSVImportConfigurator({
                 selectedAttributes: selectedAttributeColumns,
             })
         }
-    }, [elementTemplate, vectorTemplate, exportToJson, jsonFilename, metadata?.embedding, selectedAttributeColumns])
+    }, [elementTemplate, vectorTemplate, metadata?.embedding, selectedAttributeColumns])
 
     return (
         <div className="space-y-4 w-full">
@@ -561,9 +516,9 @@ export default function CSVImportConfigurator({
                                         your data fields. For better results,
                                         write complete sentences that provide
                                         context for each field. For example:
-                                        "Book titled &#123;bookTitle&#125; by
+                                        {`"`}Book titled &#123;bookTitle&#125; by
                                         &#123;author&#125; was published in
-                                        &#123;publishedYear&#125;".
+                                        &#123;publishedYear&#125;{`"`}.
                                     </p>
                                 </div>
 
@@ -793,41 +748,41 @@ export default function CSVImportConfigurator({
 
                                                 {selectedAttributeColumns.length >
                                                     0 && (
-                                                    <div>
-                                                        <Label className="text-xs">
-                                                            Selected Attributes:
-                                                        </Label>
-                                                        <div className="p-2 bg-muted rounded-md text-sm mt-1">
-                                                            {selectedAttributeColumns.map(
-                                                                (attr) => (
-                                                                    <div
-                                                                        key={
-                                                                            attr
-                                                                        }
-                                                                        className="flex gap-2"
-                                                                    >
-                                                                        <span className="font-medium">
-                                                                            {
+                                                        <div>
+                                                            <Label className="text-xs">
+                                                                Selected Attributes:
+                                                            </Label>
+                                                            <div className="p-2 bg-muted rounded-md text-sm mt-1">
+                                                                {selectedAttributeColumns.map(
+                                                                    (attr) => (
+                                                                        <div
+                                                                            key={
                                                                                 attr
                                                                             }
-                                                                            :
-                                                                        </span>
-                                                                        <span>
-                                                                            {String(
-                                                                                csvPreview
-                                                                                    .sampleRows[
-                                                                                    previewSampleIndex
-                                                                                ][
+                                                                            className="flex gap-2"
+                                                                        >
+                                                                            <span className="font-medium">
+                                                                                {
                                                                                     attr
-                                                                                ]
-                                                                            )}
-                                                                        </span>
-                                                                    </div>
-                                                                )
-                                                            )}
+                                                                                }
+                                                                                :
+                                                                            </span>
+                                                                            <span>
+                                                                                {String(
+                                                                                    csvPreview
+                                                                                        .sampleRows[
+                                                                                    previewSampleIndex
+                                                                                    ][
+                                                                                    attr
+                                                                                    ]
+                                                                                )}
+                                                                            </span>
+                                                                        </div>
+                                                                    )
+                                                                )}
+                                                            </div>
                                                         </div>
-                                                    </div>
-                                                )}
+                                                    )}
                                             </div>
                                         </div>
                                     )}
@@ -863,16 +818,13 @@ export default function CSVImportConfigurator({
                         onClick={handleImport}
                         disabled={
                             isImporting ||
-                            (!exportToJson && !metadata?.embedding) ||
+                            !metadata?.embedding ||
                             !elementTemplate ||
-                            !vectorTemplate ||
-                            (exportToJson && !jsonFilename)
+                            !vectorTemplate
                         }
                     >
                         {isImporting
                             ? "Starting Import..."
-                            : exportToJson
-                            ? "Export to JSON"
                             : "Next"}
                     </Button>
                 </div>

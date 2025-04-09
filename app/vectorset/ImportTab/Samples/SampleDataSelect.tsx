@@ -12,8 +12,8 @@ import {
     CarouselNext,
     CarouselPrevious,
 } from "@/components/ui/carousel"
-import { Dataset } from "./types/DatasetProvider"
 import { datasetRegistry } from "./providers/DatasetRegistry"
+import { Dataset } from "../types/DatasetProvider"
 
 interface SampleDataSelectProps {
     onSelect: (dataset: Dataset) => void

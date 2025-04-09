@@ -11,7 +11,7 @@ import {
     DialogTitle,
 } from "@/components/ui/dialog"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { CheckCircle2, FileSpreadsheet, Loader2, X } from "lucide-react"
+import { FileSpreadsheet, Loader2, X } from "lucide-react"
 import React from "react"
 import ImportCard from "../ImportCard"
 import CSVFileSelector, { CSVPreviewData } from "./CSVFileSelector"
@@ -144,33 +144,31 @@ export default function ImportFromCSVFlow({
             ).map((step, index) => (
                 <React.Fragment key={step}>
                     <div
-                        className={`h-2 w-2 rounded-full ${
-                            currentStep === step
+                        className={`h-2 w-2 rounded-full ${currentStep === step
                                 ? "bg-primary"
                                 : index <
-                                  [
-                                      "select",
-                                      "configure",
-                                      "attributes",
-                                      "confirm",
-                                  ].indexOf(currentStep)
-                                ? "bg-primary/50"
-                                : "bg-muted"
-                        }`}
-                    />
-                    {index < 3 && (
-                        <div
-                            className={`h-[2px] w-8 ${
-                                index <
-                                [
-                                    "select",
-                                    "configure",
-                                    "attributes",
-                                    "confirm",
-                                ].indexOf(currentStep)
+                                    [
+                                        "select",
+                                        "configure",
+                                        "attributes",
+                                        "confirm",
+                                    ].indexOf(currentStep)
                                     ? "bg-primary/50"
                                     : "bg-muted"
                             }`}
+                    />
+                    {index < 3 && (
+                        <div
+                            className={`h-[2px] w-8 ${index <
+                                    [
+                                        "select",
+                                        "configure",
+                                        "attributes",
+                                        "confirm",
+                                    ].indexOf(currentStep)
+                                    ? "bg-primary/50"
+                                    : "bg-muted"
+                                }`}
                         />
                     )}
                 </React.Fragment>
@@ -340,8 +338,8 @@ export default function ImportFromCSVFlow({
                 onClick={() => setShowDialog(true)}
             />
 
-            <Dialog 
-                open={showDialog} 
+            <Dialog
+                open={showDialog}
                 onOpenChange={(open) => {
                     // Only allow closing if we're not importing and import hasn't started
                     if (!isImporting && !importStarted && !open) {
@@ -393,13 +391,13 @@ export default function ImportFromCSVFlow({
 
                                 {(currentStep === "configure" ||
                                     currentStep === "attributes") && (
-                                    <Button
-                                        onClick={() => handleNext()}
-                                        disabled={!isConfigValid || isImporting}
-                                    >
-                                        Next
-                                    </Button>
-                                )}
+                                        <Button
+                                            onClick={() => handleNext()}
+                                            disabled={!isConfigValid || isImporting}
+                                        >
+                                            Next
+                                        </Button>
+                                    )}
                             </div>
                         )}
                     </DialogFooter>

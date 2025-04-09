@@ -26,10 +26,6 @@ export default function ImportJSONFlow({
 
         const file = event.target.files[0]
         try {
-            // Read and parse the JSON to validate it and extract vectors
-            const jsonContent = await file.text()
-            const jsonData = JSON.parse(jsonContent)
-
             // Create an import job with the JSON file
             const importJobConfig: ImportJobConfig = {
                 fileType: "json",

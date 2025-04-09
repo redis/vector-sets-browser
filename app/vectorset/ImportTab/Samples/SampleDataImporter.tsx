@@ -18,9 +18,9 @@ import {
 } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Slider } from "@/components/ui/slider"
-import { AlertCircle, CheckCircle2, Edit2 } from "lucide-react"
+import { AlertCircle, Edit2 } from "lucide-react"
 import { useEffect, useState } from "react"
-import { Dataset } from "./types/DatasetProvider"
+import { Dataset } from "../types/DatasetProvider"
 
 interface SampleDataImporterProps {
     dataset: Dataset
@@ -40,11 +40,6 @@ export function SampleDataImporter({
     const [error, setError] = useState<string | null>(null)
     const [isImporting, setIsImporting] = useState(false)
     const [importStarted, setImportStarted] = useState(false)
-    const [importProgress, setImportProgress] = useState<{
-        current: number
-        total: number
-        status?: string
-    } | null>(null)
     const [importCount, setImportCount] = useState<number>(5)
     const [embeddingMismatch, setEmbeddingMismatch] = useState<{
         open: boolean
@@ -54,7 +49,6 @@ export function SampleDataImporter({
     const [currentEmbeddingConfig, setCurrentEmbeddingConfig] = useState<EmbeddingConfig | null>(
         dataset.recommendedEmbedding || null
     )
-    const [jobId, setJobId] = useState<string | null>(null)
 
     // Initialize the current embedding config from dataset's recommended embedding
     useEffect(() => {
@@ -103,25 +97,21 @@ export function SampleDataImporter({
 
     const startImport = async () => {
         setIsImporting(true)
-        setImportProgress(null)
         setImportStarted(true)
 
         try {
             await checkAndRemovePlaceholderRecord()
 
             const { file, config } = await dataset.prepareImport({
-                count: dataset.dataType === "image" ? importCount : undefined,
-                onProgress: setImportProgress
+                count: dataset.dataType === "image" ? importCount : undefined
             })
 
             if (metadata) {
                 config.metadata = metadata
             }
 
-            // Create the import job and store the job ID
-            const result = await jobs.createImportJob(vectorSetName, file, config)
-            setJobId(result.jobId) // Store the job ID to monitor its status
-
+            // Create the import job
+            await jobs.createImportJob(vectorSetName, file, config)
         } catch (error) {
             console.error("Error importing sample dataset:", error)
             setError(
@@ -129,7 +119,6 @@ export function SampleDataImporter({
                 }`
             )
             setIsImporting(false)
-            setImportProgress(null)
         }
     }
 

@@ -1,4 +1,3 @@
-import { ApiError } from "@/app/api/client"
 import { VectorSetMetadata } from "@/app/types/vectorSetMetaData"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"

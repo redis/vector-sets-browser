@@ -54,16 +54,10 @@ function VectorSetPageContent() {
     // Keep track of search state per vector set
     const [isVectorSetChanging, setIsVectorSetChanging] = useState(false)
     // Add state to track if we should auto-open sample data dialog
-    const [openSampleData, setOpenSampleData] = useState(false)
 
     // Function to change active tab - can be passed to child components
-    const changeTab = (tabName: string, options?: { openSampleData?: boolean }) => {
+    const changeTab = (tabName: string) => {
         setActiveTab(tabName);
-        if (options?.openSampleData) {
-            setOpenSampleData(true);
-        } else {
-            setOpenSampleData(false);
-        }
     }
 
     const {
@@ -233,8 +227,6 @@ function VectorSetPageContent() {
                         value={activeTab}
                         onValueChange={(value) => {
                             setActiveTab(value)
-                            // Reset the sample data flag when manually changing tabs
-                            setOpenSampleData(false);
                         }}
                     >
                         <TabsList className="bg-gray-200 w-full">
@@ -272,7 +264,6 @@ function VectorSetPageContent() {
                             <ImportTab
                                 vectorSetName={vectorSetName}
                                 metadata={metadata}
-                                initialShowSampleData={openSampleData}
                             />
                         </TabsContent>
 
