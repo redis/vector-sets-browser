@@ -32,7 +32,6 @@ interface CSVImportConfiguratorProps {
     csvPreview: CSVPreviewData
     metadata: VectorSetMetadata | null
     vectorSetName: string
-    onImportSuccess: () => void
     onConfigured?: (config: {
         elementTemplate: string;
         vectorTemplate: string;
@@ -40,16 +39,66 @@ interface CSVImportConfiguratorProps {
     }) => void
     onValidityChange?: (isValid: boolean) => void
     hideImportButton?: boolean
+    showAttributesSection?: boolean
+}
+
+export function AttributesConfigurator({
+    csvPreview,
+    selectedAttributeColumns,
+    onAttributeToggle,
+}: {
+    csvPreview: CSVPreviewData;
+    selectedAttributeColumns: string[];
+    onAttributeToggle: (header: string) => void;
+}) {
+    return (
+        <div className="space-y-4">
+            <div className="pb-2">
+                <p className="text-sm text-muted-foreground mt-1">
+                    Select columns to store as attributes. These
+                    will be attached as JSON to each element and can
+                    be used for filtering.
+                </p>
+            </div>
+
+            <ScrollArea className="h-[400px] border rounded-md p-2">
+                <div className="space-y-3">
+                    {csvPreview.headers.map((header) => (
+                        <div
+                            key={header}
+                            className="flex items-center gap-3 px-2"
+                        >
+                            <Switch
+                                id={`attr-${header}`}
+                                checked={selectedAttributeColumns.includes(
+                                    header
+                                )}
+                                onCheckedChange={() =>
+                                    onAttributeToggle(header)
+                                }
+                            />
+                            <Label
+                                htmlFor={`attr-${header}`}
+                                className="text-sm"
+                            >
+                                {header}
+                            </Label>
+                        </div>
+                    ))}
+                </div>
+            </ScrollArea>
+        </div>
+    )
 }
 
 export default function CSVImportConfigurator({
     csvPreview,
     metadata,
     vectorSetName,
-    onImportSuccess,
     onConfigured,
     onValidityChange,
     hideImportButton = false,
+    showAttributesSection = false,
 }: CSVImportConfiguratorProps) {
     const [error, setError] = useState<string | null>(null)
     const [isImporting, setIsImporting] = useState(false)
@@ -328,9 +377,6 @@ export default function CSVImportConfigurator({
                 config
             )
 
-            // Immediately call onImportSuccess to close the wizard
-            onImportSuccess()
-            
             // Start monitoring the job status
             setImportStarted(true)
 
@@ -475,10 +521,9 @@ export default function CSVImportConfigurator({
 
     return (
         <div className="space-y-4 w-full">
-            <div className="border-b pb-2">
-                <div className="text-right">
-                    Import file selected: <strong>{csvPreview.fileName}</strong>{" "}
-                    - <strong>{csvPreview.totalRecords} records</strong>
+            <div className="pb-2">
+                <div className="text-right text-sm text-muted-foreground">
+                    File: {csvPreview.fileName}
                 </div>
             </div>
 
@@ -500,314 +545,295 @@ export default function CSVImportConfigurator({
                 </div>
             ) : suggestedElementTemplate && suggestedVectorTemplate ? (
                 <div className="space-y-8">
-                    {/* Step 1: Templates */}
-                    <div className="space-y-4">
-                        <div className="border-b pb-2">
-                            <h3 className="text-lg font-semibold">
-                                Step 1: Define Element and Vector Template
-                            </h3>
-                            <p className="text-sm text-muted-foreground mt-1">
-                                Create natural language templates using your
-                                data fields. For better results, write complete
-                                sentences that provide context for each field.
-                                For example: "Book titled &#123;bookTitle&#125;
-                                by &#123;author&#125; was published in
-                                &#123;publishedYear&#125;".
-                            </p>
-                        </div>
-
-                        <div className="space-y-6">
-                            <div className="space-y-2">
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <Label>Element Template</Label>
-                                        <p className="text-sm text-muted-foreground">
-                                            Defines how to identify each element
-                                        </p>
-                                    </div>
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() =>
-                                            setShowElementEditor(
-                                                !showElementEditor
-                                            )
-                                        }
-                                    >
-                                        {showElementEditor
-                                            ? "Hide Editor"
-                                            : "Edit"}
-                                    </Button>
-                                </div>
-                                {showElementEditor ? (
-                                    <>
-                                        <Textarea
-                                            ref={elementTemplateRef}
-                                            value={elementTemplate}
-                                            onChange={(e) =>
-                                                setElementTemplate(
-                                                    e.target.value
-                                                )
-                                            }
-                                            className="min-h-[120px] font-mono"
-                                        />
-                                        <div className="mt-2 p-2 bg-muted rounded-md">
-                                            {renderHighlightedTemplate(
-                                                elementTemplate
-                                            )}
-                                        </div>
-                                        <div className="flex flex-wrap gap-1 mt-2">
-                                            {csvPreview.headers.map(
-                                                (header) => (
-                                                    <Button
-                                                        key={header}
-                                                        variant="outline"
-                                                        size="sm"
-                                                        onClick={() =>
-                                                            insertColumnIntoTemplate(
-                                                                elementTemplate,
-                                                                header,
-                                                                setElementTemplate,
-                                                                elementTemplateRef as React.RefObject<HTMLTextAreaElement>
-                                                            )
-                                                        }
-                                                    >
-                                                        {header}
-                                                    </Button>
-                                                )
-                                            )}
-                                        </div>
-                                    </>
-                                ) : (
-                                    <div className="mt-2 p-2 bg-muted rounded-md">
-                                        {renderHighlightedTemplate(
-                                            elementTemplate
-                                        )}
-                                    </div>
-                                )}
-                            </div>
-
-                            <div className="space-y-2">
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <Label>Vector Content Template</Label>
-                                        <p className="text-sm text-muted-foreground">
-                                            The text that will be converted into
-                                            a vector
-                                        </p>
-                                    </div>
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() =>
-                                            setShowVectorEditor(
-                                                !showVectorEditor
-                                            )
-                                        }
-                                    >
-                                        {showVectorEditor
-                                            ? "Hide Editor"
-                                            : "Edit"}
-                                    </Button>
-                                </div>
-                                {showVectorEditor ? (
-                                    <>
-                                        <Textarea
-                                            ref={vectorTemplateRef}
-                                            value={vectorTemplate}
-                                            onChange={(e) =>
-                                                setVectorTemplate(
-                                                    e.target.value
-                                                )
-                                            }
-                                            className="min-h-[120px] font-mono"
-                                        />
-                                        <div className="mt-2 p-2 bg-muted rounded-md">
-                                            {renderHighlightedTemplate(
-                                                vectorTemplate
-                                            )}
-                                        </div>
-                                        <div className="flex flex-wrap gap-1 mt-2">
-                                            {csvPreview.headers.map(
-                                                (header) => (
-                                                    <Button
-                                                        key={header}
-                                                        variant="outline"
-                                                        size="sm"
-                                                        onClick={() =>
-                                                            insertColumnIntoTemplate(
-                                                                vectorTemplate,
-                                                                header,
-                                                                setVectorTemplate,
-                                                                vectorTemplateRef as React.RefObject<HTMLTextAreaElement>
-                                                            )
-                                                        }
-                                                    >
-                                                        {header}
-                                                    </Button>
-                                                )
-                                            )}
-                                        </div>
-                                    </>
-                                ) : (
-                                    <div className="mt-2 p-2 bg-muted rounded-md">
-                                        {renderHighlightedTemplate(
-                                            vectorTemplate
-                                        )}
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Step 2: Attributes */}
-                    <div className="space-y-4">
-                        <div className="border-b pb-2">
-                            <h3 className="text-lg font-semibold">
-                                Step 2: Define Attributes
-                            </h3>
-                            <p className="text-sm text-muted-foreground mt-1">
-                                Select columns to store as attributes. These
-                                will be attached as JSON to each element and can
-                                be used for filtering.
-                            </p>
-                        </div>
-
-                        <ScrollArea className="h-32 border rounded-md p-2">
-                            <div className="space-y-3">
-                                {csvPreview.headers.map((header) => (
-                                    <div
-                                        key={header}
-                                        className="flex items-center justify-between px-2"
-                                    >
-                                        <Label
-                                            htmlFor={`attr-${header}`}
-                                            className="text-sm"
-                                        >
-                                            {header}
-                                        </Label>
-                                        <Switch
-                                            id={`attr-${header}`}
-                                            checked={selectedAttributeColumns.includes(
-                                                header
-                                            )}
-                                            onCheckedChange={() =>
-                                                handleAttributeToggle(header)
-                                            }
-                                        />
-                                    </div>
-                                ))}
-                            </div>
-                        </ScrollArea>
-                    </div>
-
-                    {/* Preview Section */}
-                    <div className="space-y-4">
-                        <div className="border-b pb-2">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <h3 className="text-lg font-semibold">
-                                        Preview
-                                    </h3>
-                                    <p className="text-sm text-muted-foreground">
-                                        See how your templates will look with
-                                        actual data.
+                    {showAttributesSection ? (
+                        <AttributesConfigurator
+                            csvPreview={csvPreview}
+                            selectedAttributeColumns={selectedAttributeColumns}
+                            onAttributeToggle={handleAttributeToggle}
+                        />
+                    ) : (
+                        <>
+                            {/* Step 1: Templates */}
+                            <div className="space-y-4">
+                                <div className="border-b pb-2">
+                                    <p className="text-sm mt-1">
+                                        Create natural language templates using
+                                        your data fields. For better results,
+                                        write complete sentences that provide
+                                        context for each field. For example:
+                                        "Book titled &#123;bookTitle&#125; by
+                                        &#123;author&#125; was published in
+                                        &#123;publishedYear&#125;".
                                     </p>
                                 </div>
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => setShowPreview(!showPreview)}
-                                    className="flex items-center gap-2"
-                                >
-                                    {showPreview ? (
-                                        <>
-                                            Hide Preview{" "}
-                                            <ChevronUp className="h-4 w-4" />
-                                        </>
-                                    ) : (
-                                        <>
-                                            Show Preview{" "}
-                                            <ChevronDown className="h-4 w-4" />
-                                        </>
-                                    )}
-                                </Button>
-                            </div>
-                        </div>
 
-                        {showPreview && csvPreview.sampleRows.length > 0 && (
-                            <div className="space-y-4 border rounded-lg p-4">
-                                <div className="flex items-center justify-between">
-                                    <h4 className="text-sm font-medium">
-                                        Sample Data Preview
-                                    </h4>
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={cycleSamplePreview}
-                                    >
-                                        Next Sample
-                                    </Button>
+                                <div className="space-y-6">
+                                    <div className="space-y-2">
+                                        <div className="flex items-center justify-between">
+                                            <div>
+                                                <Label>Element Template</Label>
+                                                <p className="text-sm text-muted-foreground">
+                                                    Defines how to identify each
+                                                    element
+                                                </p>
+                                            </div>
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() =>
+                                                    setShowElementEditor(
+                                                        !showElementEditor
+                                                    )
+                                                }
+                                            >
+                                                {showElementEditor
+                                                    ? "Hide Editor"
+                                                    : "Edit"}
+                                            </Button>
+                                        </div>
+                                        {showElementEditor ? (
+                                            <>
+                                                <Textarea
+                                                    ref={elementTemplateRef}
+                                                    value={elementTemplate}
+                                                    onChange={(e) =>
+                                                        setElementTemplate(
+                                                            e.target.value
+                                                        )
+                                                    }
+                                                    className="min-h-[120px] font-mono"
+                                                />
+                                                <div className="mt-2 p-2 bg-muted rounded-md">
+                                                    {renderHighlightedTemplate(
+                                                        elementTemplate
+                                                    )}
+                                                </div>
+                                                <div className="flex flex-wrap gap-1 mt-2">
+                                                    {csvPreview.headers.map(
+                                                        (header) => (
+                                                            <Button
+                                                                key={header}
+                                                                variant="outline"
+                                                                size="sm"
+                                                                onClick={() =>
+                                                                    insertColumnIntoTemplate(
+                                                                        elementTemplate,
+                                                                        header,
+                                                                        setElementTemplate,
+                                                                        elementTemplateRef as React.RefObject<HTMLTextAreaElement>
+                                                                    )
+                                                                }
+                                                            >
+                                                                {header}
+                                                            </Button>
+                                                        )
+                                                    )}
+                                                </div>
+                                            </>
+                                        ) : (
+                                            <div className="mt-2 p-2 bg-muted rounded-md">
+                                                {renderHighlightedTemplate(
+                                                    elementTemplate
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <div className="flex items-center justify-between">
+                                            <div>
+                                                <Label>
+                                                    Vector Content Template
+                                                </Label>
+                                                <p className="text-sm text-muted-foreground">
+                                                    The text that will be
+                                                    converted into a vector
+                                                </p>
+                                            </div>
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() =>
+                                                    setShowVectorEditor(
+                                                        !showVectorEditor
+                                                    )
+                                                }
+                                            >
+                                                {showVectorEditor
+                                                    ? "Hide Editor"
+                                                    : "Edit"}
+                                            </Button>
+                                        </div>
+                                        {showVectorEditor ? (
+                                            <>
+                                                <Textarea
+                                                    ref={vectorTemplateRef}
+                                                    value={vectorTemplate}
+                                                    onChange={(e) =>
+                                                        setVectorTemplate(
+                                                            e.target.value
+                                                        )
+                                                    }
+                                                    className="min-h-[120px] font-mono"
+                                                />
+                                                <div className="mt-2 p-2 bg-muted rounded-md">
+                                                    {renderHighlightedTemplate(
+                                                        vectorTemplate
+                                                    )}
+                                                </div>
+                                                <div className="flex flex-wrap gap-1 mt-2">
+                                                    {csvPreview.headers.map(
+                                                        (header) => (
+                                                            <Button
+                                                                key={header}
+                                                                variant="outline"
+                                                                size="sm"
+                                                                onClick={() =>
+                                                                    insertColumnIntoTemplate(
+                                                                        vectorTemplate,
+                                                                        header,
+                                                                        setVectorTemplate,
+                                                                        vectorTemplateRef as React.RefObject<HTMLTextAreaElement>
+                                                                    )
+                                                                }
+                                                            >
+                                                                {header}
+                                                            </Button>
+                                                        )
+                                                    )}
+                                                </div>
+                                            </>
+                                        ) : (
+                                            <div className="mt-2 p-2 bg-muted rounded-md">
+                                                {renderHighlightedTemplate(
+                                                    vectorTemplate
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Preview Section */}
+                            <div className="space-y-4">
+                                <div className="border-b pb-2">
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <h3 className="text-lg font-semibold">
+                                                Preview
+                                            </h3>
+                                            <p className="text-sm text-muted-foreground">
+                                                See how your templates will look
+                                                with actual data.
+                                            </p>
+                                        </div>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() =>
+                                                setShowPreview(!showPreview)
+                                            }
+                                            className="flex items-center gap-2"
+                                        >
+                                            {showPreview ? (
+                                                <>
+                                                    Hide Preview{" "}
+                                                    <ChevronUp className="h-4 w-4" />
+                                                </>
+                                            ) : (
+                                                <>
+                                                    Show Preview{" "}
+                                                    <ChevronDown className="h-4 w-4" />
+                                                </>
+                                            )}
+                                        </Button>
+                                    </div>
                                 </div>
 
-                                <div className="space-y-3">
-                                    <div>
-                                        <Label className="text-xs">
-                                            Element Name:
-                                        </Label>
-                                        <div className="p-2 bg-muted rounded-md text-sm mt-1">
-                                            {renderTemplateWithData(
-                                                elementTemplate,
-                                                previewSampleIndex
-                                            )}
-                                        </div>
-                                    </div>
+                                {showPreview &&
+                                    csvPreview.sampleRows.length > 0 && (
+                                        <div className="space-y-4 border rounded-lg p-4">
+                                            <div className="flex items-center justify-between">
+                                                <h4 className="text-sm font-medium">
+                                                    Sample Data Preview
+                                                </h4>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    onClick={cycleSamplePreview}
+                                                >
+                                                    Next Sample
+                                                </Button>
+                                            </div>
 
-                                    <div>
-                                        <Label className="text-xs">
-                                            Vector Content:
-                                        </Label>
-                                        <div className="p-2 bg-muted rounded-md text-sm mt-1">
-                                            {renderTemplateWithData(
-                                                vectorTemplate,
-                                                previewSampleIndex
-                                            )}
-                                        </div>
-                                    </div>
+                                            <div className="space-y-3">
+                                                <div>
+                                                    <Label className="text-xs">
+                                                        Element Name:
+                                                    </Label>
+                                                    <div className="p-2 bg-muted rounded-md text-sm mt-1">
+                                                        {renderTemplateWithData(
+                                                            elementTemplate,
+                                                            previewSampleIndex
+                                                        )}
+                                                    </div>
+                                                </div>
 
-                                    {selectedAttributeColumns.length > 0 && (
-                                        <div>
-                                            <Label className="text-xs">
-                                                Selected Attributes:
-                                            </Label>
-                                            <div className="p-2 bg-muted rounded-md text-sm mt-1">
-                                                {selectedAttributeColumns.map(
-                                                    (attr) => (
-                                                        <div
-                                                            key={attr}
-                                                            className="flex gap-2"
-                                                        >
-                                                            <span className="font-medium">
-                                                                {attr}:
-                                                            </span>
-                                                            <span>
-                                                                {String(
-                                                                    csvPreview
-                                                                        .sampleRows[
-                                                                        previewSampleIndex
-                                                                    ][attr]
-                                                                )}
-                                                            </span>
+                                                <div>
+                                                    <Label className="text-xs">
+                                                        Vector Content:
+                                                    </Label>
+                                                    <div className="p-2 bg-muted rounded-md text-sm mt-1">
+                                                        {renderTemplateWithData(
+                                                            vectorTemplate,
+                                                            previewSampleIndex
+                                                        )}
+                                                    </div>
+                                                </div>
+
+                                                {selectedAttributeColumns.length >
+                                                    0 && (
+                                                    <div>
+                                                        <Label className="text-xs">
+                                                            Selected Attributes:
+                                                        </Label>
+                                                        <div className="p-2 bg-muted rounded-md text-sm mt-1">
+                                                            {selectedAttributeColumns.map(
+                                                                (attr) => (
+                                                                    <div
+                                                                        key={
+                                                                            attr
+                                                                        }
+                                                                        className="flex gap-2"
+                                                                    >
+                                                                        <span className="font-medium">
+                                                                            {
+                                                                                attr
+                                                                            }
+                                                                            :
+                                                                        </span>
+                                                                        <span>
+                                                                            {String(
+                                                                                csvPreview
+                                                                                    .sampleRows[
+                                                                                    previewSampleIndex
+                                                                                ][
+                                                                                    attr
+                                                                                ]
+                                                                            )}
+                                                                        </span>
+                                                                    </div>
+                                                                )
+                                                            )}
                                                         </div>
-                                                    )
+                                                    </div>
                                                 )}
                                             </div>
                                         </div>
                                     )}
-                                </div>
                             </div>
-                        )}
-                    </div>
+                        </>
+                    )}
                 </div>
             ) : (
                 <Alert variant="destructive">

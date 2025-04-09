@@ -287,12 +287,9 @@ export function SampleDataImporter({
             )}
 
             {!error && importStarted && (
-                <Alert variant="default" className="mt-4 bg-green-50 border-green-200">
-                    <CheckCircle2 className="h-4 w-4 text-green-500" />
-                    <AlertDescription className="text-green-700">
-                        Import started. You can close this dialog and track progress on the Import Tab.
-                    </AlertDescription>
-                </Alert>
+                <p>
+                Import started. Track progress on the Import Tab.
+                </p>
             )}
 
             {/* Edit embedding config dialog */}

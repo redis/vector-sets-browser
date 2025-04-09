@@ -1,6 +1,6 @@
 import { ApiError } from "@/app/api/client"
 import { vectorSets } from "@/app/api/vector-sets"
-import { vinfo, vinfo_multi } from "@/app/redis-server/api"
+import { vinfo, vinfo_multi, vcard } from "@/app/redis-server/api"
 import { VectorSetMetadata } from "@/app/types/vectorSetMetaData"
 import eventBus,{ AppEvents } from "@/app/utils/eventEmitter"
 import {
@@ -200,12 +200,32 @@ export default function VectorSetNav({
             }
         }
 
-        const handleVectorsImported = (data: {
+        const handleVectorsImported = async (data: {
             vectorSetName: string
         }) => {
             console.log(`Vectors imported to ${data.vectorSetName}`, data)
-            // here I just want to refresh the cardinality of the vector set
-            debouncedRefresh()
+            
+            try {
+                // Just get the cardinality for this specific vector set
+                const cardinalityResponse = await vcard({
+                    keyName: data.vectorSetName,
+                })
+
+                const existingInfo = vectorSetInfo[data.vectorSetName]
+                if (cardinalityResponse.success && 
+                    typeof cardinalityResponse.result === 'number' && 
+                    existingInfo) {
+                    setVectorSetInfo((prev) => ({
+                        ...prev,
+                        [data.vectorSetName]: {
+                            ...existingInfo,
+                            vectorCount: cardinalityResponse.result as number,
+                        },
+                    }))
+                }
+            } catch (error) {
+                console.error("Error updating vector count after import:", error)
+            }
         }
 
         let unsubscribes: Array<() => void> = []

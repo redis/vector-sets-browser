@@ -4,20 +4,17 @@ import {
     type ImportLogEntry,
     type Job,
 } from "@/app/api/jobs"
+import { getModelName } from "@/app/embeddings/types/embeddingModels"
 import { VectorSetMetadata } from "@/app/types/vectorSetMetaData"
 import eventBus, { AppEvents } from "@/app/utils/eventEmitter"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { subscribe } from "@/lib/sse"
 import { useCallback, useEffect, useRef, useState } from "react"
-import ActiveJobs from "./ActiveJobs"
-import ImportDialogs from "./ImportDialogs"
+import ImportFromCSVFlow from "./CSV/ImportFromCSVFlow"
 import ImportHistory from "./ImportHistory"
-import ImportCards from "./ImportCards"
+import ImportJSONFlow from "./JSON/ImportJSONFlow"
 import ImportProgress from "./ImportProgress"
-import ImportFromCSVFlow from "./ImportFromCSVFlow"
-import ImportSamplesFlow from "./ImportSamplesFlow"
-import ImportJSONFlow from "./ImportJSONFlow"
-import { getModelName } from "@/app/embeddings/types/embeddingModels"
+import ImportSamplesFlow from "./Samples/ImportSamplesFlow"
 
 interface ImportTabProps {
     vectorSetName: string
@@ -45,6 +42,7 @@ export default function ImportTab({
     const [successJob, setSuccessJob] = useState<Job | null>(null)
     const jsonFileInputRef = useRef<HTMLInputElement>(null)
     const [pollingInterval, setPollingInterval] = useState<number>(5000)
+    const lastUpdateTimeRef = useRef<Record<string, number>>({})
 
     const fetchImportLogs = useCallback(async () => {
         try {
@@ -68,14 +66,28 @@ export default function ImportTab({
                 const activeJobs = filteredJobs.filter(
                     (job) => job.status.status === "processing"
                 )
-
-                // If we have active jobs, increase polling frequency
-                if (activeJobs.length > 0 && pollingInterval > 1000) {
-                    setPollingInterval(1000) // Poll every second during active imports
-                } else if (
-                    activeJobs.length === 0 &&
-                    pollingInterval === 1000
-                ) {
+                
+                // If we have active jobs, increase polling frequency and emit progress
+                if (activeJobs.length > 0) {
+                    if (pollingInterval > 1000) {
+                        setPollingInterval(1000) // Poll every second during active imports
+                    }
+                    
+                    // Emit event to update the import progress, but throttle it
+                    // We use a ref to store last update times
+                    activeJobs.forEach(job => {
+                        const now = Date.now()
+                        const lastUpdate = lastUpdateTimeRef.current[job.jobId] || 0
+                        // Only emit if more than 2 seconds have passed since last update
+                        if (now - lastUpdate > 2000) {
+                            eventBus.emit(AppEvents.VECTORS_IMPORTED, {
+                                vectorSetName,
+                            })
+                            // Update the last update time
+                            lastUpdateTimeRef.current[job.jobId] = now
+                        }
+                    })
+                } else if (pollingInterval === 1000) {
                     setPollingInterval(5000) // Return to normal polling when no active imports
                 }
 
@@ -268,9 +280,7 @@ export default function ImportTab({
 
     // Handle dialog state changes
     const handleImportSuccess = () => {
-        // Close the sample dialog first
-        setShowImportSample(false)
-        // Then show the success dialog
+        // Show the success dialog without closing the import dialog
         setShowImportSuccessDialog(true)
     }
 
@@ -302,16 +312,20 @@ export default function ImportTab({
                     ) : (
                         <div>
                             <p className="py-4">
-                                Import your data into this Vector Set to get started.
+                                Import your data into this Vector Set to get
+                                started.
                             </p>
                             <p className="py-4">
                                 This vector set is configured to use{" "}
                                 <strong>{metadata?.embedding.provider}</strong>{" "}
                                 model:{" "}
                                 <strong>
-                                    {metadata ? getModelName(metadata.embedding) : "Unknown"}
+                                    {metadata
+                                        ? getModelName(metadata.embedding)
+                                        : "Unknown"}
                                 </strong>
-                                . You can change the embedding engine on the Information tab.
+                                . You can change the embedding engine on the
+                                Information tab.
                             </p>
                             <div className="grid grid-cols-3 gap-4">
                                 <ImportFromCSVFlow

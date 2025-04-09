@@ -3,7 +3,7 @@ import { VectorSetMetadata } from "@/app/types/vectorSetMetaData"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { Database } from "lucide-react"
 import { useState } from "react"
-import ImportCard from "./ImportCard"
+import ImportCard from "../ImportCard"
 import { SampleDataDialog } from "./SampleDataDialog"
 
 interface ImportSamplesFlowProps {
@@ -32,7 +32,7 @@ export default function ImportSamplesFlow({
             />
 
             <Dialog open={showDialog} onOpenChange={setShowDialog}>
-                <DialogContent className="max-w-4xl">
+                <DialogContent className="max-w-4xl overflow-y-scroll">
                     <SampleDataDialog
                         open={showDialog}
                         onOpenChange={(open) => {

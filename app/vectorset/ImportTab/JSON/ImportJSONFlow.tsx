@@ -3,7 +3,7 @@ import { VectorSetMetadata } from "@/app/types/vectorSetMetaData"
 import eventBus, { AppEvents } from "@/app/utils/eventEmitter"
 import { FileJson } from "lucide-react"
 import { useRef } from "react"
-import ImportCard from "./ImportCard"
+import ImportCard from "../ImportCard"
 
 interface ImportJSONFlowProps {
     metadata: VectorSetMetadata | null

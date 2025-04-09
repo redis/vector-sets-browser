@@ -172,7 +172,7 @@ export default function CSVFileSelector({
                 configured in the vector set.
             </p>
 
-            <div className="w-full mt-4">
+            <div className="w-full p-4 flex items-center justify-center mt-4">
                 <input
                     type="file"
                     ref={fileInputRef}
@@ -182,8 +182,9 @@ export default function CSVFileSelector({
                 />
                 <Button
                     type="button"
+                    variant="default"
                     onClick={() => fileInputRef.current?.click()}
-                    className="w-full"
+                    className="w-[300px]"
                 >
                     Select CSV file
                 </Button>
