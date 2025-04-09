@@ -1,106 +1,17 @@
 import { AppEvents } from "@/app/utils/eventEmitter"
 import eventBus from "@/app/utils/eventEmitter"
 
-// Event source for Server-Sent Events
-let eventSource: EventSource | null = null
-let isConnecting = false
-let reconnectAttempts = 0
-const MAX_RECONNECT_ATTEMPTS = 5
-const RECONNECT_DELAY = 2000 // 2 seconds
-
 // Fallback polling state
 let pollingInterval: NodeJS.Timeout | null = null
 let lastPollTime = 0
-const POLLING_INTERVAL = 5000 // 5 seconds
+const POLLING_INTERVAL = 2000 // 1.5 seconds to match previous interval
 
 /**
  * Initialize real-time updates using Server-Sent Events
  */
 export function initSocket() {
-    if (eventSource || isConnecting) return
-
-    if (!window.EventSource) {
-        console.warn(
-            "EventSource not supported in this browser, falling back to polling"
-        )
-        startPolling()
-        return
-    }
-
-    isConnecting = true
-
-    try {
-        const sseUrl = `/api/sse`
-        console.log("Connecting to SSE endpoint:", sseUrl)
-
-        eventSource = new EventSource(sseUrl)
-
-        eventSource.onopen = () => {
-            console.log("Server-Sent Events connection established")
-            isConnecting = false
-            reconnectAttempts = 0
-
-            // Stop polling if we have a successful SSE connection
-            stopPolling()
-        }
-
-        // Set up listeners for different event types
-        Object.values(AppEvents).forEach((eventType) => {
-            eventSource?.addEventListener(eventType, (event) => {
-                try {
-                    const data = JSON.parse(event.data)
-                    console.log(`Received ${eventType} event:`, data)
-                    eventBus.emit(eventType as AppEvents, data)
-                } catch (error) {
-                    console.error(`Error processing ${eventType} event:`, error)
-                }
-            })
-        })
-
-        // Handle generic messages
-        eventSource.onmessage = (event) => {
-            try {
-                const data = JSON.parse(event.data)
-                if (data.type && Object.values(AppEvents).includes(data.type)) {
-                    eventBus.emit(data.type as AppEvents, data.payload)
-                }
-            } catch (error) {
-                console.error("Error processing SSE message:", error)
-            }
-        }
-
-        eventSource.onerror = (error) => {
-            console.error("SSE connection error:", error)
-            isConnecting = false
-
-            if (eventSource) {
-                eventSource.close()
-                eventSource = null
-            }
-
-            // Start polling on error
-            startPolling()
-
-            // Attempt to reconnect
-            if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
-                reconnectAttempts++
-                setTimeout(() => {
-                    console.log(
-                        `Attempting to reconnect SSE (${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})...`
-                    )
-                    initSocket()
-                }, RECONNECT_DELAY * reconnectAttempts) // Exponential backoff
-            } else {
-                console.warn(
-                    "Max SSE reconnection attempts reached, using polling fallback."
-                )
-            }
-        }
-    } catch (error) {
-        console.error("Failed to connect to SSE:", error)
-        isConnecting = false
-        startPolling()
-    }
+    if (pollingInterval) return
+    startPolling()
 }
 
 /**
@@ -129,6 +40,7 @@ function startPolling() {
     lastPollTime = Date.now()
 
     pollingInterval = setInterval(() => {
+        console.log("Polling for job updates...")
         // Poll for job updates
         fetch(`/api/jobs/completed?since=${lastPollTime}`)
             .then((response) => response.json())
@@ -223,10 +135,5 @@ function stopPolling() {
  * Close SSE connection and stop polling
  */
 export function closeSocket() {
-    if (eventSource) {
-        eventSource.close()
-        eventSource = null
-    }
-
     stopPolling()
 }

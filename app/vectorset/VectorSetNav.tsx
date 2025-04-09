@@ -204,6 +204,7 @@ export default function VectorSetNav({
             vectorSetName: string
         }) => {
             console.log(`Vectors imported to ${data.vectorSetName}`, data)
+            // here I just want to refresh the cardinality of the vector set
             debouncedRefresh()
         }
 

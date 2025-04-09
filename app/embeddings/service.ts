@@ -1,7 +1,6 @@
 import { EmbeddingConfig, getExpectedDimensions } from "./types/embeddingModels"
 import { OpenAIProvider } from "./providers/openai"
 import { OllamaProvider } from "./providers/ollama"
-import { TensorFlowProvider } from "./providers/tensorflow"
 import { ImageProvider } from "./providers/image"
 import { CLIPProvider } from "./providers/clip"
 import { EmbeddingProvider } from "./providers/base"
@@ -17,7 +16,6 @@ export class EmbeddingService {
         this.providers = new Map()
         this.providers.set(PROVIDERS.OPENAI, new OpenAIProvider())
         this.providers.set(PROVIDERS.OLLAMA, new OllamaProvider())
-        this.providers.set(PROVIDERS.TENSORFLOW, new TensorFlowProvider())
         this.providers.set(PROVIDERS.IMAGE, new ImageProvider())
         this.providers.set(PROVIDERS.CLIP, new CLIPProvider())
         // Add other providers as they're implemented

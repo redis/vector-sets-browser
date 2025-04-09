@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { CheckCircle2, XCircle } from "lucide-react"
+import { motion } from 'framer-motion'
 
 interface ActiveJobsProps {
     jobs: Job[]
@@ -88,26 +89,36 @@ export default function ActiveJobs({
                                     {job.status.current} of {job.status.total} records
                                 </div>
                             </div>
-                            <Progress
-                                value={(job.status.current / job.status.total) * 100}
-                                className="w-full"
+                            <motion.div
+                                initial={{ scaleX: 0 }}
+                                animate={{ 
+                                    scaleX: job.status.current / job.status.total,
+                                    transition: { duration: 0.5 }
+                                }}
+                                className="h-2 bg-primary rounded-full origin-left"
                             />
                         </div>
 
                         {job.status.status === "completed" && (
-                            <Alert variant="default" className="mt-2">
-                                <CheckCircle2 className="h-4 w-4" />
-                                <AlertDescription className="flex justify-between items-center">
-                                    <span>Import completed successfully!</span>
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => onForceCleanupJob(job.jobId)}
-                                    >
-                                        Dismiss
-                                    </Button>
-                                </AlertDescription>
-                            </Alert>
+                            <motion.div
+                                initial={{ opacity: 0, y: 20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ duration: 0.5 }}
+                            >
+                                <Alert variant="default" className="mt-2">
+                                    <CheckCircle2 className="h-4 w-4" />
+                                    <AlertDescription className="flex justify-between items-center">
+                                        <span>Import completed successfully!</span>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => onForceCleanupJob(job.jobId)}
+                                        >
+                                            Dismiss
+                                        </Button>
+                                    </AlertDescription>
+                                </Alert>
+                            </motion.div>
                         )}
 
                         {job.status.status === "failed" && (

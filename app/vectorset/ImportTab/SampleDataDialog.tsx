@@ -8,9 +8,9 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@/components/ui/dialog"
-import { SampleDataSelect, SampleDataset } from "./SampleDataSelect"
+import { SampleDataSelect } from "./SampleDataSelect"
 import { SampleDataImporter } from "./SampleDataImporter"
-import { VectorSetMetadata } from "@/app/embeddings/types/embeddingModels"
+import { VectorSetMetadata } from "@/app/types/vectorSetMetaData"
 
 interface SampleDataDialogProps {
     open: boolean

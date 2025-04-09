@@ -90,7 +90,7 @@ export function useVectorSet(): UseVectorSetReturn {
 
     // Load vector set data when name changes
     const loadVectorSet = async () => {
-        console.log("[loadVectorSet] Loading vector set", vectorSetName)
+
         if (!vectorSetName) return
 
         try {
@@ -103,7 +103,6 @@ export function useVectorSet(): UseVectorSetReturn {
             // Load information from the vector set
             // use vinfo to get the dimensions and record count
             const infoResponse = await vinfo({ keyName: vectorSetName })
-            console.log("VINFO Response", infoResponse)
             if (!infoResponse.success || !infoResponse.result) {
                 throw new Error(infoResponse.error || "Failed to get vector set info")
             }
