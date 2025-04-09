@@ -60,39 +60,6 @@ export default function ImportTab({
 
     // Listen for job status changes
     useEffect(() => {
-<<<<<<< HEAD
-=======
-        const handleJobStatusChange = async (data: {
-            vectorSetName: string
-            status: string
-            jobId: string
-        }) => {
-            // Only handle events for our vector set
-            if (data.vectorSetName !== vectorSetName) return
-
-            console.log(`Job status changed:`, data)
-            
-            // Show success dialog when a job completes
-            if (data.status === "completed") {
-                try {
-                    // Fetch the completed job details
-                    const jobDetails = await jobs.getJob(data.jobId)
-                    setSuccessJob(jobDetails)
-                    setShowImportSuccessDialog(true)
-                    // Refresh import logs when a job completes
-                    fetchImportLogs()
-                    // Emit the VECTORS_IMPORTED event to refresh counts
-                    eventBus.emit(AppEvents.VECTORS_IMPORTED, { vectorSetName })
-                } catch (error) {
-                    console.error("Error fetching completed job details:", error)
-                }
-            }
-            
-            // Refresh job list to show current state
-            fetchJobs()
-        }
-
->>>>>>> main
         // Initial fetch
         fetchJobs()
     }, [vectorSetName, fetchJobs])

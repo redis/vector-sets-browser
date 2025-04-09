@@ -550,23 +550,6 @@ export default function CreateVectorSetModal({
                                                         </p>
                                                     </div>
                                                 )}
-                                            {embeddingConfig.provider ===
-                                                "tensorflow" &&
-                                                embeddingConfig.tensorflow && (
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="px-2 py-1 rounded bg-yellow-100 text-yellow-800 text-xs font-medium">
-                                                            TensorFlow
-                                                        </span>
-                                                        <p className="text-sm text-gray-600">
-                                                            {
-                                                                embeddingConfig
-                                                                    .tensorflow
-                                                                    .model
-                                                            }{" "}
-                                                            (built-in)
-                                                        </p>
-                                                    </div>
-                                                )}
                                         </div>
                                         <Button
                                             type="button"

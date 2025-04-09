@@ -1,7 +1,6 @@
 export type EmbeddingProvider =
     | "openai"
     | "ollama"
-    | "tensorflow"
     | "image"
     | "clip"
     | "none"
@@ -111,13 +110,8 @@ export interface ClipConfig {
     model: ClipModelName
 }
 
-export interface TensorFlowConfig {
-    model: string
-}
-
 export interface EmbeddingConfig {
     provider: EmbeddingProvider
-    tensorflow?: TensorFlowConfig
     openai?: OpenAIConfig
     ollama?: OllamaConfig
     image?: ImageConfig

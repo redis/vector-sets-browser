@@ -404,22 +404,6 @@ export function SampleDataImporter({
                                         </div>
                                     )}
                                 {embeddingMismatch.currentEmbedding?.embedding
-<<<<<<< HEAD
-                                    .provider === "tensorflow" && (
-                                        <div className="flex items-center gap-2 mt-1">
-                                            <Badge className="text-xs">Model</Badge>
-                                            <span className="text-sm">
-                                                {
-                                                    embeddingMismatch
-                                                        .currentEmbedding.embedding
-                                                        .tensorflow?.model
-                                                }
-                                            </span>
-                                        </div>
-                                    )}
-                                {embeddingMismatch.currentEmbedding?.embedding
-=======
->>>>>>> main
                                     .provider === "image" && (
                                         <div className="flex items-center gap-2 mt-1">
                                             <Badge className="text-xs">Model</Badge>
@@ -520,4 +504,4 @@ export function SampleDataImporter({
             </Dialog>
         </div>
     )
-} 
+}
