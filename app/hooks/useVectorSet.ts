@@ -47,7 +47,7 @@ interface VectorSetCache {
     loaded: boolean
 }
 
-export function useVectorSet(): UseVectorSetReturn {
+const useVectorSet = (): UseVectorSetReturn => {
     const [vectorSetName, setVectorSetName] = useState<string | null>(null)
     const [dim, setDim] = useState<number | null>(null)
     const [recordCount, setRecordCount] = useState<number | null>(null)
@@ -85,11 +85,10 @@ export function useVectorSet(): UseVectorSetReturn {
             setMetadata(null)
             return null
         }
-    }, [vectorSetName, setMetadata, vectorSetCacheRef])
+    }, [vectorSetName])
 
     // Load vector set data when name changes
     const loadVectorSet = useCallback(async () => {
-        console.log("[loadVectorSet] Loading vector set", vectorSetName)
         if (!vectorSetName) return
 
         try {
@@ -102,7 +101,6 @@ export function useVectorSet(): UseVectorSetReturn {
             // Load information from the vector set
             // use vinfo to get the dimensions and record count
             const infoResponse = await vinfo({ keyName: vectorSetName })
-            console.log("VINFO Response", infoResponse)
             if (!infoResponse.success || !infoResponse.result) {
                 throw new Error(infoResponse.error || "Failed to get vector set info")
             }
@@ -132,20 +130,19 @@ export function useVectorSet(): UseVectorSetReturn {
                     : "Error loading vector set"
             )
         }
-    }, [vectorSetName, setResults, setDim, setRecordCount, setStatusMessage, loadMetadata, vectorSetCacheRef])
+    }, [vectorSetName, loadMetadata])
 
-    // Load vector set data when name changes
     useEffect(() => {
         if (vectorSetName) {
-            loadVectorSet()
+            loadVectorSet();
         } else {
-            setDim(null)
-            setRecordCount(null)
-            setMetadata(null)
-            setStatusMessage("")
-            setResults([])
+            setDim(null);
+            setRecordCount(null);
+            setMetadata(null);
+            setStatusMessage("");
+            setResults([]);
         }
-    }, [vectorSetName, loadVectorSet, setDim, setRecordCount, setMetadata, setStatusMessage, setResults])
+    }, [vectorSetName, loadVectorSet]);
 
     // Handle adding a new vector
     const handleAddVector = async (
@@ -490,3 +487,5 @@ export function useVectorSet(): UseVectorSetReturn {
         updateMetadata,
     }
 }
+
+export { useVectorSet };

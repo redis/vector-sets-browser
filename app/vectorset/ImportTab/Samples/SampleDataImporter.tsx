@@ -54,6 +54,7 @@ export function SampleDataImporter({
     const [currentEmbeddingConfig, setCurrentEmbeddingConfig] = useState<EmbeddingConfig | null>(
         dataset.recommendedEmbedding || null
     )
+    const [jobId, setJobId] = useState<string | null>(null)
 
     // Initialize the current embedding config from dataset's recommended embedding
     useEffect(() => {
@@ -106,25 +107,21 @@ export function SampleDataImporter({
         setImportStarted(true)
 
         try {
-            // Check if this vectorset is a placeholder with only one record "First Record (Default)"
             await checkAndRemovePlaceholderRecord()
 
-            // Prepare the import using the dataset provider
             const { file, config } = await dataset.prepareImport({
                 count: dataset.dataType === "image" ? importCount : undefined,
                 onProgress: setImportProgress
             })
 
-            // Add metadata to config if available
             if (metadata) {
                 config.metadata = metadata
             }
 
-            // Create the import job
-            await jobs.createImportJob(vectorSetName, file, config)
+            // Create the import job and store the job ID
+            const result = await jobs.createImportJob(vectorSetName, file, config)
+            setJobId(result.jobId) // Store the job ID to monitor its status
 
-            setIsImporting(false)
-            setImportProgress(null)
         } catch (error) {
             console.error("Error importing sample dataset:", error)
             setError(
@@ -281,52 +278,6 @@ export function SampleDataImporter({
                 </>
             )}
 
-            {/* Import progress */}
-            {importStarted && (
-                <>
-                    <h3 className="text-lg mb-4">Importing {dataset.name}</h3>
-                    {/* Progress UI */}
-                    {importProgress && (
-                        <div className="my-4">
-                            <div className="flex justify-between text-sm mb-1">
-                                <span>Progress</span>
-                                <span>
-                                    {importProgress.current} / {importProgress.total}
-                                </span>
-                            </div>
-                            <div className="w-full bg-gray-200 rounded-full h-2.5">
-                                <div
-                                    className="bg-blue-600 h-2.5 rounded-full"
-                                    style={{
-                                        width: `${Math.round(
-                                            (importProgress.current /
-                                                importProgress.total) *
-                                            100
-                                        )}%`,
-                                    }}
-                                ></div>
-                            </div>
-                            {importProgress.status && (
-                                <p className="text-sm text-gray-600 mt-2">
-                                    {importProgress.status}
-                                </p>
-                            )}
-                        </div>
-                    )}
-
-                    <div className="flex justify-end mt-auto">
-                        <Button variant="default" onClick={() => {
-                            console.log("Import complete button clicked, closing dialog");
-                            onClose();
-                        }}>
-                            {isImporting
-                                ? "Close"
-                                : "Import Complete - Close and Go to Vector Set"}
-                        </Button>
-                    </div>
-                </>
-            )}
-
             {error && (
                 <Alert variant="destructive" className="mt-4">
                     <AlertCircle className="h-4 w-4" />
@@ -334,13 +285,10 @@ export function SampleDataImporter({
                 </Alert>
             )}
 
-            {!error && importStarted && !isImporting && (
-                <Alert variant="default" className="mt-4 bg-green-50 border-green-200">
-                    <CheckCircle2 className="h-4 w-4 text-green-500" />
-                    <AlertDescription className="text-green-700">
-                        Import completed successfully! Click the button above to return to the Vector Set.
-                    </AlertDescription>
-                </Alert>
+            {!error && importStarted && (
+                <p>
+                    Import started. Track progress on the Import Tab.
+                </p>
             )}
 
             {/* Edit embedding config dialog */}

@@ -157,11 +157,6 @@ export function useVectorSearch({
                 // Process results
                 onSearchResults(convertToVectorTuple(vsimResponse.result || []))
 
-                console.log(
-                    "VSIM RETURNED",
-                    convertToVectorTuple(vsimResponse.result || [])
-                )
-
                 if (vsimResponse.executedCommand) {
                     updateSearchState({ executedCommand: vsimResponse.executedCommand })
                 }
@@ -597,7 +592,6 @@ export function useVectorSearch({
 
     // Main search function
     const performSearch = useCallback(async () => {
-        console.log("Perform Search")
         // Skip if no vector set or if nothing has changed since last search
         if (
             !vectorSetName ||

@@ -1,28 +1,20 @@
-import { ImportJobConfig, jobs, type ImportLogEntry, type Job } from "@/app/api/jobs"
-import { vectorSets } from "@/app/api/vector-sets"
+import {
+    ImportJobConfig,
+    jobs,
+    type ImportLogEntry,
+    type Job,
+} from "@/app/api/jobs"
 import { getModelName } from "@/app/embeddings/types/embeddingModels"
 import { VectorSetMetadata } from "@/app/types/vectorSetMetaData"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogHeader,
-    DialogTitle,
-} from "@/components/ui/dialog"
-import {
-    ArrowLeft,
-    Database,
-    FileJson,
-    FileSpreadsheet
-} from "lucide-react"
-import { useCallback, useEffect, useState, useRef } from "react"
 import eventBus, { AppEvents } from "@/app/utils/eventEmitter"
-import ActiveJobs from "./ActiveJobs"
-import ImportFromCSV from "./ImportFromCSV"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { subscribe } from "@/lib/sse"
+import { useCallback, useEffect, useRef, useState } from "react"
+import ImportFromCSVFlow from "./CSV/ImportFromCSVFlow"
 import ImportHistory from "./ImportHistory"
-import { SampleDataDialog } from "./SampleDataDialog"
+import ImportJSONFlow from "./JSON/ImportJSONFlow"
+import ImportProgress from "./ImportProgress"
+import ImportSamplesFlow from "./Samples/ImportSamplesFlow"
 
 interface ImportTabProps {
     vectorSetName: string
@@ -37,32 +29,18 @@ export default function ImportTab({
 }: ImportTabProps) {
     const [jobList, setJobList] = useState<Job[]>([])
     const [showImportCSV, setShowImportCSV] = useState(false)
-    const [showImportSample, setShowImportSample] = useState(initialShowSampleData)
-    const [showImportSuccessDialog, setShowImportSuccessDialog] = useState(false)
-    const [dismissedJobIds, setDismissedJobIds] = useState<Set<string>>(new Set())
+    const [showImportSample, setShowImportSample] = useState(
+        initialShowSampleData
+    )
+    const [showImportSuccessDialog, setShowImportSuccessDialog] =
+        useState(false)
+    const [dismissedJobIds, setDismissedJobIds] = useState<Set<string>>(
+        new Set()
+    )
     const [importLogs, setImportLogs] = useState<ImportLogEntry[]>([])
     const jsonFileInputRef = useRef<HTMLInputElement>(null)
-
-    // Fetch jobs periodically to show current state
-    const fetchJobs = useCallback(async () => {
-        try {
-            const data = await jobs.getJobsByVectorSet(vectorSetName)
-            if (data) {
-                const filteredJobs = data.filter(
-                    (job) => !dismissedJobIds.has(job.jobId)
-                )
-                setJobList(filteredJobs)
-            }
-        } catch (error) {
-            console.error("Error fetching jobs:", error)
-        }
-    }, [vectorSetName, dismissedJobIds])
-
-    // Listen for job status changes
-    useEffect(() => {
-        // Initial fetch
-        fetchJobs()
-    }, [vectorSetName, fetchJobs])
+    const [pollingInterval, setPollingInterval] = useState<number>(5000)
+    const lastUpdateTimeRef = useRef<Record<string, number>>({})
 
     const fetchImportLogs = useCallback(async () => {
         try {
@@ -72,6 +50,128 @@ export default function ImportTab({
             console.error("Error fetching import logs:", error)
         }
     }, [vectorSetName])
+
+    // Enhanced job fetching with dynamic polling
+    const fetchJobs = useCallback(async () => {
+        try {
+            const data = await jobs.getJobsByVectorSet(vectorSetName)
+            if (data) {
+                const filteredJobs = data.filter(
+                    (job) => !dismissedJobIds.has(job.jobId)
+                )
+
+                // Track active jobs and adjust polling frequency
+                const activeJobs = filteredJobs.filter(
+                    (job) => job.status.status === "processing"
+                )
+
+                // If we have active jobs, increase polling frequency and emit progress
+                if (activeJobs.length > 0) {
+                    if (pollingInterval > 1000) {
+                        setPollingInterval(1000) // Poll every second during active imports
+                    }
+
+                    // Emit event to update the import progress, but throttle it
+                    // We use a ref to store last update times
+                    activeJobs.forEach(job => {
+                        const now = Date.now()
+                        const lastUpdate = lastUpdateTimeRef.current[job.jobId] || 0
+                        // Only emit if more than 2 seconds have passed since last update
+                        if (now - lastUpdate > 2000) {
+                            eventBus.emit(AppEvents.VECTORS_IMPORTED, {
+                                vectorSetName,
+                            })
+                            // Update the last update time
+                            lastUpdateTimeRef.current[job.jobId] = now
+                        }
+                    })
+                } else if (pollingInterval === 1000) {
+                    setPollingInterval(5000) // Return to normal polling when no active imports
+                }
+
+                // Check for newly completed jobs
+                const completedJobs = filteredJobs.filter(
+                    (job) =>
+                        job.status.status === "completed" &&
+                        !dismissedJobIds.has(job.jobId)
+                )
+
+                if (completedJobs.length > 0) {
+                    // Show success dialog for the most recent completion
+                    const latestCompletedJob = completedJobs[0]
+                    setSuccessJob(latestCompletedJob)
+                    setShowImportSuccessDialog(true)
+
+                    // Update import logs
+                    await fetchImportLogs()
+                }
+
+                setJobList(filteredJobs)
+            }
+        } catch (error) {
+            console.error("Error fetching jobs:", error)
+            setError("Failed to fetch jobs")
+        }
+    }, [vectorSetName, dismissedJobIds, pollingInterval, fetchImportLogs])
+
+    // Use dynamic polling interval
+    useEffect(() => {
+        const interval = setInterval(fetchJobs, pollingInterval)
+        return () => clearInterval(interval)
+    }, [fetchJobs, pollingInterval])
+
+    // Listen for job status changes
+    useEffect(() => {
+        const unsubscribe = subscribe(
+            AppEvents.JOB_STATUS_CHANGED,
+            async (data) => {
+                if (data.vectorSetName === vectorSetName) {
+                    await fetchJobs()
+                }
+            }
+        )
+        return () => unsubscribe()
+    }, [vectorSetName, fetchJobs])
+
+    // Subscribe to vector imports if needed
+    useEffect(() => {
+        const unsubscribe = subscribe(
+            AppEvents.VECTORS_IMPORTED,
+            async (data) => {
+                if (data.vectorSetName === vectorSetName) {
+                    await fetchJobs()
+                }
+            }
+        )
+        return () => unsubscribe()
+    }, [vectorSetName, fetchJobs])
+
+    // Add effect to fetch import logs periodically
+    useEffect(() => {
+        // Initial fetch
+        fetchImportLogs()
+
+        // Set up periodic fetching
+        const interval = setInterval(fetchImportLogs, 5000)
+
+        return () => clearInterval(interval)
+    }, [fetchImportLogs])
+
+    // Update logs when jobs complete
+    useEffect(() => {
+        const unsubscribe = subscribe(
+            AppEvents.JOB_STATUS_CHANGED,
+            async (data) => {
+                if (
+                    data.vectorSetName === vectorSetName &&
+                    data.status === "completed"
+                ) {
+                    await fetchImportLogs()
+                }
+            }
+        )
+        return () => unsubscribe()
+    }, [vectorSetName, fetchImportLogs])
 
     const cancelJob = async (jobId: string) => {
         try {
@@ -125,65 +225,64 @@ export default function ImportTab({
         }
     }
 
-    const handleJsonImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
-        if (!metadata || !event.target.files || event.target.files.length === 0) return;
+    const handleJsonImport = async (
+        event: React.ChangeEvent<HTMLInputElement>
+    ) => {
+        if (!metadata || !event.target.files || event.target.files.length === 0)
+            return
 
-        const file = event.target.files[0];
+        const file = event.target.files[0]
         try {
+            // Read and parse the JSON to validate it and extract vectors
+            const jsonContent = await file.text()
+            const jsonData = JSON.parse(jsonContent)
+
             // Create an import job with the JSON file
             const importJobConfig: ImportJobConfig = {
-                fileType: 'json',
-                exportType: 'redis', // We want to import to Redis
+                fileType: "json",
+                exportType: "redis", // We want to import to Redis
                 metadata: metadata,
                 // Let the server determine the appropriate columns and attributes
                 // based on the JSON structure
-            };
+            }
 
-            await jobs.createImportJob(vectorSetName, file, importJobConfig);
+            await jobs.createImportJob(vectorSetName, file, importJobConfig)
 
             // Clear the file input for future imports
             if (jsonFileInputRef.current) {
-                jsonFileInputRef.current.value = '';
+                jsonFileInputRef.current.value = ""
             }
 
             // Emit the VECTORS_IMPORTED event
-            eventBus.emit(AppEvents.VECTORS_IMPORTED, { vectorSetName });
+            eventBus.emit(AppEvents.VECTORS_IMPORTED, { vectorSetName })
 
             // Fetch jobs to update the UI
-            await fetchJobs();
-
+            await fetchJobs()
         } catch (error) {
-            console.error("Failed to import JSON data:", error);
+            console.error("Failed to import JSON data:", error)
+            setError(
+                error instanceof Error
+                    ? error.message
+                    : "Failed to import JSON file"
+            )
             // Clear the file input so the user can try again
             if (jsonFileInputRef.current) {
-                jsonFileInputRef.current.value = '';
+                jsonFileInputRef.current.value = ""
             }
         }
-    };
-
-    useEffect(() => {
-        const pollInterval = setInterval(fetchJobs, 1000);
-        fetchJobs(); // Initial fetch
-
-        return () => clearInterval(pollInterval);
-    }, [fetchJobs]);
-
-    // Add effect to fetch import logs periodically
-    useEffect(() => {
-        const pollLogsInterval = setInterval(fetchImportLogs, 5000);
-        fetchImportLogs(); // Initial fetch
-
-        return () => clearInterval(pollLogsInterval);
-    }, [fetchImportLogs]);
+    }
 
     // Handle dialog state changes
     const handleImportSuccess = () => {
+        // Show the success dialog without closing the import dialog
         setShowImportSuccessDialog(true)
     }
 
     const handleSuccessDialogClose = () => {
         setShowImportSuccessDialog(false)
-        setShowImportCSV(false)  // Close the import dialog when success dialog is closed
+        // Make sure all import dialogs are closed
+        setShowImportCSV(false)
+        setShowImportSample(false)
     }
 
     return (
@@ -195,223 +294,58 @@ export default function ImportTab({
                     </div>
                 </CardHeader>
                 <CardContent>
-                    <div className="space-y-4">
-                        {!jobList || jobList.length === 0 ? (
-                            <div className="space-y-6">
-                                {showImportCSV ? (
-                                    <div className="bg-[white] p-2 rounded-lg shadow-xs">
-                                        <div className="mb-4">
-                                            <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                onClick={() =>
-                                                    setShowImportCSV(false)
-                                                }
-                                                className="flex items-center gap-2"
-                                            >
-                                                <ArrowLeft className="h-4 w-4" />
-                                                Back
-                                            </Button>
-                                        </div>
-                                        <ImportFromCSV
-                                            onImportSuccess={handleImportSuccess}
-                                            metadata={metadata}
-                                            vectorSetName={vectorSetName}
-                                        />
-                                    </div>
-                                ) : showImportSample ? (
-                                    <div className="bg-[white] p-2 rounded-lg shadow-xs">
-                                        <div className="mb-4">
-                                            <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                onClick={() =>
-                                                    setShowImportSample(false)
-                                                }
-                                                className="flex items-center gap-2"
-                                            >
-                                                <ArrowLeft className="h-4 w-4" />
-                                                Back
-                                            </Button>
-                                        </div>
-                                        <SampleDataDialog
-                                            open={showImportSample}
-                                            onOpenChange={(open) => {
-                                                setShowImportSample(open)
-                                            }}
-                                            vectorSetName={vectorSetName}
-                                            metadata={metadata}
-                                            onImportComplete={(success) => {
-                                                console.log("onImportComplete called with success:", success);
-                                                fetchJobs();
-
-                                                if (success) {
-                                                    console.log("Import was successful, showing success dialog soon");
-                                                    setTimeout(async () => {
-                                                        try {
-                                                            const latestJobs = await jobs.getJobsByVectorSet(vectorSetName);
-                                                            console.log("Latest jobs:", latestJobs);
-                                                            if (latestJobs && latestJobs.length > 0) {
-                                                                // Sort by most recent first using message timestamp if available
-                                                                const sortedJobs = [...latestJobs].sort((a, b) => {
-                                                                    // Try to extract timestamp from message if available
-                                                                    const getTimestamp = (job: Job) => {
-                                                                        const timestampMatch = job.status.message?.match(/at (\d+)/);
-                                                                        return timestampMatch ? parseInt(timestampMatch[1], 10) : 0;
-                                                                    };
-                                                                    return getTimestamp(b) - getTimestamp(a);
-                                                                });
-
-                                                                const completedJob = sortedJobs.find(j => j.status.status === "completed");
-                                                                console.log("Found completed job:", completedJob);
-
-                                                                if (completedJob) {
-                                                                    setShowImportSuccessDialog(true);
-                                                                    console.log("Success dialog should now be visible");
-                                                                }
-                                                            }
-                                                        } catch (error) {
-                                                            console.error("Error fetching latest job:", error);
-                                                        }
-                                                    }, 1000);
-                                                }
-                                            }}
-                                            onUpdateMetadata={async (
-                                                newMetadata
-                                            ) => {
-                                                console.log(
-                                                    "Updating metadata:",
-                                                    newMetadata
-                                                )
-                                                try {
-                                                    await vectorSets.setMetadata({
-                                                        name: vectorSetName,
-                                                        metadata: newMetadata
-                                                    })
-                                                    window.location.reload()
-                                                } catch (error) {
-                                                    console.error(
-                                                        "Failed to update metadata:",
-                                                        error
-                                                    )
-                                                }
-                                            }}
-                                        />
-                                    </div>
-                                ) : (
-                                    <div>
-                                        <p className="py-4">
-                                            Import your data into this Vector
-                                            Set to get started.
-                                        </p>
-                                        <p className="py-4">
-                                            This vector set is configured to use{" "}
-                                            <strong>
-                                                {" "}
-                                                {metadata?.embedding.provider}
-                                            </strong>{" "}
-                                            model:{" "}
-                                            <strong>
-                                                {metadata
-                                                    ? getModelName(
-                                                        metadata.embedding
-                                                    )
-                                                    : "Unknown"}
-                                            </strong>
-                                            . You can change the embedding
-                                            engine on the Information tab.
-                                        </p>
-                                        <div className="grid grid-cols-3 gap-4">
-                                            <Card
-                                                className="p-6 cursor-pointer hover:shadow-md transition-shadow"
-                                                onClick={() =>
-                                                    setShowImportCSV(true)
-                                                }
-                                            >
-                                                <div className="flex flex-col items-center space-y-3">
-                                                    <FileSpreadsheet className="h-8 w-8 text-blue-500" />
-                                                    <h3 className="font-medium">
-                                                        Import from CSV
-                                                    </h3>
-                                                    <p className="text-sm text-gray-500 text-center">
-                                                        Upload your own CSV file
-                                                        with text data
-                                                    </p>
-                                                </div>
-                                            </Card>
-                                            <Card
-                                                className="p-6 cursor-pointer hover:shadow-md transition-shadow"
-                                                onClick={() =>
-                                                    setShowImportSample(true)
-                                                }
-                                            >
-                                                <div className="flex flex-col items-center space-y-3">
-                                                    <Database className="h-8 w-8 text-green-500" />
-                                                    <h3 className="font-medium">
-                                                        Sample Data
-                                                    </h3>
-                                                    <p className="text-sm text-gray-500 text-center">
-                                                        Import pre-configured
-                                                        datasets with one click
-                                                    </p>
-                                                </div>
-                                            </Card>
-                                            <Card
-                                                className="p-6 cursor-pointer hover:shadow-md transition-shadow"
-                                                onClick={() => jsonFileInputRef.current?.click()}
-                                            >
-                                                <div className="flex flex-col items-center space-y-3">
-                                                    <FileJson className="h-8 w-8 text-purple-500" />
-                                                    <h3 className="font-medium">
-                                                        Import JSON
-                                                    </h3>
-                                                    <p className="text-sm text-gray-500 text-center">
-                                                        Import test data from JSON
-                                                    </p>
-                                                </div>
-                                            </Card>
-                                        </div>
-                                    </div>
-                                )}
+                    {jobList.length > 0 ? (
+                        <ImportProgress
+                            jobs={jobList}
+                            onPauseJob={pauseJob}
+                            onResumeJob={resumeJob}
+                            onCancelJob={cancelJob}
+                            onForceCleanupJob={forceCleanupJob}
+                            onRemoveJob={removeJob}
+                        />
+                    ) : (
+                        <div>
+                            <p className="py-4">
+                                Import your data into this Vector Set to get
+                                started.
+                            </p>
+                            <p className="py-4">
+                                This vector set is configured to use{" "}
+                                <strong>{metadata?.embedding.provider}</strong>{" "}
+                                model:{" "}
+                                <strong>
+                                    {metadata
+                                        ? getModelName(metadata.embedding)
+                                        : "Unknown"}
+                                </strong>
+                                . You can change the embedding engine on the
+                                Information tab.
+                            </p>
+                            <div className="grid grid-cols-3 gap-4">
+                                <ImportFromCSVFlow
+                                    metadata={metadata}
+                                    vectorSetName={vectorSetName}
+                                    onImportSuccess={handleImportSuccess}
+                                />
+                                <ImportSamplesFlow
+                                    metadata={metadata}
+                                    vectorSetName={vectorSetName}
+                                    onImportSuccess={handleImportSuccess}
+                                    onFetchJobs={fetchJobs}
+                                />
+                                <ImportJSONFlow
+                                    metadata={metadata}
+                                    vectorSetName={vectorSetName}
+                                    onImportSuccess={handleImportSuccess}
+                                />
                             </div>
-                        ) : (
-                            <ActiveJobs
-                                jobs={jobList}
-                                onPauseJob={pauseJob}
-                                onResumeJob={resumeJob}
-                                onCancelJob={cancelJob}
-                                onForceCleanupJob={forceCleanupJob}
-                                onRemoveJob={removeJob}
-                            />
-                        )}
-                    </div>
+                        </div>
+                    )}
                 </CardContent>
             </Card>
 
             <ImportHistory importLogs={importLogs} />
 
-            <Dialog
-                open={showImportSuccessDialog}
-                onOpenChange={handleSuccessDialogClose}
-            >
-                <DialogContent className="sm:max-w-[425px]">
-                    <DialogHeader>
-                        <DialogTitle>Import Started Successfully</DialogTitle>
-                        <DialogDescription>
-                            Your data import has started. For large files this may take a long time.
-                            You can see the import status and pause/cancel on the vectorset list.
-                        </DialogDescription>
-                    </DialogHeader>
-                    <div className="mt-4 flex justify-end">
-                        <Button
-                            variant="secondary"
-                            onClick={handleSuccessDialogClose}
-                        >
-                            Close
-                        </Button>
-                    </div>
-                </DialogContent>
-            </Dialog>
             <input
                 type="file"
                 ref={jsonFileInputRef}
@@ -419,6 +353,6 @@ export default function ImportTab({
                 accept=".json"
                 className="hidden"
             />
-        </div>
+        </div >
     )
 }

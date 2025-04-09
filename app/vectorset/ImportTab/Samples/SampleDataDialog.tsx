@@ -10,7 +10,6 @@ import {
 import { SampleDataSelect } from "./SampleDataSelect"
 import { SampleDataImporter } from "./SampleDataImporter"
 import { VectorSetMetadata } from "@/app/types/vectorSetMetaData"
-import { Dataset } from "./types/DatasetProvider"
 
 interface SampleDataDialogProps {
     open: boolean

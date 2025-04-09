@@ -1,6 +1,6 @@
 import { ApiError } from "@/app/api/client"
 import { vectorSets } from "@/app/api/vector-sets"
-import { vinfo_multi } from "@/app/redis-server/api"
+import { vinfo_multi, vcard } from "@/app/redis-server/api"
 import { VectorSetMetadata } from "@/app/types/vectorSetMetaData"
 import eventBus, { AppEvents } from "@/app/utils/eventEmitter"
 import {
@@ -200,11 +200,32 @@ export default function VectorSetNav({
             }
         }
 
-        const handleVectorsImported = (data: {
+        const handleVectorsImported = async (data: {
             vectorSetName: string
         }) => {
             console.log(`Vectors imported to ${data.vectorSetName}`, data)
-            debouncedRefresh()
+
+            try {
+                // Just get the cardinality for this specific vector set
+                const cardinalityResponse = await vcard({
+                    keyName: data.vectorSetName,
+                })
+
+                const existingInfo = vectorSetInfo[data.vectorSetName]
+                if (cardinalityResponse.success &&
+                    typeof cardinalityResponse.result === 'number' &&
+                    existingInfo) {
+                    setVectorSetInfo((prev) => ({
+                        ...prev,
+                        [data.vectorSetName]: {
+                            ...existingInfo,
+                            vectorCount: cardinalityResponse.result as number,
+                        },
+                    }))
+                }
+            } catch (error) {
+                console.error("Error updating vector count after import:", error)
+            }
         }
 
         let unsubscribes: Array<() => void> = []
@@ -433,10 +454,10 @@ export default function VectorSetNav({
                             <div
                                 key={setName}
                                 className={`group list-item relative ${selectedVectorSet === setName
-                                        ? "list-item-selected"
-                                        : index % 2 === 0
-                                            ? "list-item-alt"
-                                            : "list-item-default"
+                                    ? "list-item-selected"
+                                    : index % 2 === 0
+                                        ? "list-item-alt"
+                                        : "list-item-default"
                                     }`}
                             >
                                 <div
