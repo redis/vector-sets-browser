@@ -1,7 +1,7 @@
 import { RedisConnection, getRedisUrl } from "@/app/redis-server/RedisConnection"
 import { NextResponse } from "next/server"
 import { EmbeddingConfig } from "@/app/embeddings/types/embeddingModels"
-import { DEFAULT_VECTOR_DIMENSIONS } from "@/app/vectorset/constants"
+import { DEFAULT_EMBEDDING_CONFIG } from "@/app/vectorset/constants"
 
 // Redis key for storing cache configuration
 const CONFIG_KEY = "vector-set-browser:config"
@@ -13,13 +13,7 @@ const DEFAULT_CACHE_CONFIG = {
     maxSize: 1000,
     defaultTTL: 86400, // 24 hours in seconds
     useCache: true,
-    embeddingConfig: {
-        provider: "none",
-        none: {
-            model: "default",
-            dimensions: DEFAULT_VECTOR_DIMENSIONS,
-        },
-    },
+    embeddingConfig: DEFAULT_EMBEDDING_CONFIG,
 }
 
 interface CacheConfig {

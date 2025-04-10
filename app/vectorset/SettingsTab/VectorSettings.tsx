@@ -12,7 +12,7 @@ import {
 import { useState } from "react"
 import AdvancedConfigEdit from "../AdvancedConfigEdit"
 import { vectorSets } from "@/app/api/vector-sets"
-import { DEFAULT_VECTOR_DIMENSIONS } from "../constants"
+import { DEFAULT_EMBEDDING, DEFAULT_EMBEDDING_CONFIG } from "../constants"
 
 interface VectorSettingsProps {
     vectorSetName: string
@@ -67,10 +67,10 @@ export default function VectorSettings({
                 ...workingMetadata,
                 lastUpdated: new Date().toISOString(),
                 embedding: workingMetadata.embedding || {
-                    provider: "none",
+                    provider: DEFAULT_EMBEDDING.PROVIDER,
                     none: {
-                        model: "custom",
-                        dimensions: workingMetadata.dimensions || DEFAULT_VECTOR_DIMENSIONS,
+                        model: DEFAULT_EMBEDDING.MODEL,
+                        dimensions: workingMetadata.dimensions || DEFAULT_EMBEDDING.DIMENSIONS,
                     }
                 }
             }
@@ -155,10 +155,10 @@ export default function VectorSettings({
                                     // If embedding doesn't exist, add a placeholder one to satisfy the type requirements
                                     if (!initialMetadata.embedding) {
                                         initialMetadata.embedding = {
-                                            provider: "none",
+                                            provider: DEFAULT_EMBEDDING.PROVIDER,
                                             none: {
-                                                model: "custom",
-                                                dimensions: metadata.dimensions || DEFAULT_VECTOR_DIMENSIONS
+                                                model: DEFAULT_EMBEDDING.MODEL,
+                                                dimensions: metadata.dimensions || DEFAULT_EMBEDDING.DIMENSIONS
                                             }
                                         };
                                     }
@@ -170,13 +170,7 @@ export default function VectorSettings({
                                 } else {
                                     // If no metadata at all, create a minimal valid structure
                                     initialMetadata = {
-                                        embedding: {
-                                            provider: "none",
-                                            none: {
-                                                model: "custom",
-                                                dimensions: DEFAULT_VECTOR_DIMENSIONS
-                                            }
-                                        },
+                                        embedding: DEFAULT_EMBEDDING_CONFIG,
                                         created: new Date().toISOString(),
                                         lastUpdated: new Date().toISOString(),
                                         description: "",
@@ -301,10 +295,10 @@ export default function VectorSettings({
                     isOpen={isEditConfigModalOpen}
                     onClose={() => setIsEditConfigModalOpen(false)}
                     config={metadata?.embedding || {
-                        provider: "none",
+                        provider: DEFAULT_EMBEDDING.PROVIDER,
                         none: {
-                            model: "custom",
-                            dimensions: metadata?.dimensions || DEFAULT_VECTOR_DIMENSIONS,
+                            model: DEFAULT_EMBEDDING.MODEL,
+                            dimensions: metadata?.dimensions || DEFAULT_EMBEDDING.DIMENSIONS,
                         },
                     }}
                     onSave={handleEditConfig}

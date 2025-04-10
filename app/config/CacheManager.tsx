@@ -14,7 +14,7 @@ import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { AlertTriangle, Info, Loader2, PowerOff } from "lucide-react"
 import { useEffect, useState } from "react"
-import { DEFAULT_VECTOR_DIMENSIONS } from "../vectorset/constants"
+import { DEFAULT_EMBEDDING_CONFIG } from "../vectorset/constants"
 
 interface CacheInfo {
     size: number
@@ -39,13 +39,7 @@ export default function CacheManager() {
         maxSize: 1000,
         defaultTTL: 86400,
         useCache: true,
-        embeddingConfig: {
-            provider: "none",
-            none: {
-                model: "default",
-                dimensions: DEFAULT_VECTOR_DIMENSIONS,
-            },
-        },
+        embeddingConfig: DEFAULT_EMBEDDING_CONFIG,
     })
 
     const loadCacheInfo = async () => {
@@ -92,13 +86,7 @@ export default function CacheManager() {
                 maxSize: configData.maxSize || 1000,
                 defaultTTL: configData.defaultTTL || 86400,
                 useCache: configData.useCache !== undefined ? configData.useCache : true,
-                embeddingConfig: configData.embeddingConfig || {
-                    provider: "none",
-                    none: {
-                        model: "default",
-                        dimensions: DEFAULT_VECTOR_DIMENSIONS,
-                    },
-                },
+                embeddingConfig: configData.embeddingConfig || DEFAULT_EMBEDDING_CONFIG,
             })
         } catch (error) {
             console.error("Error loading cache info:", error)
