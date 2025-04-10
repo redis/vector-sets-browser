@@ -62,9 +62,16 @@ export default function VectorSettings({
                 throw new Error("No vector set or metadata selected")
             }
 
-            const updatedMetadata = {
+            const updatedMetadata: VectorSetMetadata = {
                 ...workingMetadata,
                 lastUpdated: new Date().toISOString(),
+                embedding: workingMetadata.embedding || {
+                    provider: "none",
+                    none: {
+                        model: "custom",
+                        dimensions: workingMetadata.dimensions || 1536,
+                    }
+                }
             }
 
             await vectorSets.setMetadata({
@@ -107,21 +114,21 @@ export default function VectorSettings({
                                     {metadata?.redisConfig?.quantization || <span>Default: <span className="font-bold">Q8</span></span>}
                                 </div>
 
-                                <div className="text-gray-600">
-                                    Reduced Dimensions:
-                                </div>
-                                <div>
-                                    {metadata?.redisConfig?.reduceDimensions || <span>Default: <span className="font-bold">None (No dimension reduction)</span></span>}
-                                </div>
+                                    <div className="text-gray-600">
+                                        Reduced Dimensions:
+                                    </div>
+                                    <div>
+                                        {metadata?.redisConfig?.reduceDimensions || <span>Default: <span className="font-bold">None (No dimension reduction)</span></span>}
+                                    </div>
 
-                                <div className="text-gray-600">
-                                    Default CAS:
-                                </div>
-                                <div>
-                                    {metadata?.redisConfig?.defaultCAS !== undefined
-                                        ? (metadata?.redisConfig.defaultCAS ? "Enabled" : "Disabled")
-                                        : <span>Default: <span className="font-bold">Disabled</span></span>}
-                                </div>
+                                    <div className="text-gray-600">
+                                        Default CAS:
+                                    </div>
+                                    <div>
+                                        {metadata?.redisConfig?.defaultCAS !== undefined
+                                            ? (metadata?.redisConfig.defaultCAS ? "Enabled" : "Disabled")
+                                            : <span>Default: <span className="font-bold">Disabled</span></span>}
+                                    </div>
 
                                 <div className="text-gray-600">
                                     Build Exploration Factor:
@@ -137,8 +144,47 @@ export default function VectorSettings({
                         <Button
                             variant="default"
                             onClick={() => {
-                                setWorkingMetadata(metadata ? {...metadata} : null)
-                                setIsAdvancedConfigPanelOpen(true)
+                                // For CLI-created vector sets, create a proper metadata structure
+                                let initialMetadata: VectorSetMetadata;
+
+                                if (metadata) {
+                                    // If metadata exists, use it as a base
+                                    initialMetadata = {...metadata};
+
+                                    // If embedding doesn't exist, add a placeholder one to satisfy the type requirements
+                                    if (!initialMetadata.embedding) {
+                                        initialMetadata.embedding = {
+                                            provider: "none",
+                                            none: {
+                                                model: "custom",
+                                                dimensions: metadata.dimensions || 1536
+                                            }
+                                        };
+                                    }
+
+                                    // If redisConfig doesn't exist, initialize it as an empty object
+                                    if (!initialMetadata.redisConfig) {
+                                        initialMetadata.redisConfig = {};
+                                    }
+                                } else {
+                                    // If no metadata at all, create a minimal valid structure
+                                    initialMetadata = {
+                                        embedding: {
+                                            provider: "none",
+                                            none: {
+                                                model: "custom",
+                                                dimensions: 1536
+                                            }
+                                        },
+                                        created: new Date().toISOString(),
+                                        lastUpdated: new Date().toISOString(),
+                                        description: "",
+                                        redisConfig: {}
+                                    };
+                                }
+
+                                setWorkingMetadata(initialMetadata);
+                                setIsAdvancedConfigPanelOpen(true);
                             }}
                         >
                             Edit
