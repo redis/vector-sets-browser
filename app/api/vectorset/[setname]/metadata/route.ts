@@ -5,10 +5,12 @@ import {
 } from "@/app/redis-server/RedisConnection"
 import { NextRequest, NextResponse } from "next/server"
 
+// type Params = { params: { setname: string } }
+
 // GET /api/vectorset/[setname]/metadata - Get metadata for a vector set
 export async function GET(
-    request: NextRequest,
-    { params }: { params: { setname: string } }
+    _request: NextRequest,
+    { params }: any
 ) {
     try {
         const parsedParams = await params
@@ -37,7 +39,7 @@ export async function GET(
                 const configKey = "vector-set-browser:config"
                 const hashKey = `vset:${keyName}:metadata`
 
-                let storedData = await client.hGet(configKey, hashKey)
+                const storedData = await client.hGet(configKey, hashKey)
 
                 try {
                     // Parse the stored data
@@ -49,7 +51,7 @@ export async function GET(
                     if (
                         parsedData &&
                         JSON.stringify(parsedData) !==
-                            JSON.stringify(parsedData)
+                        JSON.stringify(parsedData)
                     ) {
                         await client.hSet(configKey, {
                             [hashKey]: JSON.stringify(parsedData),
@@ -92,7 +94,7 @@ export async function GET(
 // PUT /api/vectorset/[setname]/metadata - Set metadata for a vector set
 export async function PUT(
     request: NextRequest,
-    { params }: { params: { setname: string } }
+    { params }: any
 ) {
     try {
         console.log("PUT /api/vectorset/[setname]/metadata", params)
@@ -140,7 +142,7 @@ export async function PUT(
 
         if (!response.success) {
             return NextResponse.json(
-                { success: false, error: result.error },
+                { success: false, error: response.error },
                 { status: 500 }
             )
         }
@@ -164,7 +166,7 @@ export async function PUT(
 // Also support POST for backward compatibility
 export async function POST(
     request: NextRequest,
-    { params }: { params: { setname: string } }
+    { params }: any
 ) {
     return PUT(request, { params })
 }

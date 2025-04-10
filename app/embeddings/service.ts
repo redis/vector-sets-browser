@@ -32,7 +32,7 @@ export class EmbeddingService {
         if (isImage && config.provider !== PROVIDERS.IMAGE) {
             throw new Error(`Provider ${config.provider} does not support image data`)
         }
-        
+
         if (config.provider === PROVIDERS.IMAGE && !isImage) {
             throw new Error("Image provider requires image data")
         }
@@ -55,12 +55,12 @@ export class EmbeddingService {
         // and the VDIM returns the REDUCE size...
         // ideally we should remember the original embedding size and use that,
         // but the question is with REDUCE can you throw any size embedding at it, and it will
-        // normalize it to the expected dimensions? 
-        // TODO: We should test this... 
+        // normalize it to the expected dimensions?
+        // TODO: We should test this...
         const expectedDimensions = getExpectedDimensions(config)
-        // Validate the embedding 
+        // Validate the embedding
         const validationResult = validateVector(
-            embedding, 
+            embedding,
             expectedDimensions
         )
         if (!validationResult.isValid) {
@@ -85,7 +85,7 @@ export class EmbeddingService {
         if (areImages && config.provider !== PROVIDERS.IMAGE) {
             throw new Error(`Provider ${config.provider} does not support image data`)
         }
-        
+
         if (config.provider === PROVIDERS.IMAGE && !areImages) {
             throw new Error("Image provider requires image data")
         }
@@ -137,7 +137,7 @@ export class EmbeddingService {
         }
 
         // Validate each embedding (without normalization)
-        // get the expected dimensions from the provider 
+        // get the expected dimensions from the provider
         const expectedDimensions = getExpectedDimensions(config)
 
         const validatedEmbeddings = uncachedEmbeddings.map(

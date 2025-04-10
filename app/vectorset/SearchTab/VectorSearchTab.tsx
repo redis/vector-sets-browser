@@ -64,7 +64,7 @@ export default function VectorSearchTab({
         [setResults]
     )
 
-    const handleStatusChange = useCallback((status: string) => {}, [])
+    const handleStatusChange = useCallback(() => { }, [])
 
     const handleSearchStateChange = useCallback(
         (newState: Partial<VectorSetSearchState>) => {
@@ -94,10 +94,8 @@ export default function VectorSearchTab({
         searchFilter,
         setSearchFilter,
         error,
-        clearError,
         expansionFactor,
         setExpansionFactor,
-        lastTextEmbedding,
         executedCommand,
     } = useVectorSearch({
         vectorSetName,
@@ -164,7 +162,7 @@ export default function VectorSearchTab({
             })
             console.log("vlink DATA", response)
             if (!response || !response.result) return []
-            
+
             // data is an array of arrays
             // each inner array contains [element, similarity, vector]
             return response.result.flat().map((item) => ({
@@ -193,10 +191,8 @@ export default function VectorSearchTab({
                 dim={dim}
                 metadata={metadata}
                 error={error}
-                clearError={clearError}
                 expansionFactor={expansionFactor}
                 setExpansionFactor={setExpansionFactor}
-                lastTextEmbedding={lastTextEmbedding}
                 executedCommand={executedCommand}
                 results={results}
             />

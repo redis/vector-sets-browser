@@ -29,10 +29,10 @@ export class JobQueueService {
                 total: 0,
                 timestamp: Date.now(),
             }
-            
+
             // Get current status
             const currentStatus = await client.hGetAll(statusKey)
-            
+
             // If we have existing data, parse it
             if (currentStatus?.data) {
                 try {
@@ -47,19 +47,19 @@ export class JobQueueService {
                     // Continue with default progress
                 }
             }
-            
+
             // Update with new values
             const updatedProgress: JobProgress = {
                 ...currentProgress,
                 ...progress,
                 timestamp: Date.now(),
             }
-            
+
             // Store the updated progress
             await client.hSet(statusKey, { data: JSON.stringify(updatedProgress) })
             return updatedProgress;
         })
-        
+
         if (!result.success) {
             console.error(
                 `[JobQueue] Failed to update progress for job ${jobId}:`,
@@ -67,7 +67,11 @@ export class JobQueueService {
             )
             throw new Error(result.error)
         }
-        
+
+        if (!result.result) {
+            throw new Error(`Failed to get result for job ${jobId}`)
+        }
+
         return result.result;
     }
 
@@ -95,7 +99,7 @@ export class JobQueueService {
 
         let records: CSVRow[] = []
         let availableColumns: string[] = []
-        
+
         // Handle different file types
         if (fileType === "csv") {
             const text = await file.text()
@@ -105,18 +109,18 @@ export class JobQueueService {
                 delimiter,
                 from_line: Math.max(1, skipRows + (hasHeader ? 1 : 0)),
             }) as CSVRow[]
-            
+
             // Determine column names from the first record
             availableColumns = records.length > 0 ? Object.keys(records[0]) : []
-        } 
+        }
         else if (fileType === "json") {
             // Parse JSON file
             const text = await file.text()
             const jsonData = JSON.parse(text)
-            
+
             // Handle both array and object formats
             const dataArray = Array.isArray(jsonData) ? jsonData : [jsonData]
-            
+
             // Convert JSON objects to records
             records = dataArray.map((item, index) => {
                 // If the item has a vector property, store it for later use
@@ -126,30 +130,30 @@ export class JobQueueService {
                     text: item.text || '',
                     ...item // Include all other properties as attributes
                 }
-                
+
                 if (vector) {
                     // Store the vector directly in the record for later use
-                    ;(record as any)._vector = vector
+                    ; (record as any)._vector = vector
                 }
-                
+
                 return record
             })
-            
+
             // Get all unique keys from the first record for columns
             availableColumns = records.length > 0 ? Object.keys(records[0]) : []
-            
+
             // Update attribute columns to include all fields except id, text, and vector
             if (!options.attributeColumns || options.attributeColumns.length === 0) {
-                options.attributeColumns = availableColumns.filter(col => 
+                options.attributeColumns = availableColumns.filter(col =>
                     col !== 'id' && col !== 'text' && col !== 'vector' && col !== 'embedding' && !col.startsWith('_')
                 )
             }
         }
         else if (fileType === "image" || fileType === "images") {
-            
+
             // For image types, we create a single record with the image information
             if (options?.rawVectors && options.rawVectors.length > 0) {
-                
+
                 // Create a record for each image with pre-computed vector
                 records = options.rawVectors.map((vector, index) => {
                     // Create a basic record for the image
@@ -162,13 +166,13 @@ export class JobQueueService {
                             return acc;
                         }, {} as Record<string, string>) || {})
                     };
-                    
+
                     // Store the vector directly in the record for later use
                     (record as any)._vector = vector;
-                    
+
                     return record;
                 });
-                
+
                 availableColumns = ["image", "index", ...(options?.attributeColumns || [])];
             } else {
                 // Just a single record for the image without pre-computed vector
@@ -184,7 +188,7 @@ export class JobQueueService {
                 availableColumns = ["image", "index", ...(options?.attributeColumns || [])];
             }
         }
-        
+
         // Select appropriate columns based on options or defaults
         const elementColumn =
             options?.elementColumn ||
@@ -197,8 +201,8 @@ export class JobQueueService {
             (availableColumns.includes("plot_synopsis")
                 ? "plot_synopsis"
                 : availableColumns.length > 1
-                ? availableColumns[1]
-                : "plot_synopsis")
+                    ? availableColumns[1]
+                    : "plot_synopsis")
 
         const response = await RedisConnection.withClient(
             url,
@@ -257,9 +261,9 @@ export class JobQueueService {
                 `[JobQueue] Failed to create job ${jobId}:`,
                 response.error
             )
-            throw new Error(result.error)
+            throw new Error(response.error)
         }
-        return response.result
+        return response.result as string
     }
 
     public static async getJobProgress(
@@ -294,7 +298,7 @@ export class JobQueueService {
                 }
             }
         )
-        
+
         if (!response.success) {
             console.error(
                 `[JobQueue] Failed to get progress for job ${jobId}:`,
@@ -302,8 +306,8 @@ export class JobQueueService {
             )
             throw new Error(response.error)
         }
-        
-        return response.result
+
+        return response.result as JobProgress | null
     }
 
     public static async pauseJob(url: string, jobId: string): Promise<void> {
@@ -349,7 +353,7 @@ export class JobQueueService {
             throw new Error(response.error)
         }
         //console.log(`[JobQueue] Metadata for job ${jobId}:`, result.result);
-        return response.result
+        return response.result as CSVJobMetadata | null
     }
 
     public static async getNextQueueItem(
@@ -368,7 +372,7 @@ export class JobQueueService {
             )
             throw new Error(response.error)
         }
-        return response.result
+        return response.result as JobQueueItem | null
     }
 
     public static async cleanupJob(url: string, jobId: string): Promise<void> {

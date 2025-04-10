@@ -1,5 +1,5 @@
-import { RedisConnection, getRedisUrl } from '@/app/redis-server/RedisConnection'
-import { validateRequest, formatResponse, handleError } from '@/app/redis-server/utils'
+import { getRedisUrl } from '@/app/redis-server/RedisConnection'
+import { validateRequest } from '@/app/redis-server/utils'
 import { validateVembMultiRequest, buildVembMultiCommand, fetchEmbeddingsBatch } from './command'
 import { NextResponse } from 'next/server'
 

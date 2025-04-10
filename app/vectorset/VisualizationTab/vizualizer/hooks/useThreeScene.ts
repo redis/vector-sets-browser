@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import * as THREE from "three"
 import { COLORS_REDIS_DARK, ColorScheme } from "../constants"
 
-let COLORS: ColorScheme = COLORS_REDIS_DARK
+const COLORS: ColorScheme = COLORS_REDIS_DARK
 
 export function useThreeScene() {
     const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -139,38 +139,38 @@ export function useThreeScene() {
 
         // Update horizontal line
         if (guideLineRefsRef.current.horizontalLine) {
-            ;(
+            ; (
                 guideLineRefsRef.current.horizontalLine
                     .material as THREE.LineDashedMaterial
             ).color.set(lineColor)
-            ;(
-                guideLineRefsRef.current.horizontalLine
-                    .material as THREE.LineDashedMaterial
-            ).needsUpdate = true
+                ; (
+                    guideLineRefsRef.current.horizontalLine
+                        .material as THREE.LineDashedMaterial
+                ).needsUpdate = true
         }
 
         // Update vertical line
         if (guideLineRefsRef.current.verticalLine) {
-            ;(
+            ; (
                 guideLineRefsRef.current.verticalLine
                     .material as THREE.LineDashedMaterial
             ).color.set(lineColor)
-            ;(
-                guideLineRefsRef.current.verticalLine
-                    .material as THREE.LineDashedMaterial
-            ).needsUpdate = true
+                ; (
+                    guideLineRefsRef.current.verticalLine
+                        .material as THREE.LineDashedMaterial
+                ).needsUpdate = true
         }
 
         // Update horizontal ticks
         guideLineRefsRef.current.horizontalTicks.forEach((tick) => {
-            ;(tick.material as THREE.LineBasicMaterial).color.set(lineColor)
-            ;(tick.material as THREE.LineBasicMaterial).needsUpdate = true
+            ; (tick.material as THREE.LineBasicMaterial).color.set(lineColor)
+                ; (tick.material as THREE.LineBasicMaterial).needsUpdate = true
         })
 
         // Update vertical ticks
         guideLineRefsRef.current.verticalTicks.forEach((tick) => {
-            ;(tick.material as THREE.LineBasicMaterial).color.set(lineColor)
-            ;(tick.material as THREE.LineBasicMaterial).needsUpdate = true
+            ; (tick.material as THREE.LineBasicMaterial).color.set(lineColor)
+                ; (tick.material as THREE.LineBasicMaterial).needsUpdate = true
         })
     }, [])
 

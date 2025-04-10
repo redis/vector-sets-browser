@@ -104,29 +104,29 @@ export default function ImportJSONFlow({
         try {
             // Check how many records are in the vector set
             const countResponse = await vcard({ keyName: vectorSetName });
-            
+
             // If there's only one record, check if it's the default placeholder
             if (countResponse.success && countResponse.result === 1) {
                 // Get the record using vsim with high count to ensure we get the record
-                const searchResult = await vsim({ 
+                const searchResult = await vsim({
                     keyName: vectorSetName,
                     count: 1,
                     searchElement: "First Vector (Default)"
                 })
-                
+
                 if (searchResult.success && searchResult.result && searchResult.result.length > 0) {
                     const recordName = searchResult.result[0][0]; // First element, element name
-                    
+
                     // Check if it's the default placeholder record
                     if (recordName === "First Vector (Default)") {
                         console.log("Removing placeholder record before import:", recordName);
-                        
+
                         // Delete the default record
                         const deleteResult = await vrem({
                             keyName: vectorSetName,
                             element: recordName
                         });
-                        
+
                         if (deleteResult.success) {
                             console.log("Placeholder record removed successfully");
                         } else {

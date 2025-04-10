@@ -19,27 +19,17 @@ import ImportSamplesFlow from "./Samples/ImportSamplesFlow"
 interface ImportTabProps {
     vectorSetName: string
     metadata: VectorSetMetadata | null
-    initialShowSampleData?: boolean
 }
 
 export default function ImportTab({
     vectorSetName,
     metadata,
-    initialShowSampleData = false,
 }: ImportTabProps) {
     const [jobList, setJobList] = useState<Job[]>([])
-    const [error, setError] = useState<string | null>(null)
-    const [showImportCSV, setShowImportCSV] = useState(false)
-    const [showImportSample, setShowImportSample] = useState(
-        initialShowSampleData
-    )
-    const [showImportSuccessDialog, setShowImportSuccessDialog] =
-        useState(false)
     const [dismissedJobIds, setDismissedJobIds] = useState<Set<string>>(
         new Set()
     )
     const [importLogs, setImportLogs] = useState<ImportLogEntry[]>([])
-    const [successJob, setSuccessJob] = useState<Job | null>(null)
     const jsonFileInputRef = useRef<HTMLInputElement>(null)
     const [pollingInterval, setPollingInterval] = useState<number>(5000)
     const lastUpdateTimeRef = useRef<Record<string, number>>({})
@@ -66,13 +56,13 @@ export default function ImportTab({
                 const activeJobs = filteredJobs.filter(
                     (job) => job.status.status === "processing"
                 )
-                
+
                 // If we have active jobs, increase polling frequency and emit progress
                 if (activeJobs.length > 0) {
                     if (pollingInterval > 1000) {
                         setPollingInterval(1000) // Poll every second during active imports
                     }
-                    
+
                     // Emit event to update the import progress, but throttle it
                     // We use a ref to store last update times
                     activeJobs.forEach(job => {
@@ -99,11 +89,6 @@ export default function ImportTab({
                 )
 
                 if (completedJobs.length > 0) {
-                    // Show success dialog for the most recent completion
-                    const latestCompletedJob = completedJobs[0]
-                    setSuccessJob(latestCompletedJob)
-                    setShowImportSuccessDialog(true)
-
                     // Update import logs
                     await fetchImportLogs()
                 }
@@ -112,7 +97,6 @@ export default function ImportTab({
             }
         } catch (error) {
             console.error("Error fetching jobs:", error)
-            setError("Failed to fetch jobs")
         }
     }, [vectorSetName, dismissedJobIds, pollingInterval, fetchImportLogs])
 
@@ -181,7 +165,6 @@ export default function ImportTab({
             fetchJobs()
         } catch (error) {
             console.error("Error cancelling job:", error)
-            setError("Failed to cancel job")
         }
     }
 
@@ -195,7 +178,6 @@ export default function ImportTab({
             fetchJobs()
         } catch (error) {
             console.error(`Error pausing job:`, error)
-            setError(`Failed to pause job`)
         }
     }
 
@@ -206,7 +188,6 @@ export default function ImportTab({
             fetchJobs()
         } catch (error) {
             console.error(`Error resuming job:`, error)
-            setError(`Failed to resume job`)
         }
     }
 
@@ -219,18 +200,6 @@ export default function ImportTab({
         setJobList((prevJobs) => prevJobs.filter((job) => job.jobId !== jobId))
     }
 
-    const forceCleanupJob = async (jobId: string) => {
-        try {
-            // Force cancel the job
-            await jobs.cancelJob(jobId)
-            // Remove it from the UI
-            removeJob(jobId)
-        } catch (error) {
-            console.error("Error force cleaning job:", error)
-            setError("Failed to force clean job")
-        }
-    }
-
     const handleJsonImport = async (
         event: React.ChangeEvent<HTMLInputElement>
     ) => {
@@ -239,10 +208,6 @@ export default function ImportTab({
 
         const file = event.target.files[0]
         try {
-            // Read and parse the JSON to validate it and extract vectors
-            const jsonContent = await file.text()
-            const jsonData = JSON.parse(jsonContent)
-
             // Create an import job with the JSON file
             const importJobConfig: ImportJobConfig = {
                 fileType: "json",
@@ -266,11 +231,6 @@ export default function ImportTab({
             await fetchJobs()
         } catch (error) {
             console.error("Failed to import JSON data:", error)
-            setError(
-                error instanceof Error
-                    ? error.message
-                    : "Failed to import JSON file"
-            )
             // Clear the file input so the user can try again
             if (jsonFileInputRef.current) {
                 jsonFileInputRef.current.value = ""
@@ -278,18 +238,7 @@ export default function ImportTab({
         }
     }
 
-    // Handle dialog state changes
-    const handleImportSuccess = () => {
-        // Show the success dialog without closing the import dialog
-        setShowImportSuccessDialog(true)
-    }
-
-    const handleSuccessDialogClose = () => {
-        setShowImportSuccessDialog(false)
-        // Make sure all import dialogs are closed
-        setShowImportCSV(false)
-        setShowImportSample(false)
-    }
+    const handleImportSuccess = () => { }
 
     return (
         <div className="space-y-6">
@@ -306,7 +255,6 @@ export default function ImportTab({
                             onPauseJob={pauseJob}
                             onResumeJob={resumeJob}
                             onCancelJob={cancelJob}
-                            onForceCleanupJob={forceCleanupJob}
                             onRemoveJob={removeJob}
                         />
                     ) : (
@@ -359,6 +307,6 @@ export default function ImportTab({
                 accept=".json"
                 className="hidden"
             />
-        </div>
+        </div >
     )
 }

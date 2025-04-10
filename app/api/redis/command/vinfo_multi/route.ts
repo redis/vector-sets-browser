@@ -1,5 +1,5 @@
 import { RedisConnection, getRedisUrl } from '@/app/redis-server/RedisConnection'
-import { validateRequest, formatResponse, handleError } from '@/app/redis-server/utils'
+import { validateRequest } from '@/app/redis-server/utils'
 import { validateVinfoMultiRequest, buildVinfoMultiCommand } from './command'
 import { NextResponse } from 'next/server'
 
@@ -8,7 +8,7 @@ export async function POST(request: Request) {
         // Validate request
         const validatedRequest = await validateRequest(request, validateVinfoMultiRequest)
         console.log("Received VINFO_MULTI request")
-        
+
         // Get Redis URL
         const redisUrl = await getRedisUrl()
         if (!redisUrl) {
@@ -32,7 +32,7 @@ export async function POST(request: Request) {
 
         // Execute commands
         const response = await RedisConnection.withClient(redisUrl, async (client) => {
-            const multi = client.multi() 
+            const multi = client.multi()
 
             commands.forEach(command => {
                 multi.addCommand(command)

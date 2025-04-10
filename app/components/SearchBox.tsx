@@ -61,12 +61,10 @@ interface SearchBoxProps {
     searchCount?: string
     setSearchCount?: (value: string) => void
     error?: string | null
-    clearError?: () => void
     expansionFactor?: number
     setExpansionFactor?: (value: number | undefined) => void
     filterExpansionFactor?: number
     setFilterExpansionFactor?: (value: number | undefined) => void
-    lastTextEmbedding?: number[]
     executedCommand?: string
     results?: VectorTuple[]
 }
@@ -84,12 +82,10 @@ export default function SearchBox({
     searchCount,
     setSearchCount,
     error,
-    clearError,
     expansionFactor,
     setExpansionFactor,
     filterExpansionFactor,
     setFilterExpansionFactor,
-    lastTextEmbedding,
     executedCommand,
     results = [],
 }: SearchBoxProps) {
@@ -118,11 +114,6 @@ export default function SearchBox({
             "200"
         )
     })
-
-    // Add state for the last generated image embedding
-    const [lastImageEmbedding, setLastImageEmbedding] = useState<
-        number[] | null
-    >(null)
 
     // Add a ref to track if we've initialized the search type
     const initialSearchTypeSetRef = useRef(false)
@@ -238,21 +229,23 @@ export default function SearchBox({
         return true
     })
 
-    // Compute the placeholder text based on current searchType
+    // Compute the placeholder text based on current searchType and metadata
     const searchBoxPlaceholder = useMemo(() => {
+        if (!metadata?.embedding) return ""
+
         switch (searchType) {
             case "Element":
                 return "Enter Element"
             case "Image":
                 return "Enter image data"
             case "Vector":
-                return supportsEmbeddings && isTextEmbedding(metadata?.embedding)
+                return supportsEmbeddings && isTextEmbedding(metadata.embedding)
                     ? "Enter search text or vector data (0.1, 0.2, ...)"
                     : "Enter vector data (0.1, 0.2, ...)"
             default:
                 return ""
         }
-    }, [searchType, supportsEmbeddings, isTextEmbedding])
+    }, [searchType, supportsEmbeddings, metadata?.embedding])
 
     // set default searchType only when metadata changes
     useEffect(() => {
@@ -263,11 +256,11 @@ export default function SearchBox({
             // Choose appropriate default search type based on embedding format
             let newSearchType: "Vector" | "Element" | "Image"
 
-            if (isImageEmbedding(metadata?.embedding)) {
+            if (isImageEmbedding(metadata.embedding)) {
                 newSearchType = "Image"
-            } else if (isTextEmbedding(metadata?.embedding)) {
+            } else if (isTextEmbedding(metadata.embedding)) {
                 newSearchType = "Vector"
-            } else if (isMultiModalEmbedding(metadata?.embedding)) {
+            } else if (isMultiModalEmbedding(metadata.embedding)) {
                 newSearchType = "Vector"
             } else {
                 newSearchType = "Element"
@@ -276,13 +269,7 @@ export default function SearchBox({
             setSearchType(newSearchType)
             initialSearchTypeSetRef.current = true
         }
-    }, [
-        metadata,
-        isImageEmbedding,
-        isTextEmbedding,
-        setSearchType,
-        supportsEmbeddings,
-    ])
+    }, [metadata, setSearchType, supportsEmbeddings])
 
     // Save settings when they change
     useEffect(() => {
@@ -305,9 +292,6 @@ export default function SearchBox({
     }
 
     const handleImageEmbeddingGenerated = (embedding: number[]) => {
-        // Store the embedding
-        setLastImageEmbedding(embedding)
-
         // Set search query to a vector representation (needed for the search)
         setSearchQuery(embedding.join(", "))
     }
@@ -457,11 +441,10 @@ export default function SearchBox({
                             <Button
                                 variant="outline"
                                 size="icon"
-                                className={`h-9 ${
-                                    showFilters
-                                        ? "bg-gray-500 hover:bg-gray-600 text-white"
-                                        : "bg-[white] hover:bg-gray-100"
-                                }`}
+                                className={`h-9 ${showFilters
+                                    ? "bg-gray-500 hover:bg-gray-600 text-white"
+                                    : "bg-[white] hover:bg-gray-100"
+                                    }`}
                                 onClick={() => setShowFilters(!showFilters)}
                             >
                                 <Filter className="h-4 w-4" />
@@ -480,11 +463,10 @@ export default function SearchBox({
                                     error={
                                         error
                                             ? error.includes(
-                                                  "syntax error in FILTER"
-                                              )
+                                                "syntax error in FILTER"
+                                            )
                                             : false
                                     }
-                                    onHelp={() => setShowFilterHelp(true)}
                                     vectorSetName={vectorSetName}
                                 />
                             </div>
@@ -521,7 +503,6 @@ export default function SearchBox({
                             searchQuery={searchQuery}
                             searchFilter={localFilter}
                             showRedisCommand={showRedisCommand}
-                            setShowRedisCommand={setShowRedisCommand}
                         />
                     </div>
                 )}
@@ -713,7 +694,7 @@ export default function SearchBox({
                         </div>
                     </div>
                     <DialogFooter>
-                        <Button onClick={()=>setShowSearchOptions(false)}>Done</Button>
+                        <Button onClick={() => setShowSearchOptions(false)}>Done</Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>

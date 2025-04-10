@@ -337,11 +337,11 @@ export default function CreateVectorSetModal({
                                             </div>
                                             {vectorDataChoice ===
                                                 "embedding" && (
-                                                <div>
-                                                    Using{" "}
-                                                    {embeddingConfig.provider}
-                                                </div>
-                                            )}
+                                                    <div>
+                                                        Using{" "}
+                                                        {embeddingConfig.provider}
+                                                    </div>
+                                                )}
                                         </div>
                                         <div>
                                             <ChevronRight className="h-5 w-5" />
@@ -381,7 +381,6 @@ export default function CreateVectorSetModal({
                                         searchQuery={""}
                                         searchFilter={""}
                                         showRedisCommand={true}
-                                        setShowRedisCommand={() => {}}
                                     />
                                 </div>
                             )}
@@ -410,11 +409,10 @@ export default function CreateVectorSetModal({
 
                 {/* Vector Data Panel */}
                 <div
-                    className={`absolute top-0 left-0 w-full h-full bg-[white] p-6 transition-transform duration-300 transform ${
-                        activePanel === "vectorData"
-                            ? "translate-x-0"
-                            : "translate-x-full"
-                    } overflow-y-auto`}
+                    className={`absolute top-0 left-0 w-full h-full bg-[white] p-6 transition-transform duration-300 transform ${activePanel === "vectorData"
+                        ? "translate-x-0"
+                        : "translate-x-full"
+                        } overflow-y-auto`}
                 >
                     <div className="flex items-center mb-4 border-b pb-4">
                         <Button
@@ -441,21 +439,19 @@ export default function CreateVectorSetModal({
                     <div className="flex space-x-4 w-full min-h-[350px]">
                         {/* Manual Option Panel */}
                         <div
-                            className={`border w-full rounded-lg p-6 cursor-pointer transition-all duration-200 ${
-                                vectorDataChoice === "manual"
+                            className={`border w-full rounded-lg p-6 cursor-pointer transition-all duration-200 ${vectorDataChoice === "manual"
                                     ? "border-primary ring-2 ring-primary/20 shadow-md"
                                     : "hover:border-gray-400"
-                            }`}
+                                }`}
                             onClick={() => setVectorDataChoice("manual")}
                         >
                             <div className="flex justify-between items-start">
                                 <div className="flex items-start">
                                     <div
-                                        className={`w-5 h-5 shrink-0 rounded-full border flex items-center justify-center mr-3 mt-1 ${
-                                            vectorDataChoice === "manual"
+                                        className={`w-5 h-5 shrink-0 rounded-full border flex items-center justify-center mr-3 mt-1 ${vectorDataChoice === "manual"
                                                 ? "border-primary"
                                                 : "border-gray-300"
-                                        }`}
+                                            }`}
                                     >
                                         {vectorDataChoice === "manual" && (
                                             <div className="w-3 h-3 rounded-full bg-red-500"></div>
@@ -503,21 +499,19 @@ export default function CreateVectorSetModal({
 
                         {/* Embedding Model Option Panel */}
                         <div
-                            className={`w-full border rounded-lg p-6 cursor-pointer transition-all duration-200 ${
-                                vectorDataChoice === "embedding"
+                            className={`w-full border rounded-lg p-6 cursor-pointer transition-all duration-200 ${vectorDataChoice === "embedding"
                                     ? "border-primary ring-2 ring-primary/20 shadow-md"
                                     : "hover:border-gray-400"
-                            }`}
+                                }`}
                             onClick={() => setVectorDataChoice("embedding")}
                         >
                             <div className="flex justify-between items-start">
                                 <div className="flex items-start">
                                     <div
-                                        className={`w-5 h-5 shrink-0 rounded-full border flex items-center justify-center mr-3 mt-1 ${
-                                            vectorDataChoice === "embedding"
+                                        className={`w-5 h-5 shrink-0 rounded-full border flex items-center justify-center mr-3 mt-1 ${vectorDataChoice === "embedding"
                                                 ? "border-primary"
                                                 : "border-gray-300"
-                                        }`}
+                                            }`}
                                     >
                                         {vectorDataChoice === "embedding" && (
                                             <div className="w-3 h-3 rounded-full bg-red-500"></div>
@@ -583,23 +577,6 @@ export default function CreateVectorSetModal({
                                                         </p>
                                                     </div>
                                                 )}
-                                            {embeddingConfig.provider ===
-                                                "tensorflow" &&
-                                                embeddingConfig.tensorflow && (
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="px-2 py-1 rounded bg-yellow-100 text-yellow-800 text-xs font-medium">
-                                                            TensorFlow
-                                                        </span>
-                                                        <p className="text-sm text-gray-600">
-                                                            {
-                                                                embeddingConfig
-                                                                    .tensorflow
-                                                                    .model
-                                                            }{" "}
-                                                            (built-in)
-                                                        </p>
-                                                    </div>
-                                                )}
                                         </div>
                                         <Button
                                             type="button"
@@ -626,11 +603,10 @@ export default function CreateVectorSetModal({
 
                 {/* Advanced Configuration Panel */}
                 <div
-                    className={`absolute top-0 left-0 w-full h-full bg-[white] p-6 transition-transform duration-300 transform ${
-                        activePanel === "advancedConfiguration"
+                    className={`absolute top-0 left-0 w-full h-full bg-[white] p-6 transition-transform duration-300 transform ${activePanel === "advancedConfiguration"
                             ? "translate-x-0"
                             : "translate-x-full"
-                    } overflow-y-auto`}
+                        } overflow-y-auto`}
                 >
                     <div className="flex items-center mb-4 border-b pb-4">
                         <Button

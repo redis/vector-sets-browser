@@ -1,5 +1,5 @@
 import { validateKeyName, validateElement } from '@/app/redis-server/utils'
-import { RedisConnection } from "@/app/redis-server/RedisConnection"
+import { RedisConnection, RedisOperationResult } from "@/app/redis-server/RedisConnection"
 
 export interface VembMultiRequest {
     keyName: string
@@ -40,7 +40,7 @@ export function validateVembMultiRequest(body: any): { isValid: boolean; error?:
 export function buildVembMultiCommand(request: VembMultiRequest): string[][] {
     // Return an array of VEMB commands, one for each element
     return request.elements.map(element => ['VEMB', request.keyName, element])
-} 
+}
 
 /**
  * Fetches embeddings for multiple elements in a single batch operation
@@ -53,30 +53,25 @@ export async function fetchEmbeddingsBatch(
     redisUrl: string,
     keyName: string,
     elements: string[]
-): Promise<{ success: boolean; result?: (number[] | null)[]; error?: string }> {
-    return await RedisConnection.withClient(redisUrl, async (client) => {
-        try {
-            const multi = client.multi()
+): Promise<RedisOperationResult<(number[] | null)[]>> {
+    return RedisConnection.withClient(redisUrl, async (client) => {
+        const multi = client.multi()
 
-            // Add VEMB commands for each element
-            elements.forEach((id) => {
-                multi.addCommand(["VEMB", keyName, id])
-            })
+        // Add VEMB commands for each element
+        elements.forEach((id) => {
+            multi.addCommand(["VEMB", keyName, id])
+        })
 
-            const result = await multi.exec()
-            return result
-                    ? result.map((item) =>
-                          Array.isArray(item)
-                              ? item.map((val) => parseFloat(String(val)))
-                              : null
-                      )
-                    : []
-        } catch (error) {
-            console.error("Batch embeddings fetch error:", error)
-            return {
-                success: false,
-                error: error instanceof Error ? error.message : String(error),
-            }
+        const result = await multi.exec()
+
+        if (!result) {
+            return []
         }
+
+        return result.map((item) =>
+            Array.isArray(item)
+                ? item.map((val) => parseFloat(String(val)))
+                : null
+        )
     })
 } 

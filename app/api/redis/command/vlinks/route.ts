@@ -141,7 +141,7 @@ export async function POST(request: Request) {
                         ([id, score]): LinkTupleWithEmb => [String(id), parseFloat(String(score)), embeddingMap.get(id) || null]
                     )
                 )
-            } 
+            }
         }
 
         return NextResponse.json({

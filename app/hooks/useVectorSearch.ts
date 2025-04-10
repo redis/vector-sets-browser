@@ -384,10 +384,9 @@ export function useVectorSearch({
                 searchVector = vectorData
                 // Set status message to show the first 3 numbers of the vector
                 const firstThreeNumbers = searchVector.slice(0, 3).join(", ")
-                searchString = `Results for Vector [${firstThreeNumbers}${
-                    searchVector.length > 3 ? "..." : ""
-                }]`
-                
+                searchString = `Results for Vector [${firstThreeNumbers}${searchVector.length > 3 ? "..." : ""
+                    }]`
+
                 // Clear any previous text embedding since this is a raw vector search
                 updateSearchState({ lastTextEmbedding: undefined })
             } else {
@@ -397,7 +396,7 @@ export function useVectorSearch({
                     internalSearchState.searchQuery
                 )
                 searchString = `Results for "${internalSearchState.searchQuery}"`
-                
+
                 // Store the text embedding
                 updateSearchState({ lastTextEmbedding: searchVector })
             }
@@ -411,7 +410,7 @@ export function useVectorSearch({
                 filter: internalSearchState.searchFilter,
                 expansionFactor: internalSearchState.expansionFactor
             })
-            
+
             // Use the execution time from the server response
             if (vsimResponse.executionTimeMs) {
                 const durationInSeconds = (
@@ -512,13 +511,13 @@ export function useVectorSearch({
                 const vectorData = internalSearchState.searchQuery
                     .split(",")
                     .map((n) => parseFloat(n.trim()))
-                
+
                 // Check if we have valid vector data
                 if (vectorData.some(isNaN)) {
                     //handleError("Invalid image embedding data")
                     return
                 }
-                
+
                 // Check if the vector dimensions match the expected dimensions
                 const expectedDimResponse = await vdim({ keyName: vectorSetName! })
                 if (!expectedDimResponse.success || expectedDimResponse.result === undefined) {
@@ -526,10 +525,10 @@ export function useVectorSearch({
                     return
                 }
                 const expectedDim = expectedDimResponse.result
-                
+
                 // Log dimensions for debugging
                 console.log(`Image embedding dimensions: ${vectorData.length}, Required: ${expectedDim}`)
-                
+
                 if (vectorData.length !== expectedDim) {
                     // Log detailed error
                     console.error(`Vector dimension mismatch: image embedding has ${vectorData.length} dimensions but vector set ${vectorSetName} requires ${expectedDim} dimensions`)
@@ -560,8 +559,8 @@ export function useVectorSearch({
                 }
 
                 // Update results title
-                updateSearchState({ 
-                    resultsTitle: "Results for uploaded image" 
+                updateSearchState({
+                    resultsTitle: "Results for uploaded image"
                 })
 
                 // Process results
@@ -599,9 +598,9 @@ export function useVectorSearch({
             (lastSearchRef.current.query === internalSearchState.searchQuery &&
                 lastSearchRef.current.type === internalSearchState.searchType &&
                 lastSearchRef.current.count ===
-                    internalSearchState.searchCount &&
+                internalSearchState.searchCount &&
                 lastSearchRef.current.filter ===
-                    internalSearchState.searchFilter)
+                internalSearchState.searchFilter)
         ) {
             return
         }

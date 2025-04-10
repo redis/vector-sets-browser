@@ -30,7 +30,7 @@ export function useRedisConnection(
     const [showVectorSets, setShowVectorSets] = useState(false)
     const [statusMessage, setStatusMessage] = useState("")
     const [isInitializing, setIsInitializing] = useState(true)
-    const [state, setState] = useState<StoredConnectionState>({
+    const [_state, setState] = useState<StoredConnectionState>({
         redisUrl: "",
         showVectorSets: true,
     })
@@ -162,7 +162,11 @@ export function useRedisConnection(
         async (newState: Partial<StoredConnectionState>) => {
             setState((prev) => {
                 const updated = { ...prev, ...newState }
-                userSettings.set(STORAGE_KEY, updated).catch(console.error)
+                try {
+                    userSettings.set(STORAGE_KEY, updated)
+                } catch (error) {
+                    console.error("Error updating Redis connection state:", error)
+                }
                 return updated
             })
         },

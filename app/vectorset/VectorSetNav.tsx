@@ -1,8 +1,8 @@
 import { ApiError } from "@/app/api/client"
 import { vectorSets } from "@/app/api/vector-sets"
-import { vinfo, vinfo_multi, vcard } from "@/app/redis-server/api"
+import { vinfo_multi, vcard } from "@/app/redis-server/api"
 import { VectorSetMetadata } from "@/app/types/vectorSetMetaData"
-import eventBus,{ AppEvents } from "@/app/utils/eventEmitter"
+import eventBus, { AppEvents } from "@/app/utils/eventEmitter"
 import {
     estimateVectorSetMemoryUsage,
     formatBytes,
@@ -109,12 +109,12 @@ export default function VectorSetNav({
             // Process results for each vector set
             vinfoResponse.result.forEach((result, index) => {
                 const set = sets[index]
-                
+
                 // Skip if the result is null or undefined (vector set may have been deleted)
                 if (!result) {
                     return
                 }
-                
+
                 // Handle error case or invalid result
                 if (typeof result !== 'object' || 'error' in result) {
                     console.debug(`Skipping info for vector set ${set}:`, result)
@@ -204,7 +204,7 @@ export default function VectorSetNav({
             vectorSetName: string
         }) => {
             console.log(`Vectors imported to ${data.vectorSetName}`, data)
-            
+
             try {
                 // Just get the cardinality for this specific vector set
                 const cardinalityResponse = await vcard({
@@ -212,8 +212,8 @@ export default function VectorSetNav({
                 })
 
                 const existingInfo = vectorSetInfo[data.vectorSetName]
-                if (cardinalityResponse.success && 
-                    typeof cardinalityResponse.result === 'number' && 
+                if (cardinalityResponse.success &&
+                    typeof cardinalityResponse.result === 'number' &&
                     existingInfo) {
                     setVectorSetInfo((prev) => ({
                         ...prev,
@@ -453,13 +453,12 @@ export default function VectorSetNav({
                         return (
                             <div
                                 key={setName}
-                                className={`group list-item relative ${
-                                    selectedVectorSet === setName
-                                        ? "list-item-selected"
-                                        : index % 2 === 0
-                                          ? "list-item-alt"
-                                          : "list-item-default"
-                                }`}
+                                className={`group list-item relative ${selectedVectorSet === setName
+                                    ? "list-item-selected"
+                                    : index % 2 === 0
+                                        ? "list-item-alt"
+                                        : "list-item-default"
+                                    }`}
                             >
                                 <div
                                     onClick={() => onVectorSetSelect(setName)}

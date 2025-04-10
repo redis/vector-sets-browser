@@ -40,11 +40,10 @@ export default function TopNav() {
                         .map(({ href, paths, label }) => (
                             <Link key={href} href={href} legacyBehavior>
                                 <div
-                                    className={`font-mono hover:text-red-500 py-2 cursor-pointer border-b-2 ${
-                                        paths.some((path) => pathname === path)
-                                            ? "border-red-500 text-red-600"
-                                            : "border-transparent text-black"
-                                    }`}
+                                    className={`font-mono hover:text-red-500 py-2 cursor-pointer border-b-2 ${paths.some((path) => pathname === path)
+                                        ? "border-red-500 text-red-600"
+                                        : "border-transparent text-black"
+                                        }`}
                                 >
                                     {label}
                                 </div>

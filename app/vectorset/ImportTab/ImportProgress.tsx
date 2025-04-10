@@ -9,7 +9,6 @@ interface ImportProgressProps {
     onPauseJob: (jobId: string) => void
     onResumeJob: (jobId: string) => void
     onCancelJob: (jobId: string) => void
-    onForceCleanupJob: (jobId: string) => void
     onRemoveJob: (jobId: string) => void
 }
 
@@ -18,7 +17,6 @@ export default function ImportProgress({
     onPauseJob,
     onResumeJob,
     onCancelJob,
-    onForceCleanupJob,
     onRemoveJob,
 }: ImportProgressProps) {
     return (
@@ -71,16 +69,16 @@ export default function ImportProgress({
                                     {(isCompleted ||
                                         isFailed ||
                                         isCancelled) && (
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={() =>
-                                                onRemoveJob(job.jobId)
-                                            }
-                                        >
-                                            <XCircle className="h-4 w-4" />
-                                        </Button>
-                                    )}
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() =>
+                                                    onRemoveJob(job.jobId)
+                                                }
+                                            >
+                                                <XCircle className="h-4 w-4" />
+                                            </Button>
+                                        )}
                                 </div>
                             </div>
                         </CardHeader>

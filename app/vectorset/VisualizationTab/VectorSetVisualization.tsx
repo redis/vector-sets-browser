@@ -16,9 +16,9 @@ import {
     useVectorSearch,
     VectorSetSearchState,
 } from "@/app/hooks/useVectorSearch"
-import { VectorSetMetadata } from "@/app/embeddings/types/embeddingModels"
 import VectorViz3D from "./VectorViz3D"
 import HNSWVizPure from "./vizualizer/HNSW2dViz"
+import { VectorSetMetadata } from "@/app/types/vectorSetMetaData"
 
 interface VectorSetVisualizationProps {
     vectorSetName: string
@@ -108,7 +108,7 @@ export default function VectorSetVisualization({
                 console.log("[getNeighbors] No neighbors found for element:", element)
                 return []
             }
-            const neighbors = data.result 
+            const neighbors = data.result
 
             // data is an array of arrays
             // each inner array contains [element, similarity, vector]
@@ -153,7 +153,6 @@ export default function VectorSetVisualization({
                 searchCount={searchCount}
                 setSearchCount={setSearchCount}
                 error={fileOperationStatus}
-                clearError={() => setFileOperationStatus("")}
                 expansionFactor={searchState.expansionFactor}
                 setExpansionFactor={(factor) =>
                     setSearchState({ ...searchState, expansionFactor: factor })

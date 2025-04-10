@@ -1,5 +1,3 @@
-import { EmbeddingProvider } from "../types/embeddingModels"
-
 export interface ValidationResult {
     isValid: boolean
     error?: string
@@ -37,7 +35,7 @@ export function validateVector(
     }
 
     let processedVector: number[] = [];
-    
+
     try {
         // Process vector based on provider
         if (Array.isArray(vector)) {

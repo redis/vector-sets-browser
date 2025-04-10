@@ -47,12 +47,6 @@ export default function ConsolePage() {
         }
     }
 
-    const openAddServerDialog = () => {
-        if (connectionListRef.current) {
-            connectionListRef.current.setIsAddDialogOpen(true)
-        }
-    }
-
     useEffect(() => {
         router.push("/console")
     }, [router])
