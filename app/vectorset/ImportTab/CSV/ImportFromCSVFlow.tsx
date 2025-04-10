@@ -361,13 +361,13 @@ export default function ImportFromCSVFlow({
                         </div>
                     </DialogHeader>
 
-                    <div className="flex-none px-6">{renderStepIndicator()}</div>
+                    <div className="flex-none px-6">
+                        {renderStepIndicator()}
+                    </div>
 
                     <div className="flex-1 min-h-0">
                         <ScrollArea className="h-full">
-                            <div className="px-6 py-4">
-                                {renderContent()}
-                            </div>
+                            <div className="px-6 py-4">{renderContent()}</div>
                         </ScrollArea>
                     </div>
 
