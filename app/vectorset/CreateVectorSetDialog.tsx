@@ -9,14 +9,14 @@ import {
 
 import { vadd } from "@/app/redis-server/api"
 import { getDefaultTextEmbeddingConfig } from "@/app/utils/embeddingUtils"
+import { userSettings } from "@/app/utils/userSettings"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ArrowLeft, ChevronRight } from "lucide-react"
-import { useEffect, useState, useRef } from "react"
+import { useEffect, useRef, useState } from "react"
 import EditEmbeddingConfigModal from "../components/EmbeddingConfig/EditEmbeddingConfigDialog"
 import RedisCommandBox from "../components/RedisCommandBox"
 import AdvancedConfigEdit from "./AdvancedConfigEdit"
-import { userSettings } from "@/app/utils/userSettings"
 
 interface CreateVectorSetModalProps {
     isOpen: boolean
@@ -48,8 +48,8 @@ export default function CreateVectorSetModal({
     const [embeddingConfig, setEmbeddingConfig] = useState<EmbeddingConfig>({
         provider: "clip",
         clip: {
-            model: "clip-vit-base-patch32"
-        }
+            model: "clip-vit-base-patch32",
+        },
     })
     const [isOllamaAvailable, setIsOllamaAvailable] = useState(false)
     const [isConfigInitialized, setIsConfigInitialized] = useState(false)
@@ -73,7 +73,9 @@ export default function CreateVectorSetModal({
                 )
                 const defaultConfig = await getDefaultTextEmbeddingConfig()
                 console.log(
-                    `[CreateVectorSetDialog] Default config loaded: ${JSON.stringify(defaultConfig)}`
+                    `[CreateVectorSetDialog] Default config loaded: ${JSON.stringify(
+                        defaultConfig
+                    )}`
                 )
 
                 setEmbeddingConfig(defaultConfig)
@@ -176,7 +178,9 @@ export default function CreateVectorSetModal({
     // Handle edit config changes
     const handleEditConfig = (config: EmbeddingConfig) => {
         console.log(
-            `[CreateVectorSetDialog] Updating embedding config: ${JSON.stringify(config)}`
+            `[CreateVectorSetDialog] Updating embedding config: ${JSON.stringify(
+                config
+            )}`
         )
         setEmbeddingConfig(config)
         setMetadata((prev) => ({
@@ -187,7 +191,7 @@ export default function CreateVectorSetModal({
 
     // Handle Enter key press
     const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-        if (e.key === 'Enter') {
+        if (e.key === "Enter") {
             handleSubmit()
         }
     }
@@ -266,7 +270,9 @@ export default function CreateVectorSetModal({
             <div className="bg-[white] rounded-lg p-6 w-2xl min-h-[600px] max-h-[90vh] overflow-hidden relative">
                 {/* Main Content */}
                 <div
-                    className={`transition-transform duration-300 ${activePanel ? "transform -translate-x-full" : ""} w-full`}
+                    className={`transition-transform duration-300 ${
+                        activePanel ? "transform -translate-x-full" : ""
+                    } w-full`}
                 >
                     <div className="mb-4">
                         <h1 className="text-2xl font-semibold">
@@ -460,7 +466,8 @@ export default function CreateVectorSetModal({
                                             Manual
                                         </h4>
                                         <p className="text-sm text-gray-600 mt-1">
-                                            Set the dimensions manually. No built-in embedding model
+                                            Set the dimensions manually. No
+                                            built-in embedding model
                                         </p>
                                     </div>
                                 </div>
