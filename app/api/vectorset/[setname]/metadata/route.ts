@@ -99,7 +99,7 @@ export async function PUT(
     try {
         console.log("PUT /api/vectorset/[setname]/metadata", params)
 
-        const parsedParams = params
+        const parsedParams = await params
 
         if (!parsedParams || !parsedParams.setname) {
             console.error("Missing setname parameter:", parsedParams)

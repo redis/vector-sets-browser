@@ -17,6 +17,7 @@ import { useEffect, useRef, useState } from "react"
 import EditEmbeddingConfigModal from "../components/EmbeddingConfig/EditEmbeddingConfigDialog"
 import RedisCommandBox from "../components/RedisCommandBox"
 import AdvancedConfigEdit from "./AdvancedConfigEdit"
+import { DEFAULT_EMBEDDING } from "./constants"
 
 interface CreateVectorSetModalProps {
     isOpen: boolean
@@ -479,7 +480,7 @@ export default function CreateVectorSetModal({
                                             <Input
                                                 type="number"
                                                 className="border-gray-300"
-                                                placeholder="1536"
+                                                placeholder={DEFAULT_EMBEDDING.DIMENSIONS.toString()}
                                                 min="2"
                                                 value={dimensions}
                                                 onChange={(e) =>
