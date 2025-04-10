@@ -46,10 +46,10 @@ export default function VectorSettings({
                 name: vectorSetName,
                 metadata: updatedMetadata,
             })
-            
+
             // Notify parent of metadata update
             onMetadataUpdate?.(updatedMetadata)
-            
+
             setIsEditConfigModalOpen(false)
         } catch (error) {
             console.error("[VectorSetPage] Error saving config:", error)
@@ -71,10 +71,10 @@ export default function VectorSettings({
                 name: vectorSetName,
                 metadata: updatedMetadata,
             })
-            
+
             // Notify parent of metadata update
             onMetadataUpdate?.(updatedMetadata)
-            
+
             console.log("Advanced config saved successfully")
             setIsAdvancedConfigPanelOpen(false)
         } catch (error) {
@@ -118,7 +118,7 @@ export default function VectorSettings({
                                     Default CAS:
                                 </div>
                                 <div>
-                                    {metadata?.redisConfig?.defaultCAS !== undefined 
+                                    {metadata?.redisConfig?.defaultCAS !== undefined
                                         ? (metadata?.redisConfig.defaultCAS ? "Enabled" : "Disabled")
                                         : <span>Default: <span className="font-bold">Disabled</span></span>}
                                 </div>
@@ -134,8 +134,8 @@ export default function VectorSettings({
                     </div>
                     <div className="w-full flex">
                         <div className="grow"></div>
-                        <Button 
-                            variant="default" 
+                        <Button
+                            variant="default"
                             onClick={() => {
                                 setWorkingMetadata(metadata ? {...metadata} : null)
                                 setIsAdvancedConfigPanelOpen(true)
@@ -164,7 +164,7 @@ export default function VectorSettings({
                         <strong>VADD</strong> operations. It does not affect the
                         redis-server or the underlying vector-set data.
                     </p>
-                    {metadata?.embedding && (
+                    {metadata?.embedding ? (
                         <div className="flex items-center gap-4 p-4">
                             <div>
                                 <div className="flex space-x-2">
@@ -197,12 +197,28 @@ export default function VectorSettings({
                                 Edit
                             </Button>
                         </div>
+                    ) : (
+                        <div className="flex flex-col items-start gap-4 p-4">
+                            <div className="text-sm bg-yellow-50 border border-yellow-200 rounded p-4 w-full">
+                                <p className="font-medium text-yellow-800">No Embedding Configuration</p>
+                                <p className="text-yellow-700">
+                                    This vector set was likely created from the CLI and doesn{`'`}t have embedding configuration.
+                                    Adding an embedding configuration will enable VSIM search and VADD operations in the web interface.
+                                </p>
+                            </div>
+                            <Button
+                                variant="default"
+                                onClick={() => setIsEditConfigModalOpen(true)}
+                            >
+                                Add Embedding Config
+                            </Button>
+                        </div>
                     )}
                 </CardContent>
             </Card>
 
-            <Dialog 
-                open={isAdvancedConfigPanelOpen} 
+            <Dialog
+                open={isAdvancedConfigPanelOpen}
                 onOpenChange={setIsAdvancedConfigPanelOpen}
             >
                 <DialogContent className="max-w-[900px] max-h-[90vh] overflow-y-auto">
@@ -237,10 +253,16 @@ export default function VectorSettings({
                 <EditEmbeddingConfigModal
                     isOpen={isEditConfigModalOpen}
                     onClose={() => setIsEditConfigModalOpen(false)}
-                    config={metadata?.embedding}
+                    config={metadata?.embedding || {
+                        provider: "none",
+                        none: {
+                            model: "custom",
+                            dimensions: metadata?.dimensions || 1536,
+                        },
+                    }}
                     onSave={handleEditConfig}
                 />
             )}
         </div>
     )
-} 
+}
