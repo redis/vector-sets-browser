@@ -16,6 +16,7 @@ import {
     OLLAMA_MODELS,
     IMAGE_MODELS,
 } from "@/app/embeddings/types/embeddingModels"
+import { DEFAULT_VECTOR_DIMENSIONS } from "@/app/vectorset/constants"
 
 // Group models by provider for the dropdown
 const GROUPED_MODELS = [
@@ -54,7 +55,7 @@ interface CalculationResult {
 
 export default function VectorSetCalculator() {
     const [config, setConfig] = useState({
-        modelDim: 1536, // Default to OpenAI's text-embedding-ada-002
+        modelDim: DEFAULT_VECTOR_DIMENSIONS, // Default to OpenAI's text-embedding-ada-002
         numVectors: 1000000,
         quantization: "Q8", // Default to Q8
         reduceDimensions: "",
@@ -217,7 +218,7 @@ export default function VectorSetCalculator() {
                                                 setConfig({
                                                     ...config,
                                                     modelType: value,
-                                                    modelDim: model?.dimensions || 1536,
+                                                    modelDim: model?.dimensions || DEFAULT_VECTOR_DIMENSIONS,
                                                     vectorSize: "",
                                                 })
                                             }
@@ -457,4 +458,4 @@ export default function VectorSetCalculator() {
             </div>
         </div>
     )
-} 
+}

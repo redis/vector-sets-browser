@@ -1,6 +1,7 @@
 import { RedisConnection, getRedisUrl } from "@/app/redis-server/RedisConnection"
 import { NextResponse } from "next/server"
 import { EmbeddingConfig } from "@/app/embeddings/types/embeddingModels"
+import { DEFAULT_VECTOR_DIMENSIONS } from "@/app/vectorset/constants"
 
 // Redis key for storing cache configuration
 const CONFIG_KEY = "vector-set-browser:config"
@@ -16,7 +17,7 @@ const DEFAULT_CACHE_CONFIG = {
         provider: "none",
         none: {
             model: "default",
-            dimensions: 1536,
+            dimensions: DEFAULT_VECTOR_DIMENSIONS,
         },
     },
 }
@@ -45,12 +46,12 @@ export async function GET() {
                     CONFIG_KEY,
                     EMBEDDING_CACHE_CONFIG_KEY
                 )
-                
+
                 // If no configuration exists, return the default
                 if (!configJson) {
                     return DEFAULT_CACHE_CONFIG
                 }
-                
+
                 try {
                     return JSON.parse(configJson)
                 } catch (err) {
@@ -145,4 +146,4 @@ export async function POST(request: Request) {
             { status: 500 }
         )
     }
-} 
+}

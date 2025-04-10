@@ -12,6 +12,7 @@ import {
 import { useState } from "react"
 import AdvancedConfigEdit from "../AdvancedConfigEdit"
 import { vectorSets } from "@/app/api/vector-sets"
+import { DEFAULT_VECTOR_DIMENSIONS } from "../constants"
 
 interface VectorSettingsProps {
     vectorSetName: string
@@ -69,7 +70,7 @@ export default function VectorSettings({
                     provider: "none",
                     none: {
                         model: "custom",
-                        dimensions: workingMetadata.dimensions || 1536,
+                        dimensions: workingMetadata.dimensions || DEFAULT_VECTOR_DIMENSIONS,
                     }
                 }
             }
@@ -157,7 +158,7 @@ export default function VectorSettings({
                                             provider: "none",
                                             none: {
                                                 model: "custom",
-                                                dimensions: metadata.dimensions || 1536
+                                                dimensions: metadata.dimensions || DEFAULT_VECTOR_DIMENSIONS
                                             }
                                         };
                                     }
@@ -173,7 +174,7 @@ export default function VectorSettings({
                                             provider: "none",
                                             none: {
                                                 model: "custom",
-                                                dimensions: 1536
+                                                dimensions: DEFAULT_VECTOR_DIMENSIONS
                                             }
                                         },
                                         created: new Date().toISOString(),
@@ -303,7 +304,7 @@ export default function VectorSettings({
                         provider: "none",
                         none: {
                             model: "custom",
-                            dimensions: metadata?.dimensions || 1536,
+                            dimensions: metadata?.dimensions || DEFAULT_VECTOR_DIMENSIONS,
                         },
                     }}
                     onSave={handleEditConfig}

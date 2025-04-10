@@ -14,6 +14,7 @@ import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { AlertTriangle, Info, Loader2, PowerOff } from "lucide-react"
 import { useEffect, useState } from "react"
+import { DEFAULT_VECTOR_DIMENSIONS } from "../vectorset/constants"
 
 interface CacheInfo {
     size: number
@@ -42,7 +43,7 @@ export default function CacheManager() {
             provider: "none",
             none: {
                 model: "default",
-                dimensions: 1536,
+                dimensions: DEFAULT_VECTOR_DIMENSIONS,
             },
         },
     })
@@ -95,7 +96,7 @@ export default function CacheManager() {
                     provider: "none",
                     none: {
                         model: "default",
-                        dimensions: 1536,
+                        dimensions: DEFAULT_VECTOR_DIMENSIONS,
                     },
                 },
             })
