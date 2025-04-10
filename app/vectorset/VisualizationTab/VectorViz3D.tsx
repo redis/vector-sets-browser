@@ -280,7 +280,7 @@ const ConnectionLines = ({
 
     return (
         <group>
-            {similarities.map((sim, idx) => {
+            {similarities.map((sim) => {
                 const start = points[sim.i].position
                 const end = points[sim.j].position
                 const opacity = Math.min(
@@ -296,6 +296,7 @@ const ConnectionLines = ({
                     >
                         <bufferGeometry attach="geometry">
                             <bufferAttribute
+                                args={[new Float32Array([...start, ...end]), 3]}
                                 attach="attributes-position"
                                 count={2}
                                 array={new Float32Array([...start, ...end])}
@@ -401,7 +402,7 @@ export default function VectorViz3D({
 
     // Calculate positions using useMemo instead of useEffect
     const positions = React.useMemo(() => {
-    
+
         // If we already have positions and we're initialized, only recalculate if data changed
         if (isInitializedRef.current && positionsRef.current.length > 0) {
             const dataChanged = vectors.some((vector, idx) => {
@@ -532,6 +533,7 @@ export default function VectorViz3D({
                     <line>
                         <bufferGeometry>
                             <bufferAttribute
+                                args={[new Float32Array([0, 0, 0, maxDim, 0, 0]), 3]}
                                 attach="attributes-position"
                                 count={2}
                                 array={
@@ -545,6 +547,7 @@ export default function VectorViz3D({
                     <line>
                         <bufferGeometry>
                             <bufferAttribute
+                                args={[new Float32Array([0, 0, 0, 0, maxDim, 0]), 3]}
                                 attach="attributes-position"
                                 count={2}
                                 array={
@@ -558,6 +561,7 @@ export default function VectorViz3D({
                     <line>
                         <bufferGeometry>
                             <bufferAttribute
+                                args={[new Float32Array([0, 0, 0, 0, 0, maxDim]), 3]}
                                 attach="attributes-position"
                                 count={2}
                                 array={
@@ -871,7 +875,7 @@ export default function VectorViz3D({
                                                 color: "#666",
                                             }}
                                         >
-                                            Click "Search Similar" to find
+                                            Click {`"`}Search Similar{`"`} to find
                                             related vectors
                                         </div>
                                         <button

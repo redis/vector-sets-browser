@@ -128,7 +128,7 @@ export default function Home() {
                                     querying audio embeddings. Use them for
                                     audio fingerprinting, voice recognition,
                                     music recommendation, and sound
-                                    classification. With Redis's in-memory
+                                    classification. With Redis{`'`}s in-memory
                                     performance, your audio similarity searches
                                     will be lightning fast.
                                 </p>

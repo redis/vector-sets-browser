@@ -75,12 +75,6 @@ type AttributeCache = {
 type AttributeValue = string | number | boolean | any[]
 type ParsedAttributes = Record<string, AttributeValue>
 
-// Add this new type and function after the existing type definitions
-type FieldFilter = {
-    field: string
-    expression: string
-}
-
 // Add this new component for the attribute columns dialog
 interface AttributeColumnsDialogProps {
     isOpen: boolean
@@ -187,14 +181,6 @@ function AttributeColumnsDialog({
     )
 }
 
-// Add a new interface to pass updated attributes back from the dialog
-interface EditAttributesDialogProps {
-    isOpen: boolean
-    onClose: (updatedAttributes?: string) => void
-    keyName: string
-    element: string
-}
-
 export default function VectorResults({
     results,
     onRowClick,
@@ -218,7 +204,6 @@ export default function VectorResults({
         setShowAttributes,
         showOnlyFilteredAttributes,
         setShowOnlyFilteredAttributes,
-        attributeColumns: savedAttributeColumns,
         updateAttributeColumnVisibility,
         getColumnVisibility,
         isLoaded,
@@ -334,7 +319,7 @@ export default function VectorResults({
     // Single source of truth for attribute fetching
     const fetchAttributes = async (elements: string[]) => {
         try {
-            const response = await vgetattr_multi({keyName, elements, returnCommandOnly: false});
+            const response = await vgetattr_multi({ keyName, elements, returnCommandOnly: false });
 
             if (!response?.success || !response?.result) {
                 console.error(`Error fetching attributes`, response?.error);
@@ -353,18 +338,18 @@ export default function VectorResults({
 
         let isCancelled = false;
         const elements = results.map(row => row[0]);
-        
+
         const fetchAndProcessAttributes = async () => {
             setIsLoadingAttributes(true);
             try {
                 const attributes = await fetchAttributes(elements);
-                
+
                 if (isCancelled || !attributes) return;
-                
+
                 const newCache = { ...attributeCache };
                 const newParsedCache: Record<string, ParsedAttributes> = {};
                 const allAttributeColumns = new Set<string>();
-                
+
                 elements.forEach((element, i) => {
                     newCache[element] = attributes[i];
                     if (attributes[i]) {
@@ -377,11 +362,11 @@ export default function VectorResults({
                         }
                     }
                 });
-                
+
                 if (!isCancelled) {
                     setAttributeCache(newCache);
                     setParsedAttributeCache(newParsedCache);
-                    
+
                     // Update columns in a single operation
                     setAvailableColumns(prev => {
                         const systemColumns = prev.filter(col => col.type === "system");
@@ -403,7 +388,7 @@ export default function VectorResults({
         };
 
         fetchAndProcessAttributes();
-        
+
         return () => {
             isCancelled = true;
         };
@@ -428,7 +413,7 @@ export default function VectorResults({
     useEffect(() => {
         if (!showAttributes || (showOnlyFilteredAttributes && !searchFilter)) {
             // Only hide attribute columns, don't remove them
-            setAvailableColumns(prev => 
+            setAvailableColumns(prev =>
                 prev.map(col => ({
                     ...col,
                     visible: col.type === "system" ? col.visible : false
@@ -441,10 +426,10 @@ export default function VectorResults({
         setAvailableColumns(prev => {
             return prev.map(col => {
                 if (col.type === "system") return col;
-                
-                const shouldBeVisible = !showOnlyFilteredAttributes || 
+
+                const shouldBeVisible = !showOnlyFilteredAttributes ||
                     (showOnlyFilteredAttributes && filteredFields.includes(col.name));
-                
+
                 return {
                     ...col,
                     visible: shouldBeVisible
@@ -458,11 +443,11 @@ export default function VectorResults({
         if (!showAttributes || !showOnlyFilteredAttributes || filteredFields.length === 0) return;
 
         const newValues: Record<string, Record<string, string>> = {};
-        
+
         for (const row of results) {
             const element = row[0];
             const parsedAttributes = parsedAttributeCache[element];
-            
+
             if (parsedAttributes) {
                 newValues[element] = {};
                 for (const field of filteredFields) {
@@ -470,7 +455,7 @@ export default function VectorResults({
                 }
             }
         }
-        
+
         setFilteredFieldValues(newValues);
     }, [showAttributes, showOnlyFilteredAttributes, filteredFields, results, parsedAttributeCache]);
 
@@ -614,8 +599,8 @@ export default function VectorResults({
                     {!isLoaded
                         ? "Loading settings..."
                         : isLoading
-                        ? "Loading vector set..."
-                        : "Searching for vectors..."}
+                            ? "Loading vector set..."
+                            : "Searching for vectors..."}
                 </p>
             </div>
         )
@@ -625,8 +610,8 @@ export default function VectorResults({
     if (isEmptyVectorSet) {
         return (
             <EmptyVectorSet
-                onAddVector={onAddVector || (() => {})}
-                onChangeTab={changeTab || (() => {})}
+                onAddVector={onAddVector || (() => { })}
+                onChangeTab={changeTab || (() => { })}
             />
         )
     }
@@ -951,12 +936,12 @@ export default function VectorResults({
                                                         (prev) =>
                                                             prev.map((c) =>
                                                                 c.name ===
-                                                                col.name
+                                                                    col.name
                                                                     ? {
-                                                                          ...c,
-                                                                          visible:
-                                                                              checked,
-                                                                      }
+                                                                        ...c,
+                                                                        visible:
+                                                                            checked,
+                                                                    }
                                                                     : c
                                                             )
                                                     )
@@ -979,42 +964,42 @@ export default function VectorResults({
                                     {availableColumns.some(
                                         (col) => col.type === "attribute"
                                     ) && (
-                                        <>
-                                            <DropdownMenuSeparator />
-                                            <DropdownMenuItem
-                                                onClick={() =>
-                                                    setIsAttributeColumnsDialogOpen(
-                                                        true
-                                                    )
-                                                }
-                                                className="cursor-pointer"
-                                            >
-                                                <div className="flex items-center justify-between w-full">
-                                                    <span>
-                                                        Attribute Columns
-                                                    </span>
-                                                    <span className="text-xs text-gray-500">
-                                                        {
-                                                            availableColumns.filter(
-                                                                (col) =>
-                                                                    col.type ===
+                                            <>
+                                                <DropdownMenuSeparator />
+                                                <DropdownMenuItem
+                                                    onClick={() =>
+                                                        setIsAttributeColumnsDialogOpen(
+                                                            true
+                                                        )
+                                                    }
+                                                    className="cursor-pointer"
+                                                >
+                                                    <div className="flex items-center justify-between w-full">
+                                                        <span>
+                                                            Attribute Columns
+                                                        </span>
+                                                        <span className="text-xs text-gray-500">
+                                                            {
+                                                                availableColumns.filter(
+                                                                    (col) =>
+                                                                        col.type ===
                                                                         "attribute" &&
-                                                                    col.visible
-                                                            ).length
-                                                        }{" "}
-                                                        /{" "}
-                                                        {
-                                                            availableColumns.filter(
-                                                                (col) =>
-                                                                    col.type ===
-                                                                    "attribute"
-                                                            ).length
-                                                        }
-                                                    </span>
-                                                </div>
-                                            </DropdownMenuItem>
-                                        </>
-                                    )}
+                                                                        col.visible
+                                                                ).length
+                                                            }{" "}
+                                                            /{" "}
+                                                            {
+                                                                availableColumns.filter(
+                                                                    (col) =>
+                                                                        col.type ===
+                                                                        "attribute"
+                                                                ).length
+                                                            }
+                                                        </span>
+                                                    </div>
+                                                </DropdownMenuItem>
+                                            </>
+                                        )}
                                 </DropdownMenuContent>
                             </DropdownMenu>
                         </div>
@@ -1034,9 +1019,9 @@ export default function VectorResults({
                                             type="checkbox"
                                             checked={
                                                 selectedElements.size ===
-                                                    filteredAndSortedResults.length &&
+                                                filteredAndSortedResults.length &&
                                                 filteredAndSortedResults.length >
-                                                    0
+                                                0
                                             }
                                             onChange={(e) =>
                                                 e.target.checked
@@ -1059,16 +1044,15 @@ export default function VectorResults({
                                     return (
                                         <TableHead
                                             key={col.name}
-                                            className={`relative ${
-                                                col.type === "system"
-                                                    ? "cursor-pointer hover:bg-gray-50"
-                                                    : ""
-                                            }`}
+                                            className={`relative ${col.type === "system"
+                                                ? "cursor-pointer hover:bg-gray-50"
+                                                : ""
+                                                }`}
                                             onClick={() =>
                                                 col.type === "system"
                                                     ? handleSort(
-                                                          col.name as SortColumn
-                                                      )
+                                                        col.name as SortColumn
+                                                    )
                                                     : undefined
                                             }
                                         >
@@ -1117,11 +1101,10 @@ export default function VectorResults({
                         {filteredAndSortedResults.map((row, index) => (
                             <TableRow
                                 key={index}
-                                className={`group ${
-                                    selectedElements.has(row[0])
+                                className={`group ${selectedElements.has(row[0])
                                         ? "bg-blue-50"
                                         : ""
-                                }`}
+                                    }`}
                             >
                                 {/* Add a checkbox cell when in select mode */}
                                 {selectMode && (
@@ -1152,9 +1135,9 @@ export default function VectorResults({
                                             onClick={
                                                 selectMode
                                                     ? () =>
-                                                          handleSelectToggle(
-                                                              row[0]
-                                                          )
+                                                        handleSelectToggle(
+                                                            row[0]
+                                                        )
                                                     : undefined
                                             }
                                             className={
@@ -1169,7 +1152,7 @@ export default function VectorResults({
                                                         {row[0]}
                                                     </div>
                                                 ) : typeof row[1] ===
-                                                  "number" ? (
+                                                    "number" ? (
                                                     row[1].toFixed(4)
                                                 ) : (
                                                     row[1]
@@ -1177,7 +1160,7 @@ export default function VectorResults({
                                             ) : (
                                                 formatAttributeValue(
                                                     parsedAttributeCache[
-                                                        row[0]
+                                                    row[0]
                                                     ]?.[col.name]
                                                 )
                                             )}
@@ -1299,11 +1282,10 @@ export default function VectorResults({
                     {filteredAndSortedResults.map((row, index) => (
                         <div
                             key={index}
-                            className={`bg-[white] rounded-lg border p-4 hover:shadow-md group ${
-                                selectedElements.has(row[0])
-                                    ? "border-blue-400 bg-blue-50"
-                                    : ""
-                            }`}
+                            className={`bg-[white] rounded-lg border p-4 hover:shadow-md group ${selectedElements.has(row[0])
+                                ? "border-blue-400 bg-blue-50"
+                                : ""
+                                }`}
                             onClick={
                                 selectMode
                                     ? () => handleSelectToggle(row[0])
@@ -1470,7 +1452,7 @@ export default function VectorResults({
                                         ATTRIBUTES
                                     </div>
                                     {isLoadingAttributes &&
-                                    attributeCache[row[0]] === undefined ? (
+                                        attributeCache[row[0]] === undefined ? (
                                         <div className="text-sm text-gray-500">
                                             Loading...
                                         </div>
@@ -1478,7 +1460,7 @@ export default function VectorResults({
                                         <div className="flex gap-4 flex-wrap bg-gray-50 rounded-md p-2 w-full items-center">
                                             {Object.entries(
                                                 parsedAttributeCache[row[0]] ||
-                                                    {}
+                                                {}
                                             ).map(([key, value]) => (
                                                 <div
                                                     key={key}

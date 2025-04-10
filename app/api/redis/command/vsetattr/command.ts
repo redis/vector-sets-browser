@@ -23,7 +23,7 @@ export function validateVsetattrRequest(body: any): { isValid: boolean; error?: 
 
     try {
         JSON.parse(body.attributes)
-    } catch (e) {
+    } catch (_e) {
         return { isValid: false, error: 'Attributes must be a valid JSON string' }
     }
 

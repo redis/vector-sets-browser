@@ -1,9 +1,7 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 
-interface TopNavProps {}
-
-export default function TopNav({}: TopNavProps) {
+export default function TopNav() {
     const pathname = usePathname()
 
     const navItems = [
@@ -24,7 +22,7 @@ export default function TopNav({}: TopNavProps) {
     return (
         <header className="bg-[white] border-b sticky top-0 z-10">
             <div className="flex items-center p-2 space-x-4 pr-4">
-                <a href="/" className="ml-2 flex items-center">
+                <Link href="/" className="ml-2 flex items-center">
                     {/* Image with proper aspect ratio handling */}
                     <span
                         className="w-20 h-10 mr-2 flex items-center justify-center bg-contain bg-no-repeat bg-center"
@@ -34,7 +32,7 @@ export default function TopNav({}: TopNavProps) {
                     <div>
                         <h1 className="text-xl font-bold">VectorSet</h1>
                     </div>
-                </a>
+                </Link>
                 <div className="grow"></div>
                 <nav className="flex items-center gap-4 pl-8">
                     {navItems
@@ -42,11 +40,10 @@ export default function TopNav({}: TopNavProps) {
                         .map(({ href, paths, label }) => (
                             <Link key={href} href={href} legacyBehavior>
                                 <div
-                                    className={`font-mono hover:text-red-500 py-2 cursor-pointer border-b-2 ${
-                                        paths.some((path) => pathname === path)
-                                            ? "border-red-500 text-red-600"
-                                            : "border-transparent text-black"
-                                    }`}
+                                    className={`font-mono hover:text-red-500 py-2 cursor-pointer border-b-2 ${paths.some((path) => pathname === path)
+                                        ? "border-red-500 text-red-600"
+                                        : "border-transparent text-black"
+                                        }`}
                                 >
                                     {label}
                                 </div>

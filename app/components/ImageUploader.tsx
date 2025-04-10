@@ -1,9 +1,7 @@
 import {
-    ImageConfig,
     EmbeddingConfig,
     CLIP_MODELS,
 } from "@/app/embeddings/types/embeddingModels"
-import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import Image from "next/image"
 import { ChangeEvent, useEffect, useRef, useState } from "react"
@@ -55,7 +53,6 @@ export default function ImageUploader({
     const [isLoading, setIsLoading] = useState(false)
     const [isProcessingEmbedding, setIsProcessingEmbedding] = useState(false)
     const [imageData, setImageData] = useState<string | null>(null)
-    const [status, setStatus] = useState("")
     const fileInputRef = useRef<HTMLInputElement>(null)
     // Add state to track multiple images
     const [imageFiles, setImageFiles] = useState<ImageFileInfo[]>([])
@@ -87,20 +84,14 @@ export default function ImageUploader({
         )
 
         if (imageFiles.length === 0) {
-            setStatus("No valid image files found")
             return
         }
-
-        setStatus(`Processing ${imageFiles.length} images...`)
 
         // Process each file and add it to our collection
         const newImages: ImageFileInfo[] = []
 
         for (let i = 0; i < imageFiles.length; i++) {
             const file = imageFiles[i]
-            setStatus(
-                `Processing image ${i + 1} of ${imageFiles.length}: ${file.name}`
-            )
 
             try {
                 // Convert to base64
@@ -121,7 +112,6 @@ export default function ImageUploader({
 
                 // Generate embedding if needed
                 if (onEmbeddingGenerated) {
-                    setStatus(`Generating embedding for ${file.name}...`)
                     setIsProcessingEmbedding(true)
 
                     try {
@@ -159,19 +149,16 @@ export default function ImageUploader({
             }
         }
 
-        setStatus(`Processed ${newImages.length} images successfully`)
     }
 
     const processFile = async (file: File) => {
         // Skip non-image files
         if (!file.type.startsWith("image/")) {
-            setStatus(`Skipping non-image file: ${file.name}`)
             return
         }
 
         try {
             setIsLoading(true)
-            setStatus(`Processing: ${file.name}`)
 
             // Create preview URL
             const objectUrl = URL.createObjectURL(file)
@@ -200,7 +187,6 @@ export default function ImageUploader({
 
             // Generate embedding if handler is provided
             if (onEmbeddingGenerated) {
-                setStatus(`Generating embedding for ${file.name}...`)
                 setIsProcessingEmbedding(true)
 
                 try {
@@ -219,78 +205,12 @@ export default function ImageUploader({
                     }
                 } catch (error) {
                     console.error("Error generating embedding:", error)
-                    setStatus(
-                        `Error with ${file.name}: ${error instanceof Error ? error.message : "Unknown error"}`
-                    )
                 } finally {
                     setIsProcessingEmbedding(false)
                 }
             }
         } catch (error) {
             console.error(`Error processing image ${file.name}:`, error)
-            setStatus(`Error processing ${file.name}.`)
-        } finally {
-            setIsLoading(false)
-        }
-    }
-
-    const processNextFile = async (files: File[], index: number) => {
-        if (index >= files.length) return // No more files to process
-
-        const file = files[index]
-
-        // Skip non-image files
-        if (!file.type.startsWith("image/")) {
-            setStatus(`Skipping non-image file: ${file.name}`)
-            // Process next file after a short delay
-            setTimeout(() => processNextFile(files, index + 1), 500)
-            return
-        }
-
-        try {
-            setIsLoading(true)
-            setStatus(
-                `Processing ${index + 1} of ${files.length}: ${file.name}`
-            )
-
-            // Create preview URL (shows the most recent file)
-            const objectUrl = URL.createObjectURL(file)
-            setPreviewUrl(objectUrl)
-
-            // Convert to base64
-            const base64Data = await fileToBase64(file)
-            setImageData(base64Data)
-            onImageSelect(base64Data)
-
-            // Provide the file name if the callback exists
-            if (onFileNameSelect) {
-                onFileNameSelect(file.name)
-            }
-
-            // Generate embedding if handler is provided
-            if (onEmbeddingGenerated) {
-                setStatus(`Generating embedding for ${file.name}...`)
-                setIsProcessingEmbedding(true)
-
-                try {
-                    await generateEmbeddingAndReturn(base64Data)
-                } catch (error) {
-                    console.error("Error generating embedding:", error)
-                    setStatus(
-                        `Error with ${file.name}: ${error instanceof Error ? error.message : "Unknown error"}`
-                    )
-                } finally {
-                    setIsProcessingEmbedding(false)
-                }
-            }
-
-            // Process next file after completion
-            setTimeout(() => processNextFile(files, index + 1), 500)
-        } catch (error) {
-            console.error(`Error processing image ${file.name}:`, error)
-            setStatus(`Error processing ${file.name}. Moving to next file...`)
-            // Continue with next file even after error
-            setTimeout(() => processNextFile(files, index + 1), 500)
         } finally {
             setIsLoading(false)
         }
@@ -340,7 +260,6 @@ export default function ImageUploader({
 
         try {
             setIsProcessingEmbedding(true)
-            setStatus("Loading model...")
 
             // Check if we're using CLIP
             if (config.provider === "clip") {
@@ -350,7 +269,6 @@ export default function ImageUploader({
                 )
                 const clipProvider = new CLIPProvider()
 
-                setStatus("Generating embedding using CLIP...")
                 console.log("Generating embedding using CLIP...")
 
                 const modelPath = config.clip?.model
@@ -358,18 +276,16 @@ export default function ImageUploader({
                     : "Xenova/clip-vit-base-patch32"
 
                 embedding = await clipProvider.getImageEmbedding(
-                    data,
-                    modelPath
+                    data as string,
+                    modelPath as string
                 )
             } else if (config.provider === "image") {
                 // For MobileNet, continue with existing flow
                 const model = await loadImageModel()
 
-                setStatus("Processing image...")
                 // Preprocess the image
                 const tensor = await preprocessImage(data)
 
-                setStatus("Generating embedding using TensorFlow MobileNet...")
                 console.log(
                     "Generating embedding using TensorFlow MobileNet..."
                 )
@@ -387,7 +303,7 @@ export default function ImageUploader({
                     activationLayer = internalModel.execute(tensor, [
                         "global_average_pooling2d",
                     ])
-                } catch (e) {
+                } catch (_e) {
                     console.log(
                         "Couldn't find global_average_pooling2d layer, using default model output"
                     )
@@ -402,7 +318,6 @@ export default function ImageUploader({
                 tensor.dispose()
                 activationLayer.dispose()
             }
-            setStatus("Embedding generated successfully")
 
             // If there's a callback, call it
             if (onEmbeddingGenerated) {
@@ -412,11 +327,6 @@ export default function ImageUploader({
             return embedding
         } catch (error) {
             console.error("Error generating embedding:", error)
-            setStatus(
-                `Error: ${
-                    error instanceof Error ? error.message : "Unknown error"
-                }`
-            )
             throw error
         } finally {
             setIsProcessingEmbedding(false)
@@ -677,8 +587,8 @@ export default function ImageUploader({
                                     ? "Processing embedding..."
                                     : "Processing image..."
                                 : allowMultiple
-                                  ? "Drag and drop one or more images here, or click to select"
-                                  : "Drag and drop an image here, or click to select"}
+                                    ? "Drag and drop one or more images here, or click to select"
+                                    : "Drag and drop an image here, or click to select"}
                         </div>
                         <svg
                             xmlns="http://www.w3.org/2000/svg"

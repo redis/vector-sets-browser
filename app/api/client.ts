@@ -31,13 +31,13 @@ export const apiClient = {
         }
     ): Promise<ApiResponse<TResponse>> {
         const { method = 'GET', data, headers = {} } = options ?? {};
-        
+
         try {
             // Handle URL resolution differently for server and client side
-            const resolvedUrl = typeof window !== 'undefined' 
+            const resolvedUrl = typeof window !== 'undefined'
                 ? new URL(url, window.location.origin)
                 : new URL(url, 'http://localhost:3000'); // Default for server-side
-            
+
             const response = await fetch(resolvedUrl.toString(), {
                 method,
                 headers: {
@@ -69,12 +69,12 @@ export const apiClient = {
 
             if (!responseData.success) {
                 console.error("Operation failed:", responseData);
-                const errorMessage = responseData.error || 
-                                    (responseData.result && typeof responseData.result === 'object' && 'error' in responseData.result 
-                                        ? responseData.result.error 
-                                        : null) || 
-                                    'Operation failed';
-                throw new ApiError(errorMessage, undefined, responseData);
+                const errorMessage = responseData.error ||
+                    (responseData.result && typeof responseData.result === 'object' && 'error' in responseData.result
+                        ? responseData.result.error
+                        : null) ||
+                    'Operation failed';
+                throw new ApiError(errorMessage as string, undefined, responseData);
             }
 
             // Return the result and execution time if available
@@ -85,7 +85,7 @@ export const apiClient = {
                 executedCommand: responseData.executedCommand,
                 error: responseData.error
             };
-            
+
         } catch (error) {
             if (error instanceof ApiError) {
                 throw error;
@@ -107,7 +107,7 @@ export const apiClient = {
     ) {
         // For backward compatibility, if the third parameter is a boolean, ignore it
         const headers = typeof headersOrOptions === 'object' ? headersOrOptions : undefined;
-        
+
         return this.request<TResponse, TRequest>(url, {
             method: 'POST',
             data,

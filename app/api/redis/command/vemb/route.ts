@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import { RedisConnection, getRedisUrl } from "@/app/redis-server/RedisConnection"
 import { validateRequest } from '@/app/redis-server/utils'
-import { validateVembRequest, buildVembCommand } from "./command" 
+import { validateVembRequest, buildVembCommand } from "./command"
 
 export async function POST(request: Request) {
     try {
@@ -36,7 +36,7 @@ export async function POST(request: Request) {
         if (!response.success || !response.result || !Array.isArray(response.result)) {
             return NextResponse.json(
                 { success: false, error: response.error || "Invalid response format" },
-                { status: 500 } 
+                { status: 500 }
             )
         }
 

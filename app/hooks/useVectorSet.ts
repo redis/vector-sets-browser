@@ -6,7 +6,6 @@ import {
     VectorTuple,
     vadd,
     vcard,
-    vdim,
     vemb,
     vgetattr,
     vinfo,
@@ -16,7 +15,7 @@ import { VectorSetMetadata } from "@/app/types/vectorSetMetaData"
 
 import { validateVector } from "@/app/embeddings/utils/validation"
 import eventBus, { AppEvents } from "@/app/utils/eventEmitter"
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useRef, useState, useCallback } from "react"
 
 interface UseVectorSetReturn {
     vectorSetName: string | null
@@ -48,7 +47,7 @@ interface VectorSetCache {
     loaded: boolean
 }
 
-export function useVectorSet(): UseVectorSetReturn {
+const useVectorSet = (): UseVectorSetReturn => {
     const [vectorSetName, setVectorSetName] = useState<string | null>(null)
     const [dim, setDim] = useState<number | null>(null)
     const [recordCount, setRecordCount] = useState<number | null>(null)
@@ -60,7 +59,7 @@ export function useVectorSet(): UseVectorSetReturn {
     const vectorSetCacheRef = useRef<Record<string, VectorSetCache>>({})
 
     // Load metadata when vector set changes
-    const loadMetadata = async () => {
+    const loadMetadata = useCallback(async () => {
         if (!vectorSetName) return null
 
         // Check if metadata is already cached
@@ -86,11 +85,10 @@ export function useVectorSet(): UseVectorSetReturn {
             setMetadata(null)
             return null
         }
-    }
+    }, [vectorSetName])
 
     // Load vector set data when name changes
-    const loadVectorSet = async () => {
-        console.log("[loadVectorSet] Loading vector set", vectorSetName)
+    const loadVectorSet = useCallback(async () => {
         if (!vectorSetName) return
 
         try {
@@ -103,12 +101,11 @@ export function useVectorSet(): UseVectorSetReturn {
             // Load information from the vector set
             // use vinfo to get the dimensions and record count
             const infoResponse = await vinfo({ keyName: vectorSetName })
-            console.log("VINFO Response", infoResponse)
             if (!infoResponse.success || !infoResponse.result) {
                 throw new Error(infoResponse.error || "Failed to get vector set info")
             }
             const dim = Number(infoResponse.result["vector-dim"])
-            const recordCount = Number(infoResponse.result["size"]) 
+            const recordCount = Number(infoResponse.result["size"])
 
             setDim(dim)
             setRecordCount(recordCount)
@@ -133,7 +130,19 @@ export function useVectorSet(): UseVectorSetReturn {
                     : "Error loading vector set"
             )
         }
-    }
+    }, [vectorSetName, loadMetadata])
+
+    useEffect(() => {
+        if (vectorSetName) {
+            loadVectorSet();
+        } else {
+            setDim(null);
+            setRecordCount(null);
+            setMetadata(null);
+            setStatusMessage("");
+            setResults([]);
+        }
+    }, [vectorSetName, loadVectorSet]);
 
     // Handle adding a new vector
     const handleAddVector = async (
@@ -157,7 +166,7 @@ export function useVectorSet(): UseVectorSetReturn {
                         `Vector dimensions mismatch: expected ${dim}, got ${elementData.length}`
                     )
                 }
-                
+
                 newVector = elementData
             } else {
                 // Assume elementData is text that needs to be embedded
@@ -181,7 +190,7 @@ export function useVectorSet(): UseVectorSetReturn {
             }
 
             // Validate the vector (no normalization)
-            let validationResult = validateVector(
+            const validationResult = validateVector(
                 newVector,
                 metadata?.embedding ? getExpectedDimensions(metadata?.embedding) : undefined,
             )
@@ -322,45 +331,45 @@ export function useVectorSet(): UseVectorSetReturn {
             setStatusMessage("Please select a vector set first")
             return
         }
-         try {
-             setStatusMessage(`Deleting elements "${elements}"...`)
-             // Delete the vectors
-                 
-             await vrem({
-                 keyName: vectorSetName,
-                 elements,
-             })
+        try {
+            setStatusMessage(`Deleting elements "${elements}"...`)
+            // Delete the vectors
 
-             // Get the new record count
-             const newRecordCountResponse = await vcard({
-                 keyName: vectorSetName,
-             })
+            await vrem({
+                keyName: vectorSetName,
+                elements,
+            })
 
-             if (!newRecordCountResponse.success || newRecordCountResponse.result === undefined) {
-                 throw new Error(newRecordCountResponse.error || "Failed to get updated record count")
-             }
+            // Get the new record count
+            const newRecordCountResponse = await vcard({
+                keyName: vectorSetName,
+            })
 
-             setRecordCount(newRecordCountResponse.result)
+            if (!newRecordCountResponse.success || newRecordCountResponse.result === undefined) {
+                throw new Error(newRecordCountResponse.error || "Failed to get updated record count")
+            }
 
-             // Update the cache
-             if (vectorSetCacheRef.current[vectorSetName]) {
-                 vectorSetCacheRef.current[vectorSetName].recordCount = newRecordCountResponse.result
-             }
+            setRecordCount(newRecordCountResponse.result)
 
-             // Emit event to notify other components
-             eventBus.emit(AppEvents.VECTOR_DELETED, {
-                 vectorSetName,
-                 elements,
-                 newCount: newRecordCountResponse.result
-             })
+            // Update the cache
+            if (vectorSetCacheRef.current[vectorSetName]) {
+                vectorSetCacheRef.current[vectorSetName].recordCount = newRecordCountResponse.result
+            }
 
-             setStatusMessage("Vectors deleted successfully")
+            // Emit event to notify other components
+            eventBus.emit(AppEvents.VECTOR_DELETED, {
+                vectorSetName,
+                elements,
+                newCount: newRecordCountResponse.result
+            })
 
-             // Remove the vectors from the results list
-             setResults((prevResults) =>
-                 prevResults.filter(([id]) => !elements.includes(id))
-             )
-         } catch (error) {
+            setStatusMessage("Vectors deleted successfully")
+
+            // Remove the vectors from the results list
+            setResults((prevResults) =>
+                prevResults.filter(([id]) => !elements.includes(id))
+            )
+        } catch (error) {
             console.error("Error deleting vectors:", error)
             setStatusMessage(
                 error instanceof ApiError
@@ -431,19 +440,6 @@ export function useVectorSet(): UseVectorSetReturn {
         }
     }
 
-    // Load vector set data when name changes
-    useEffect(() => {
-        if (vectorSetName) {
-            loadVectorSet()
-        } else {
-            setDim(null)
-            setRecordCount(null)
-            setMetadata(null)
-            setStatusMessage("")
-            setResults([])
-        }
-    }, [vectorSetName])
-
     // Add a new method specifically for metadata updates
     const updateMetadata = async (newMetadata: VectorSetMetadata) => {
         if (!vectorSetName) return;
@@ -491,3 +487,5 @@ export function useVectorSet(): UseVectorSetReturn {
         updateMetadata,
     }
 }
+
+export { useVectorSet };

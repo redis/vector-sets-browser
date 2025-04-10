@@ -2,12 +2,10 @@
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useRouter, useSearchParams } from "next/navigation"
-import { useEffect, useState } from "react"
+import { Suspense, useEffect, useState } from "react"
 import { useRedisConnection } from "../hooks/useRedisConnection"
-import { VectorSetSearchState } from "../hooks/useVectorSearch"
 import { useVectorSet } from "../hooks/useVectorSet"
 import { getConnection, removeConnection } from "../redis-server/connectionManager"
-import { EmbeddingConfig, VectorSetMetadata } from "@/app/embeddings/types/embeddingModels"
 import { userSettings } from "../utils/userSettings"
 import AddVectorModal from "./AddVectorDialog"
 import ImportTab from "./ImportTab/ImportTab"
@@ -33,16 +31,19 @@ import VectorSettings from "./SettingsTab/VectorSettings"
  * - Connection verification failure -> redirect to /home
  */
 
-// Default search state
-const DEFAULT_SEARCH_STATE: VectorSetSearchState = {
-    searchType: "Vector",
-    searchQuery: "",
-    searchCount: "10",
-    resultsTitle: "Search Results",
-    searchFilter: "",
+export default function VectorSetPage() {
+    return (
+        <Suspense fallback={
+            <div className="flex items-center justify-center w-full h-screen">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+            </div>
+        }>
+            <VectorSetPageContent />
+        </Suspense>
+    )
 }
 
-export default function VectorSetPage() {
+function VectorSetPageContent() {
     const router = useRouter()
     const searchParams = useSearchParams()
     const connectionId = searchParams.get("cid")
@@ -53,16 +54,10 @@ export default function VectorSetPage() {
     // Keep track of search state per vector set
     const [isVectorSetChanging, setIsVectorSetChanging] = useState(false)
     // Add state to track if we should auto-open sample data dialog
-    const [openSampleData, setOpenSampleData] = useState(false)
 
     // Function to change active tab - can be passed to child components
-    const changeTab = (tabName: string, options?: { openSampleData?: boolean }) => {
+    const changeTab = (tabName: string) => {
         setActiveTab(tabName);
-        if (options?.openSampleData) {
-            setOpenSampleData(true);
-        } else {
-            setOpenSampleData(false);
-        }
     }
 
     const {
@@ -86,8 +81,6 @@ export default function VectorSetPage() {
         handleShowVector,
         results,
         setResults,
-        loadVectorSet,
-        setMetadata,
         updateMetadata,
     } = useVectorSet()
 
@@ -135,7 +128,7 @@ export default function VectorSetPage() {
                             }) =>
                                 conn.id === connection.url ||
                                 `redis://${conn.host}:${conn.port}` ===
-                                    connection.url
+                                connection.url
                         )
                         if (matchingConnection) {
                             setRedisName(matchingConnection.name)
@@ -234,8 +227,6 @@ export default function VectorSetPage() {
                         value={activeTab}
                         onValueChange={(value) => {
                             setActiveTab(value)
-                            // Reset the sample data flag when manually changing tabs
-                            setOpenSampleData(false);
                         }}
                     >
                         <TabsList className="bg-gray-200 w-full">
@@ -273,7 +264,6 @@ export default function VectorSetPage() {
                             <ImportTab
                                 vectorSetName={vectorSetName}
                                 metadata={metadata}
-                                initialShowSampleData={openSampleData}
                             />
                         </TabsContent>
 

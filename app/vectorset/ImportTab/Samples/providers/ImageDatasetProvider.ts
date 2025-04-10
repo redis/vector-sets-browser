@@ -1,7 +1,7 @@
 import { ImportJobConfig } from "@/app/api/jobs"
 import { EmbeddingConfig, isImageEmbedding } from "@/app/embeddings/types/embeddingModels"
 import { getImageEmbedding } from "@/app/utils/imageEmbedding"
-import { Dataset, DatasetMetadata, DatasetProvider, ImportProgress } from "../types/DatasetProvider"
+import { Dataset, DatasetMetadata, DatasetProvider, ImportProgress } from "../../types/DatasetProvider"
 
 export interface ImageDatasetConfig extends DatasetMetadata {
     baseUrl: string

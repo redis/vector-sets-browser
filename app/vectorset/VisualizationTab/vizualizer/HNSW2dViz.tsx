@@ -9,7 +9,6 @@ import {
     LoadingOverlay,
     ZoomControls,
 } from "./components"
-import { MAX_LABELED_NODES } from "./constants"
 import {
     useCanvasEvents,
     useForceSimulator,
@@ -92,6 +91,9 @@ const HNSWVizPure: React.FC<HNSWVizPureProps> = ({
         handleZoom: originalHandleZoom,
     } = useThreeScene()
 
+    // Cast the ref to the required non-null type for compatibility with other hooks
+    const typedCanvasRef = canvasRef as React.RefObject<HTMLCanvasElement>;
+
     // Function to update label scales based on camera distance
     const updateLabelScales = useCallback(() => {
         if (!camera) return
@@ -140,7 +142,7 @@ const HNSWVizPure: React.FC<HNSWVizPureProps> = ({
     )
 
     // Animation loop ref
-    const animationFrameRef = useRef<number>()
+    const animationFrameRef = useRef<number>(null)
 
     // Set up animation loop
     useEffect(() => {
@@ -181,7 +183,7 @@ const HNSWVizPure: React.FC<HNSWVizPureProps> = ({
         camera,
         renderer,
         fitCameraToNodes,
-        canvasRef
+        typedCanvasRef
     )
 
     // Initialize node management
@@ -491,7 +493,7 @@ const HNSWVizPure: React.FC<HNSWVizPureProps> = ({
 
     // Initialize canvas events
     useCanvasEvents(
-        canvasRef,
+        typedCanvasRef,
         camera,
         scene,
         handleNodeClick,
@@ -621,7 +623,7 @@ const HNSWVizPure: React.FC<HNSWVizPureProps> = ({
             )
             initialMesh.userData.similarity = initialElement.similarity
             scene.add(initialMesh)
-            const initialNode = addNode(initialMesh)
+            addNode(initialMesh)
 
             // Delay the initial node click to ensure proper initialization
             setTimeout(() => {
@@ -645,7 +647,7 @@ const HNSWVizPure: React.FC<HNSWVizPureProps> = ({
 
         // Update node colors
         nodesRef.current.forEach((node) => {
-            ;(node.mesh.material as THREE.MeshBasicMaterial).color.set(
+            ; (node.mesh.material as THREE.MeshBasicMaterial).color.set(
                 isDarkMode ? 0xffffff : 0x1a3b4c
             )
         })
@@ -782,10 +784,6 @@ const HNSWVizPure: React.FC<HNSWVizPureProps> = ({
                         continue
                     }
 
-                    const angle = Math.random() * Math.PI * 2
-                    const radius = 1 + Math.random() * 2
-                    const x = node.position.x + Math.cos(angle) * radius
-                    const y = node.position.y + Math.sin(angle) * radius
                     const neighbor = createNodeMesh(item.element, item.vector)
                     if (neighbor && scene) {
                         neighbor.userData.similarity = item.similarity
@@ -952,7 +950,6 @@ const HNSWVizPure: React.FC<HNSWVizPureProps> = ({
         )
         initialMesh.userData.similarity = initialElement.similarity
         scene.add(initialMesh)
-        const initialNode = addNode(initialMesh)
 
         // Fit camera to the initial node
         fitCameraToNodes()

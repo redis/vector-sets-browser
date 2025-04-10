@@ -12,8 +12,8 @@ import {
     CarouselNext,
     CarouselPrevious,
 } from "@/components/ui/carousel"
-import { Dataset } from "./types/DatasetProvider"
 import { datasetRegistry } from "./providers/DatasetRegistry"
+import { Dataset } from "../types/DatasetProvider"
 
 interface SampleDataSelectProps {
     onSelect: (dataset: Dataset) => void
@@ -22,11 +22,11 @@ interface SampleDataSelectProps {
     useCarousel?: boolean
 }
 
-export function SampleDataSelect({ 
-    onSelect, 
-    onCancel, 
+export function SampleDataSelect({
+    onSelect,
+    onCancel,
     selectedDataset: initialSelectedDataset = null,
-    useCarousel = false 
+    useCarousel = false
 }: SampleDataSelectProps) {
     const [selectedDataset, setSelectedDataset] = useState<string | null>(initialSelectedDataset)
     const [error, setError] = useState<string | null>(null)
@@ -42,11 +42,11 @@ export function SampleDataSelect({
             setError("Please select a dataset first")
             return
         }
-        
+
         try {
             const dataset = datasetRegistry.getDatasetByName(selectedDataset)
             onSelect(dataset)
-        } catch (error) {
+        } catch (_error) {
             setError(`Dataset not found: ${selectedDataset}`)
         }
     }
@@ -59,7 +59,7 @@ export function SampleDataSelect({
 
             {useCarousel ? (
                 <div className="relative w-full overflow-visible px-12">
-                    <Carousel 
+                    <Carousel
                         className="w-full"
                         opts={{
                             align: "start",
@@ -69,8 +69,8 @@ export function SampleDataSelect({
                         <CarouselContent className="">
                             {datasets.map((dataset) => (
                                 <CarouselItem key={dataset.name} className="pl-4 basis-full sm:basis-1/2 md:basis-1/2">
-                                    <DatasetCard 
-                                        dataset={dataset} 
+                                    <DatasetCard
+                                        dataset={dataset}
                                         isSelected={selectedDataset === dataset.name}
                                         onSelect={handleSelectDataset}
                                     />
@@ -84,9 +84,9 @@ export function SampleDataSelect({
             ) :
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {datasets.map((dataset) => (
-                        <DatasetCard 
+                        <DatasetCard
                             key={dataset.name}
-                            dataset={dataset} 
+                            dataset={dataset}
                             isSelected={selectedDataset === dataset.name}
                             onSelect={handleSelectDataset}
                         />
@@ -98,8 +98,8 @@ export function SampleDataSelect({
                 <Button variant="outline" onClick={onCancel}>
                     Cancel
                 </Button>
-                <Button 
-                    variant="default" 
+                <Button
+                    variant="default"
                     onClick={handleContinue}
                     disabled={!selectedDataset}
                 >

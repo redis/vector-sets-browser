@@ -15,8 +15,8 @@ import {
     OPENAI_MODELS,
     OLLAMA_MODELS,
     IMAGE_MODELS,
-    CLIP_MODELS,
 } from "@/app/embeddings/types/embeddingModels"
+import { DEFAULT_EMBEDDING } from "@/app/vectorset/constants"
 
 // Group models by provider for the dropdown
 const GROUPED_MODELS = [
@@ -55,7 +55,7 @@ interface CalculationResult {
 
 export default function VectorSetCalculator() {
     const [config, setConfig] = useState({
-        modelDim: 1536, // Default to OpenAI's text-embedding-ada-002
+        modelDim: DEFAULT_EMBEDDING.DIMENSIONS, // Default to OpenAI's text-embedding-ada-002
         numVectors: 1000000,
         quantization: "Q8", // Default to Q8
         reduceDimensions: "",
@@ -79,20 +79,20 @@ export default function VectorSetCalculator() {
 
     function generateRedisCommand(modelDim: number, storeDim: number | null, quantization: string) {
         let cmd = "VADD myindex"
-        
+
         if (storeDim && storeDim < modelDim) {
             cmd += ` REDUCE ${storeDim}`
         }
-        
+
         cmd += ` VALUES ${modelDim} <vector_values...> my_element`
-        
+
         if (quantization === "NOQUANT") {
             cmd += " NOQUANT"
         } else if (quantization === "BIN") {
             cmd += " BIN"
         }
         // Q8 is default, so no need to add a flag
-        
+
         return cmd
     }
 
@@ -214,11 +214,11 @@ export default function VectorSetCalculator() {
                                                 const model = GROUPED_MODELS
                                                     .flatMap(g => g.models)
                                                     .find(m => m.id === value)
-                                                
+
                                                 setConfig({
                                                     ...config,
                                                     modelType: value,
-                                                    modelDim: model?.dimensions || 1536,
+                                                    modelDim: model?.dimensions || DEFAULT_EMBEDDING.DIMENSIONS,
                                                     vectorSize: "",
                                                 })
                                             }
@@ -397,7 +397,7 @@ export default function VectorSetCalculator() {
 
             <div className="space-y-6">
                 <h3 className="text-lg font-semibold">Memory Usage Comparison</h3>
-                
+
                 <div className="space-y-6">
                     {/* Raw Vector Data Bar */}
                     <div className="space-y-2">
@@ -458,4 +458,4 @@ export default function VectorSetCalculator() {
             </div>
         </div>
     )
-} 
+}

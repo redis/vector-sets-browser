@@ -1,4 +1,4 @@
-import { VectorSetMetadata } from "@/app/embeddings/types/embeddingModels"
+import { VectorSetMetadata } from "../types/vectorSetMetaData"
 
 interface VectorSetHeaderProps {
     vectorSetName: string

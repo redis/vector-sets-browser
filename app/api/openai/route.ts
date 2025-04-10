@@ -26,7 +26,7 @@ async function validateApiKey(apiKey: string): Promise<boolean> {
 export async function POST(request: Request) {
     try {
         const { apiKey } = await request.json();
-        
+
         if (!apiKey) {
             return NextResponse.json(
                 { error: "API key is required" },
@@ -42,19 +42,19 @@ export async function POST(request: Request) {
                 { status: 400 }
             );
         }
-
         // Set the cookie with the API key
-        cookies().set(OPENAI_KEY_COOKIE, apiKey, COOKIE_OPTIONS);
-        
-        return NextResponse.json({ 
+        const cookieStore = await cookies();
+        await cookieStore.set(OPENAI_KEY_COOKIE, apiKey, COOKIE_OPTIONS);
+
+        return NextResponse.json({
             success: true,
             message: "API key saved successfully"
         });
     } catch (error) {
         console.error("Error saving OpenAI API key:", error);
         return NextResponse.json(
-            { 
-                error: error instanceof Error ? error.message : "Failed to save API key" 
+            {
+                error: error instanceof Error ? error.message : "Failed to save API key"
             },
             { status: 500 }
         );
@@ -63,8 +63,9 @@ export async function POST(request: Request) {
 
 export async function GET() {
     try {
-        const apiKey = cookies().get(OPENAI_KEY_COOKIE)?.value;
-        
+        const cookieStore = await cookies();
+        const apiKey = cookieStore.get(OPENAI_KEY_COOKIE)?.value;
+
         if (!apiKey) {
             return NextResponse.json(
                 { error: "No API key found" },
@@ -73,15 +74,15 @@ export async function GET() {
         }
 
         // We don't send the actual key back to the client
-        return NextResponse.json({ 
+        return NextResponse.json({
             success: true,
             hasKey: true
         });
     } catch (error) {
         console.error("Error checking OpenAI API key:", error);
         return NextResponse.json(
-            { 
-                error: error instanceof Error ? error.message : "Failed to check API key" 
+            {
+                error: error instanceof Error ? error.message : "Failed to check API key"
             },
             { status: 500 }
         );
@@ -90,16 +91,17 @@ export async function GET() {
 
 export async function DELETE() {
     try {
-        cookies().delete(OPENAI_KEY_COOKIE);
-        return NextResponse.json({ 
+        const cookieStore = await cookies();
+        cookieStore.delete(OPENAI_KEY_COOKIE);
+        return NextResponse.json({
             success: true,
-            message: "API key removed successfully" 
+            message: "API key removed successfully"
         });
     } catch (error) {
         console.error("Error removing OpenAI API key:", error);
         return NextResponse.json(
-            { 
-                error: error instanceof Error ? error.message : "Failed to remove API key" 
+            {
+                error: error instanceof Error ? error.message : "Failed to remove API key"
             },
             { status: 500 }
         );

@@ -18,9 +18,9 @@ import {
 } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Slider } from "@/components/ui/slider"
-import { AlertCircle, CheckCircle2, Edit2 } from "lucide-react"
+import { AlertCircle, Edit2 } from "lucide-react"
 import { useEffect, useState } from "react"
-import { Dataset } from "./types/DatasetProvider"
+import { Dataset } from "../types/DatasetProvider"
 
 interface SampleDataImporterProps {
     dataset: Dataset
@@ -40,11 +40,6 @@ export function SampleDataImporter({
     const [error, setError] = useState<string | null>(null)
     const [isImporting, setIsImporting] = useState(false)
     const [importStarted, setImportStarted] = useState(false)
-    const [importProgress, setImportProgress] = useState<{
-        current: number
-        total: number
-        status?: string
-    } | null>(null)
     const [importCount, setImportCount] = useState<number>(5)
     const [embeddingMismatch, setEmbeddingMismatch] = useState<{
         open: boolean
@@ -64,7 +59,7 @@ export function SampleDataImporter({
 
     const handleStartImport = async () => {
         setError(null)
-        
+
         // Check compatibility
         if (metadata) {
             const isCompatible = dataset.validateEmbedding(metadata.embedding)
@@ -102,38 +97,28 @@ export function SampleDataImporter({
 
     const startImport = async () => {
         setIsImporting(true)
-        setImportProgress(null)
         setImportStarted(true)
 
         try {
-            // Check if this vectorset is a placeholder with only one record "First Record (Default)"
             await checkAndRemovePlaceholderRecord()
 
-            // Prepare the import using the dataset provider
             const { file, config } = await dataset.prepareImport({
-                count: dataset.dataType === "image" ? importCount : undefined,
-                onProgress: setImportProgress
+                count: dataset.dataType === "image" ? importCount : undefined
             })
 
-            // Add metadata to config if available
             if (metadata) {
                 config.metadata = metadata
             }
 
             // Create the import job
             await jobs.createImportJob(vectorSetName, file, config)
-
-            setIsImporting(false)
-            setImportProgress(null)
         } catch (error) {
             console.error("Error importing sample dataset:", error)
             setError(
-                `Error importing sample dataset: ${
-                    error instanceof Error ? error.message : String(error)
+                `Error importing sample dataset: ${error instanceof Error ? error.message : String(error)
                 }`
             )
             setIsImporting(false)
-            setImportProgress(null)
         }
     }
 
@@ -143,29 +128,29 @@ export function SampleDataImporter({
         try {
             // Check how many records are in the vector set
             const count = await vcard({ keyName: vectorSetName });
-            
+
             // If there's only one record, check if it's the default placeholder
-            if (count === 1) {
+            if (count.result === 1) {
                 // Get the record using vsim with high count to ensure we get the record
-                const searchResult = await vsim({ 
+                const searchResult = await vsim({
                     keyName: vectorSetName,
                     count: 1,
                     searchElement: "First Vector (Default)"
                 })
-                
+
                 if (searchResult.result) {
                     const recordName = searchResult.result[0][0]; // First element, element name
-                    
+
                     // Check if it's the default placeholder record
                     if (recordName === "First Vector (Default)") {
                         console.log("Removing placeholder record before import:", recordName);
-                        
+
                         // Delete the default record
                         await vrem({
                             keyName: vectorSetName,
                             element: recordName
                         });
-                        
+
                         console.log("Placeholder record removed successfully");
                     }
                 }
@@ -201,11 +186,11 @@ export function SampleDataImporter({
                                 <div className="flex flex-col">
                                     <div className="flex items-center justify-between text-sm text-gray-600 dark:text-gray-400">
                                         <div className="flex items-center gap-1">
-                                            <span className="font-medium">Embedding Engine:</span> 
+                                            <span className="font-medium">Embedding Engine:</span>
                                             <Badge variant="secondary" className="text-xs">
                                                 {currentEmbeddingConfig?.provider}
-                                                {currentEmbeddingConfig?.provider === "ollama" && 
-                                                    currentEmbeddingConfig.ollama?.modelName && 
+                                                {currentEmbeddingConfig?.provider === "ollama" &&
+                                                    currentEmbeddingConfig.ollama?.modelName &&
                                                     `: ${currentEmbeddingConfig.ollama.modelName}`}
                                                 {currentEmbeddingConfig?.provider === "openai" &&
                                                     currentEmbeddingConfig.openai?.model &&
@@ -225,7 +210,7 @@ export function SampleDataImporter({
                                             Change
                                         </Button>
                                     </div>
-                                    
+
                                     {currentEmbeddingConfig?.provider === "ollama" && (
                                         <div className="text-xs text-green-600 font-medium mt-1">
                                             ✓ Using locally installed Ollama
@@ -241,11 +226,11 @@ export function SampleDataImporter({
                         <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
                             <p className="text-sm mb-3">
                                 This will import the {dataset.name} dataset into your vector set.
-                                {dataset.dataType === "image" ? 
-                                    " You can specify how many images to import." : 
+                                {dataset.dataType === "image" ?
+                                    " You can specify how many images to import." :
                                     ""}
                             </p>
-                            
+
                             {/* Image count slider for image datasets */}
                             {dataset.dataType === "image" && (
                                 <div className="space-y-2 mt-4">
@@ -255,7 +240,7 @@ export function SampleDataImporter({
                                         </Label>
                                         <span className="font-medium">{importCount}</span>
                                     </div>
-                                    <Slider 
+                                    <Slider
                                         id="import-count"
                                         min={1}
                                         max={100}
@@ -282,52 +267,6 @@ export function SampleDataImporter({
                 </>
             )}
 
-            {/* Import progress */}
-            {importStarted && (
-                <>
-                    <h3 className="text-lg mb-4">Importing {dataset.name}</h3>
-                    {/* Progress UI */}
-                    {importProgress && (
-                        <div className="my-4">
-                            <div className="flex justify-between text-sm mb-1">
-                                <span>Progress</span>
-                                <span>
-                                    {importProgress.current} / {importProgress.total}
-                                </span>
-                            </div>
-                            <div className="w-full bg-gray-200 rounded-full h-2.5">
-                                <div
-                                    className="bg-blue-600 h-2.5 rounded-full"
-                                    style={{
-                                        width: `${Math.round(
-                                            (importProgress.current /
-                                                importProgress.total) *
-                                                100
-                                        )}%`,
-                                    }}
-                                ></div>
-                            </div>
-                            {importProgress.status && (
-                                <p className="text-sm text-gray-600 mt-2">
-                                    {importProgress.status}
-                                </p>
-                            )}
-                        </div>
-                    )}
-                    
-                    <div className="flex justify-end mt-auto">
-                        <Button variant="default" onClick={() => {
-                            console.log("Import complete button clicked, closing dialog");
-                            onClose();
-                        }}>
-                            {isImporting 
-                              ? "Close" 
-                              : "Import Complete - Close and Go to Vector Set"}
-                        </Button>
-                    </div>
-                </>
-            )}
-
             {error && (
                 <Alert variant="destructive" className="mt-4">
                     <AlertCircle className="h-4 w-4" />
@@ -335,13 +274,10 @@ export function SampleDataImporter({
                 </Alert>
             )}
 
-            {!error && importStarted && !isImporting && (
-                <Alert variant="default" className="mt-4 bg-green-50 border-green-200">
-                    <CheckCircle2 className="h-4 w-4 text-green-500" />
-                    <AlertDescription className="text-green-700">
-                        Import completed successfully! Click the button above to return to the Vector Set.
-                    </AlertDescription>
-                </Alert>
+            {!error && importStarted && (
+                <p>
+                    Import started. Track progress on the Import Tab.
+                </p>
             )}
 
             {/* Edit embedding config dialog */}
@@ -358,7 +294,7 @@ export function SampleDataImporter({
             {/* Embedding mismatch dialog */}
             <Dialog
                 open={embeddingMismatch.open}
-                onOpenChange={(open) => 
+                onOpenChange={(open) =>
                     setEmbeddingMismatch({ ...embeddingMismatch, open })
                 }
             >
@@ -393,30 +329,30 @@ export function SampleDataImporter({
                                 </div>
                                 {embeddingMismatch.currentEmbedding?.embedding
                                     .provider === "openai" && (
-                                    <div className="flex items-center gap-2 mt-1">
-                                        <Badge className="text-xs">Model</Badge>
-                                        <span className="text-sm">
-                                            {
-                                                embeddingMismatch
-                                                    .currentEmbedding.embedding
-                                                    .openai?.model
-                                            }
-                                        </span>
-                                    </div>
-                                )}
+                                        <div className="flex items-center gap-2 mt-1">
+                                            <Badge className="text-xs">Model</Badge>
+                                            <span className="text-sm">
+                                                {
+                                                    embeddingMismatch
+                                                        .currentEmbedding.embedding
+                                                        .openai?.model
+                                                }
+                                            </span>
+                                        </div>
+                                    )}
                                 {embeddingMismatch.currentEmbedding?.embedding
                                     .provider === "image" && (
-                                    <div className="flex items-center gap-2 mt-1">
-                                        <Badge className="text-xs">Model</Badge>
-                                        <span className="text-sm">
-                                            {
-                                                embeddingMismatch
-                                                    .currentEmbedding.embedding
-                                                    .image?.model
-                                            }
-                                        </span>
-                                    </div>
-                                )}
+                                        <div className="flex items-center gap-2 mt-1">
+                                            <Badge className="text-xs">Model</Badge>
+                                            <span className="text-sm">
+                                                {
+                                                    embeddingMismatch
+                                                        .currentEmbedding.embedding
+                                                        .image?.model
+                                                }
+                                            </span>
+                                        </div>
+                                    )}
                             </div>
 
                             <div>
@@ -433,32 +369,32 @@ export function SampleDataImporter({
                                 </div>
                                 {dataset.recommendedEmbedding.provider ===
                                     "openai" && (
-                                    <div className="flex items-center gap-2 mt-1">
-                                        <Badge className="text-xs bg-green-100 text-green-800 hover:bg-green-100">
-                                            Model
-                                        </Badge>
-                                        <span className="text-sm">
-                                            {
-                                                dataset.recommendedEmbedding
-                                                    .openai?.model
-                                            }
-                                        </span>
-                                    </div>
-                                )}
+                                        <div className="flex items-center gap-2 mt-1">
+                                            <Badge className="text-xs bg-green-100 text-green-800 hover:bg-green-100">
+                                                Model
+                                            </Badge>
+                                            <span className="text-sm">
+                                                {
+                                                    dataset.recommendedEmbedding
+                                                        .openai?.model
+                                                }
+                                            </span>
+                                        </div>
+                                    )}
                                 {dataset.recommendedEmbedding.provider ===
                                     "image" && (
-                                    <div className="flex items-center gap-2 mt-1">
-                                        <Badge className="text-xs bg-green-100 text-green-800 hover:bg-green-100">
-                                            Model
-                                        </Badge>
-                                        <span className="text-sm">
-                                            {
-                                                dataset.recommendedEmbedding
-                                                    .image?.model
-                                            }
-                                        </span>
-                                    </div>
-                                )}
+                                        <div className="flex items-center gap-2 mt-1">
+                                            <Badge className="text-xs bg-green-100 text-green-800 hover:bg-green-100">
+                                                Model
+                                            </Badge>
+                                            <span className="text-sm">
+                                                {
+                                                    dataset.recommendedEmbedding
+                                                        .image?.model
+                                                }
+                                            </span>
+                                        </div>
+                                    )}
                             </div>
                         </div>
                     </div>
@@ -483,7 +419,7 @@ export function SampleDataImporter({
                                         dataset.recommendedEmbedding,
                                         embeddingMismatch.currentEmbedding
                                             ?.description ||
-                                            `Automatically configured for ${dataset.name}`
+                                        `Automatically configured for ${dataset.name}`
                                     )
 
                                     // Update parent component's metadata
@@ -505,4 +441,4 @@ export function SampleDataImporter({
             </Dialog>
         </div>
     )
-} 
+}

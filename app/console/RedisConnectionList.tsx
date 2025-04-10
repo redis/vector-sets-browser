@@ -183,7 +183,7 @@ const RedisConnectionList = forwardRef<
                         ])
                         // If connection successful, break the retry loop
                         break
-                    } catch (error) {
+                    } catch (_error) {
                         attempts++
                         if (attempts === maxAttempts) {
                             throw new Error(
@@ -247,7 +247,7 @@ const RedisConnectionList = forwardRef<
                         ])
                         // If connection successful, break the retry loop
                         break
-                    } catch (error) {
+                    } catch (_error) {
                         attempts++
                         if (attempts === maxAttempts) {
                             throw new Error(
@@ -271,8 +271,7 @@ const RedisConnectionList = forwardRef<
                 saveConnections(updatedConnections)
             } catch (error) {
                 toast.error(
-                    `Failed to connect: ${
-                        error instanceof Error ? error.message : "Unknown error"
+                    `Failed to connect: ${error instanceof Error ? error.message : "Unknown error"
                     }`
                 )
                 console.error("Failed to connect:", error)
@@ -297,9 +296,9 @@ const RedisConnectionList = forwardRef<
             const updatedConnections = recentConnections.map((conn) =>
                 conn.id === editingConnection.id
                     ? {
-                          ...editingConnection,
-                          id: `redis://${editingConnection.host}:${editingConnection.port}`,
-                      }
+                        ...editingConnection,
+                        id: `redis://${editingConnection.host}:${editingConnection.port}`,
+                    }
                     : conn
             )
             saveConnections(updatedConnections)
@@ -511,14 +510,13 @@ const RedisConnectionList = forwardRef<
                                     {recentConnections.map((connection) => (
                                         <TableRow
                                             key={connection.id}
-                                            className={`group hover:bg-gray-50 border-b transition-colors ${
-                                                currentUrl === connection.id
-                                                    ? "bg-gray-200 border-l-4 border-l-red-500"
-                                                    : ""
-                                            }`}
+                                            className={`group hover:bg-gray-50 border-b transition-colors ${currentUrl === connection.id
+                                                ? "bg-gray-200 border-l-4 border-l-red-500"
+                                                : ""
+                                                }`}
                                         >
                                             {editingConnection?.id ===
-                                            connection.id ? (
+                                                connection.id ? (
                                                 <>
                                                     <TableCell>
                                                         <Input

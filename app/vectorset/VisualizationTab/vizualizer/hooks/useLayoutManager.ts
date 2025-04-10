@@ -23,7 +23,6 @@ export function useLayoutManager(
     // Get stored layout or default to "pca"
     const [currentLayout, setCurrentLayout] =
         useState<LayoutAlgorithmType>("pca")
-    const animationFrameId = useRef<number>()
     const forceSimulationActive = useRef<boolean>(true)
     const [isProjectionRunning, setIsProjectionRunning] =
         useState<boolean>(false)
@@ -191,8 +190,7 @@ export function useLayoutManager(
             } catch (error) {
                 console.error("Error in UMAP projection:", error)
                 toast.error(
-                    `Error in UMAP projection: ${
-                        error instanceof Error ? error.message : "Unknown error"
+                    `Error in UMAP projection: ${error instanceof Error ? error.message : "Unknown error"
                     }`
                 )
             } finally {
@@ -238,7 +236,7 @@ export function useLayoutManager(
                     setIsProjectionRunning(false)
                     return
                 }
-                
+
                 // Run PCA
                 console.log("vectors", vectors.length)
                 console.log("vector length", vectors[0].length)
@@ -312,7 +310,7 @@ export function useLayoutManager(
                 return
             }
 
-            ;(window as any).lastLayoutChange = now
+            ; (window as any).lastLayoutChange = now
 
             // Only update layout type if it's different
             if (currentLayout !== layoutType) {
@@ -326,7 +324,7 @@ export function useLayoutManager(
                 // Clear any previous attempt flags for this layout if we're explicitly selecting it
                 const layoutKey = `${layoutType}_${nodesRef.current.length}`
                 const attemptedKey = `attempted_${layoutKey}`
-                ;(window as any)[attemptedKey] = false
+                    ; (window as any)[attemptedKey] = false
             }
 
             // Get the selected layout algorithm
@@ -354,7 +352,7 @@ export function useLayoutManager(
             // Check if we've already attempted this exact layout with this number of nodes
             if (!(window as any)[attemptedKey]) {
                 // Mark as attempted to prevent repeated calls
-                ;(window as any)[attemptedKey] = true
+                ; (window as any)[attemptedKey] = true
 
                 // Apply the layout with error handling
                 try {

@@ -7,12 +7,12 @@ export interface Job {
     jobId: string
     status: {
         status:
-            | "processing"
-            | "paused"
-            | "pending"
-            | "completed"
-            | "failed"
-            | "cancelled"
+        | "processing"
+        | "paused"
+        | "pending"
+        | "completed"
+        | "failed"
+        | "cancelled"
         current: number
         total: number
         message?: string
@@ -109,7 +109,7 @@ export const jobs = {
     ): Promise<{ jobId: string }> {
         // Convert file to base64 for JSON transport
         const fileContent = await file.text();
-        
+
         // Create the request body
         const requestBody: CreateImportJobRequestBody = {
             vectorSetName,
@@ -122,6 +122,6 @@ export const jobs = {
             { jobId: string },
             CreateImportJobRequestBody
         >(`/api/jobs`, requestBody)
-        return response.result || { jobId: "" }
+        return response?.result || { jobId: "" }
     },
 }

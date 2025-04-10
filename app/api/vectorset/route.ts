@@ -34,7 +34,7 @@ export async function GET() {
                 } while (cursor !== "0")
 
                 return Array.from(vectorSets)
-            } catch (error) {
+            } catch (_error) {
                 return []
             }
         })

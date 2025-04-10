@@ -112,7 +112,6 @@ export default function InfoPanel({
                             searchQuery={""}
                             searchFilter={""}
                             showRedisCommand={true}
-                            setShowRedisCommand={() => {}}
                         />
                     </div>
                 </CardContent>

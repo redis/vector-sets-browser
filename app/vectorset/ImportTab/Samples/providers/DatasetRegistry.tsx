@@ -1,7 +1,7 @@
-import { DatasetProvider } from "../types/DatasetProvider"
 import { ImageDatasetProvider } from "./ImageDatasetProvider"
 import { TextDatasetProvider } from "./TextDatasetProvider"
 import { BookIcon, MovieIcon, FaceIcon } from "./DatasetIcons"
+import { DatasetProvider } from "../../types/DatasetProvider"
 
 // Initialize text datasets
 const textDatasetProvider = new TextDatasetProvider([

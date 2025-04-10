@@ -64,7 +64,7 @@ export default function VectorSearchTab({
         [setResults]
     )
 
-    const handleStatusChange = useCallback((status: string) => {}, [])
+    const handleStatusChange = useCallback(() => { }, [])
 
     const handleSearchStateChange = useCallback(
         (newState: Partial<VectorSetSearchState>) => {
@@ -97,7 +97,6 @@ export default function VectorSearchTab({
         clearError: hookClearError,
         expansionFactor,
         setExpansionFactor,
-        lastTextEmbedding,
         executedCommand,
     } = useVectorSearch({
         vectorSetName,
@@ -199,10 +198,8 @@ export default function VectorSearchTab({
                 dim={dim}
                 metadata={metadata}
                 error={error}
-                clearError={clearError}
                 expansionFactor={expansionFactor}
                 setExpansionFactor={setExpansionFactor}
-                lastTextEmbedding={lastTextEmbedding}
                 executedCommand={executedCommand}
                 results={results}
             />

@@ -13,8 +13,6 @@ let tfInitialized = false
 const isBrowser = typeof window !== "undefined"
 
 // Import node-specific packages conditionally
-let Canvas: any
-let Image: any
 
 // Don't try to load tfjs-node directly, as it causes webpack issues
 // We'll use dynamic imports instead when needed
@@ -22,9 +20,7 @@ let Image: any
 if (!isBrowser) {
     try {
         // Dynamic import for node-canvas in server environment
-        const canvas = require("canvas")
-        Canvas = canvas.Canvas
-        Image = canvas.Image
+        await import('canvas')
     } catch (error) {
         console.error("[TensorFlow.js] Failed to load canvas package:", error)
     }
@@ -86,7 +82,7 @@ export async function loadImageModel(config: ImageConfig): Promise<any> {
             // Server-side processing is not supported
             throw new Error(
                 "Image processing in server components is not supported. " +
-                    "Please use client components for image processing."
+                "Please use client components for image processing."
             )
         }
 
@@ -120,7 +116,6 @@ export async function loadImageModel(config: ImageConfig): Promise<any> {
  */
 export async function preprocessImage(
     imageData: string,
-    config: ImageConfig
 ): Promise<any> {
     try {
         // Ensure TensorFlow.js is loaded
@@ -144,7 +139,7 @@ export async function preprocessImage(
             // Server-side processing is not supported
             throw new Error(
                 "Image processing in server components is not supported. " +
-                    "Please use client components for image processing."
+                "Please use client components for image processing."
             )
         }
 
@@ -169,28 +164,28 @@ export async function preprocessImage(
         // Set crossOrigin to anonymous to avoid CORS issues with data URLs
         image.crossOrigin = "anonymous"
         image.src = base64Data
-        
+
         try {
             await imagePromise
-            
+
             console.log(
                 "[TensorFlow.js] Image loaded successfully:",
                 image.width,
                 "x",
                 image.height
             )
-            
+
             // Create a tensor from the image
             const tensor = tf.browser.fromPixels(image)
             console.log(
                 "[TensorFlow.js] Image tensor created with shape:",
                 tensor.shape
             )
-            
+
             // Resize to the expected input size
             const resized = tf.image.resizeBilinear(tensor, [inputSize, inputSize])
             console.log("[TensorFlow.js] Image resized to:", resized.shape)
-            
+
             // Convert to float and normalize to [-1, 1]
             const normalized = resized
                 .toFloat()
@@ -200,15 +195,15 @@ export async function preprocessImage(
                 "[TensorFlow.js] Image normalized with shape:",
                 normalized.shape
             )
-            
+
             // Clean up intermediate tensors
             tensor.dispose()
             resized.dispose()
-            
+
             return normalized
         } catch (error) {
             console.error("[TensorFlow.js] Error processing image:", error);
-            
+
             // Fallback: create an empty tensor with the right dimensions
             // This ensures we don't crash the app even if image processing fails
             console.log("[TensorFlow.js] Creating fallback tensor");
@@ -235,7 +230,7 @@ export async function getImageEmbedding(
         const model = await loadImageModel(config)
 
         // Preprocess the image
-        const tensor = await preprocessImage(imageData, config)
+        const tensor = await preprocessImage(imageData)
 
         console.log(
             "[TensorFlow.js] Generating embedding with model:",
@@ -253,7 +248,7 @@ export async function getImageEmbedding(
         // Execute the model up to the penultimate layer
         // This gives us the feature vector (embedding) before classification
         let activationLayer;
-        
+
         try {
             console.log("[TensorFlow.js] Attempting to execute model with layer name 'global_average_pooling2d_1'");
             // Try first with the expected layer name
@@ -261,15 +256,15 @@ export async function getImageEmbedding(
                 batchedTensor,
                 ["global_average_pooling2d_1"] // This is the name of the penultimate layer in MobileNet v1
             );
-        } catch (e) {
+        } catch (_e) {
             console.log("[TensorFlow.js] First layer name failed, trying alternate layer name 'global_average_pooling2d'");
             try {
                 // Try alternate layer name
                 activationLayer = internalModel.execute(
                     batchedTensor,
-                    ["global_average_pooling2d"] 
+                    ["global_average_pooling2d"]
                 );
-            } catch (e2) {
+            } catch (_e2) {
                 console.log("[TensorFlow.js] Both layer names failed, using model.infer() method");
                 // If both specific layers fail, use model's infer method
                 activationLayer = model.infer(batchedTensor, true);
@@ -283,7 +278,8 @@ export async function getImageEmbedding(
         )
 
         // Convert to array
-        const embedding = Array.from(await activationLayer.data())
+        const rawData = await activationLayer.data();
+        const embedding = Array.from(rawData).map(val => Number(val));
 
         // Debug the embedding
         console.log(

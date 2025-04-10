@@ -1,6 +1,6 @@
 import { ImportJobConfig } from "@/app/api/jobs"
 import { EmbeddingConfig, isTextEmbedding } from "@/app/embeddings/types/embeddingModels"
-import { Dataset, DatasetMetadata, DatasetProvider, ImportProgress } from "../types/DatasetProvider"
+import { Dataset, DatasetMetadata, DatasetProvider } from "../../types/DatasetProvider"
 
 export interface TextDatasetConfig extends DatasetMetadata {
     fileUrl: string
@@ -44,7 +44,7 @@ export class TextDataset implements Dataset {
         }
     }
 
-    async prepareImport({ onProgress }: { onProgress?: (progress: ImportProgress) => void } = {}): Promise<{ file: File, config: ImportJobConfig }> {
+    async prepareImport(): Promise<{ file: File, config: ImportJobConfig }> {
         // Fetch the CSV file
         const response = await fetch(this.config.fileUrl)
         if (!response.ok) {

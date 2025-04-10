@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server'
 import { RedisOperationResult } from './RedisConnection'
-import { cookies } from 'next/headers'
 
 export interface ApiResponse<T = any> {
     success: boolean
@@ -15,10 +14,10 @@ export async function validateRequest<T>(
     validator: (body: any) => { isValid: boolean; error?: string; value?: T }
 ): Promise<T> {
     let body: any
-    
+
     try {
         body = await request.json()
-    } catch (error) {
+    } catch (_error) {
         throw new Error('Invalid JSON in request body')
     }
 
@@ -51,7 +50,7 @@ export function formatResponse<T>(response: RedisOperationResult<T>): NextRespon
 
 export function handleError(error: unknown): NextResponse {
     console.error('Redis operation error:', error)
-    
+
     if (error instanceof Error) {
         console.error('Error details:', {
             name: error.name,

@@ -213,7 +213,7 @@ export default function EditAttributesDialog({
                             }
                         }
                     )
-                } catch (err) {
+                } catch (_err) {
                     setError("Invalid JSON format")
                     return
                 }
@@ -384,21 +384,21 @@ export default function EditAttributesDialog({
                                                                 index
                                                             ].value =
                                                                 attr.type ===
-                                                                "number"
+                                                                    "number"
                                                                     ? Number(
-                                                                          e
-                                                                              .target
-                                                                              .value
-                                                                      )
+                                                                        e
+                                                                            .target
+                                                                            .value
+                                                                    )
                                                                     : e.target
-                                                                          .value
+                                                                        .value
                                                             updateAttributes(
                                                                 newAttributes
                                                             )
                                                         }}
                                                         type={
                                                             attr.type ===
-                                                            "number"
+                                                                "number"
                                                                 ? "number"
                                                                 : "text"
                                                         }
