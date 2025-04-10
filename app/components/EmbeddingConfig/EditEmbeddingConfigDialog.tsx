@@ -26,6 +26,7 @@ import { userSettings } from "@/app/utils/userSettings"
 import { useEffect, useState } from "react"
 import ImageModelSelector from "./ImageModelSelector"
 import OllamaModelSelector from "./OllamaModelSelector"
+import { defaultOllamaUrl } from "@/app/utils/embeddingUtils"
 
 const DEFAULT_CONFIG: EmbeddingConfig = {
     provider: "openai",
@@ -91,7 +92,7 @@ export default function EditEmbeddingConfigModal({
     // Ollama specific state
     const [ollamaConfig, setOllamaConfig] = useState({
         apiUrl:
-            config.ollama?.apiUrl ?? "http://localhost:11434",
+            config.ollama?.apiUrl ?? defaultOllamaUrl(),
         modelName: config.ollama?.modelName ?? "llama2",
         promptTemplate: config.ollama?.promptTemplate ?? "",
     })
@@ -122,7 +123,7 @@ export default function EditEmbeddingConfigModal({
                 setOllamaConfig({
                     apiUrl:
                         config.ollama.apiUrl ??
-                        "http://localhost:11434",
+                        defaultOllamaUrl(),
                     modelName: config.ollama.modelName ?? "llama2",
                     promptTemplate: config.ollama.promptTemplate ?? "",
                 })
@@ -398,7 +399,7 @@ export default function EditEmbeddingConfigModal({
                                                 apiUrl: e.target.value,
                                             })
                                         }
-                                        placeholder="http://localhost:11434/api/embeddings"
+                                        placeholder={`${defaultOllamaUrl()}/api/embeddings`}
                                     />
                                 </div>
                                 <div className="space-y-2">
