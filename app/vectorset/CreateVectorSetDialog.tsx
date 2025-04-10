@@ -12,7 +12,7 @@ import { getDefaultTextEmbeddingConfig } from "@/app/utils/embeddingUtils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ArrowLeft, ChevronRight } from "lucide-react"
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef } from "react"
 import EditEmbeddingConfigModal from "../components/EmbeddingConfig/EditEmbeddingConfigDialog"
 import RedisCommandBox from "../components/RedisCommandBox"
 import AdvancedConfigEdit from "./AdvancedConfigEdit"
@@ -39,6 +39,7 @@ export default function CreateVectorSetModal({
     const [dimensions, setDimensions] = useState(256)
     const [error, setError] = useState<string | null>(null)
     const [isCreating, setIsCreating] = useState(false)
+    const nameInputRef = useRef<HTMLInputElement>(null)
 
     // Vector data choice and embedding config
     const [vectorDataChoice, setVectorDataChoice] = useState<
@@ -86,6 +87,16 @@ export default function CreateVectorSetModal({
 
         initEmbeddingConfig()
     }, [])
+
+    // Auto-focus the name input when dialog opens
+    useEffect(() => {
+        if (isOpen) {
+            // Small delay to ensure the dialog is fully mounted
+            setTimeout(() => {
+                nameInputRef.current?.focus()
+            }, 0)
+        }
+    }, [isOpen])
 
     // Function to get the current effective embedding config based on user choices
     const getCurrentEmbeddingConfig = (): EmbeddingConfig => {
@@ -172,6 +183,13 @@ export default function CreateVectorSetModal({
             ...prev,
             embedding: config,
         }))
+    }
+
+    // Handle Enter key press
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === 'Enter') {
+            handleSubmit()
+        }
     }
 
     // Form submission
@@ -281,12 +299,14 @@ export default function CreateVectorSetModal({
                                         )}
                                     </div>
                                     <Input
+                                        ref={nameInputRef}
                                         className="text-right border-none"
                                         placeholder="Enter a name for your vector set"
                                         value={name}
                                         onChange={(e) =>
                                             setName(e.target.value)
                                         }
+                                        onKeyDown={handleKeyDown}
                                     />
                                 </div>
                             </div>

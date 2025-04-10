@@ -1,4 +1,3 @@
-import { ApiError } from "@/app/api/client"
 import { VectorSetMetadata } from "@/app/types/vectorSetMetaData"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
@@ -96,10 +95,7 @@ export default function CSVFileSelector({
                     /^-?(\d+(?:,\d+)*(?:\.\d+)?)\s+\w+/
                 )
                 if (numberWithUnitsMatch) {
-                    const numberPart = numberWithUnitsMatch[1].replace(
-                        /,/g,
-                        ""
-                    )
+                    const numberPart = numberWithUnitsMatch[1].replace(/,/g, "")
                     const parsedNumber = parseFloat(numberPart)
                     return isNaN(parsedNumber) ? value : parsedNumber
                 }
@@ -117,16 +113,11 @@ export default function CSVFileSelector({
             // Parse first few rows for preview
             const sampleRows = lines.slice(1, 4).map((line) => {
                 const values = parseCSVLine(line)
-                return headers.reduce(
-                    (obj, header, i) => {
-                        // Process the value to handle numeric data correctly
-                        obj[header] = values[i]
-                            ? processValue(values[i])
-                            : ""
-                        return obj
-                    },
-                    {} as Record<string, string | number>
-                )
+                return headers.reduce((obj, header, i) => {
+                    // Process the value to handle numeric data correctly
+                    obj[header] = values[i] ? processValue(values[i]) : ""
+                    return obj
+                }, {} as Record<string, string | number>)
             })
 
             const preview: CSVPreviewData = {
@@ -134,7 +125,7 @@ export default function CSVFileSelector({
                 headers,
                 sampleRows,
                 fileName: file.name,
-                fileContent: text
+                fileContent: text,
             }
 
             // Validate dimensions
@@ -161,15 +152,17 @@ export default function CSVFileSelector({
 
     return (
         <div className="w-full">
-            <div className="text-lg font-medium">Select a file to get started</div>
+            <div className="text-lg font-medium">
+                Select a file to get started
+            </div>
 
             <p className="text-sm text-muted-foreground mt-2">
                 Import a CSV file to create a new vector set. The first row
                 should contain column headers.
             </p>
             <p className="text-sm text-muted-foreground mt-2">
-                Each item will be embedded using the embedding engine
-                configured in the vector set.
+                Each item will be embedded using the embedding engine configured
+                in the vector set.
             </p>
 
             <div className="w-full p-4 flex items-center justify-center mt-4">
@@ -194,8 +187,8 @@ export default function CSVFileSelector({
                 <Alert variant="destructive" className="mt-4">
                     <AlertCircle className="h-4 w-4" />
                     <AlertDescription>
-                        Please configure an embedding engine in the vector
-                        set settings before importing data.
+                        Please configure an embedding engine in the vector set
+                        settings before importing data.
                     </AlertDescription>
                 </Alert>
             )}
@@ -208,4 +201,4 @@ export default function CSVFileSelector({
             )}
         </div>
     )
-} 
+}

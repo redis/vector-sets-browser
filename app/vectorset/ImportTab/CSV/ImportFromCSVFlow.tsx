@@ -11,7 +11,7 @@ import {
     DialogTitle,
 } from "@/components/ui/dialog"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { CheckCircle2, FileSpreadsheet, Loader2, X } from "lucide-react"
+import { FileSpreadsheet, Loader2, X } from "lucide-react"
 import React from "react"
 import ImportCard from "../ImportCard"
 import CSVFileSelector, { CSVPreviewData } from "./CSVFileSelector"
@@ -340,8 +340,8 @@ export default function ImportFromCSVFlow({
                 onClick={() => setShowDialog(true)}
             />
 
-            <Dialog 
-                open={showDialog} 
+            <Dialog
+                open={showDialog}
                 onOpenChange={(open) => {
                     // Only allow closing if we're not importing and import hasn't started
                     if (!isImporting && !importStarted && !open) {
@@ -363,13 +363,13 @@ export default function ImportFromCSVFlow({
                         </div>
                     </DialogHeader>
 
-                    <div className="flex-none px-6">{renderStepIndicator()}</div>
+                    <div className="flex-none px-6">
+                        {renderStepIndicator()}
+                    </div>
 
                     <div className="flex-1 min-h-0">
                         <ScrollArea className="h-full">
-                            <div className="px-6 py-4">
-                                {renderContent()}
-                            </div>
+                            <div className="px-6 py-4">{renderContent()}</div>
                         </ScrollArea>
                     </div>
 
