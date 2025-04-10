@@ -243,8 +243,8 @@ export default function VectorSettings({
                             <div className="text-sm bg-yellow-50 border border-yellow-200 rounded p-4 w-full">
                                 <p className="font-medium text-yellow-800">No Embedding Configuration</p>
                                 <p className="text-yellow-700">
-                                    This vector set was likely created from the CLI and doesn{`'`}t have embedding configuration.
-                                    Adding an embedding configuration will enable VSIM search and VADD operations in the web interface.
+                                This vector set was created outside of the browser and doesn{`'`}t have an embedding configuration.
+                                Adding one will enable VSIM search and VADD operations in the web interface.
                                 </p>
                             </div>
                             <Button
