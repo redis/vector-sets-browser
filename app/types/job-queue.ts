@@ -37,7 +37,7 @@ export interface CSVJobMetadata {
 }
 
 export interface CSVRow {
-    [key: string]: string
+    [key: string]: string | number
 }
 
 export interface JobQueueItem {

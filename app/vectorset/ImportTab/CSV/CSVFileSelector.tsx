@@ -3,6 +3,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { AlertCircle } from "lucide-react"
 import { useRef, useState } from "react"
+import { convertToNumericIfPossible } from "@/app/utils/numberUtils"
 
 export interface CSVPreviewData {
     totalRecords: number
@@ -83,24 +84,7 @@ export default function CSVFileSelector({
 
             // Parse numeric values and handle comma-separated numbers
             const processValue = (value: string): string | number => {
-                // Remove commas from numbers (e.g., "1,234.56" or "123,100,000" → numeric value)
-                if (/^-?[\d,]+(\.\d+)?$/.test(value)) {
-                    const numberWithoutCommas = value.replace(/,/g, "")
-                    const parsedNumber = parseFloat(numberWithoutCommas)
-                    return isNaN(parsedNumber) ? value : parsedNumber
-                }
-
-                // Extract numbers from text with units (e.g., "160 min" → 160)
-                const numberWithUnitsMatch = value.match(
-                    /^-?(\d+(?:,\d+)*(?:\.\d+)?)\s+\w+/
-                )
-                if (numberWithUnitsMatch) {
-                    const numberPart = numberWithUnitsMatch[1].replace(/,/g, "")
-                    const parsedNumber = parseFloat(numberPart)
-                    return isNaN(parsedNumber) ? value : parsedNumber
-                }
-
-                return value
+                return convertToNumericIfPossible(value);
             }
 
             const lines = text

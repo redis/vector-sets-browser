@@ -8,6 +8,7 @@ import { JobQueueService } from "./job-queue"
 import { RedisConnection } from "@/app/redis-server/RedisConnection"
 import { registerCompletedJob } from "@/app/lib/completedJobs"
 import { buildVectorElement, saveVectorData } from "@/app/lib/importUtils"
+import { convertToNumericIfPossible } from "@/app/utils/numberUtils"
 
 export class JobProcessor {
     private url: string
@@ -96,7 +97,7 @@ export class JobProcessor {
     private async addToRedis(
         element: string,
         embedding: number[],
-        attributes?: Record<string, string>
+        attributes?: Record<string, string | number>
     ): Promise<void> {
         if (!this.metadata) {
             throw new Error("Job metadata not loaded")
@@ -167,10 +168,10 @@ export class JobProcessor {
     }
 
     private processTemplate(template: string, rowData: CSVRow): string {
-        // Replace ${columnName} with the actual value from rowData
+        // Replace ${columnName} with the actual value from rowData, ensuring string output
         return template.replace(/\${([^}]+)}/g, (match, columnName) => {
             return rowData[columnName] !== undefined
-                ? rowData[columnName]
+                ? String(rowData[columnName])  // Ensure string output for embedding
                 : match
         });
     }
@@ -178,7 +179,7 @@ export class JobProcessor {
     private async processToJson(
         elementId: string,
         embedding: number[],
-        attributes?: Record<string, string>
+        attributes?: Record<string, string | number>
     ): Promise<void> {
         if (!this.metadata) {
             throw new Error("Job metadata not loaded")
@@ -362,7 +363,7 @@ export class JobProcessor {
                         // Get the element identifier from the configured column
                         const elementColumn =
                             this.metadata.elementColumn || "id" // Default to "id" for JSON files
-                        elementId = item.rowData[elementColumn]
+                        elementId = String(item.rowData[elementColumn]) // Ensure string output for element ID
                     }
 
                     if (!elementId) {
@@ -390,7 +391,7 @@ export class JobProcessor {
                             // Get the text to embed from the configured column
                             const textColumn =
                                 this.metadata.textColumn || "text" // Default to "text" for JSON files
-                            textToEmbed = item.rowData[textColumn]
+                            textToEmbed = String(item.rowData[textColumn]) // Ensure string output for embedding
                         }
 
                         if (!textToEmbed) {
@@ -410,18 +411,24 @@ export class JobProcessor {
                     }
 
                     // Extract attributes if attribute columns are configured
-                    const attributes: Record<string, string> = {}
+                    const attributes: Record<string, string | number> = {}
                     if (
-                        this.metadata.attributeColumns &&
+                        this.metadata?.attributeColumns &&
                         this.metadata.attributeColumns.length > 0
                     ) {
-                        for (const column of this.metadata.attributeColumns) {
-                            if (item.rowData[column] !== undefined) {
-                                attributes[column] = item.rowData[column]
+                        this.metadata.attributeColumns.forEach((column: string) => {
+                            const value = item.rowData[column]
+                            if (value !== undefined) {
+                                // Replace spaces with hyphens in attribute names for query compatibility
+                                const attributeName = column.replace(/\s+/g, '-').toLowerCase() // Also convert to lowercase for consistency
+                                // For attributes, we want to preserve numeric types
+                                attributes[attributeName] = typeof value === 'number' 
+                                    ? value 
+                                    : convertToNumericIfPossible(String(value))
                             }
-                        }
+                        })
                         console.log(
-                            `[JobProcessor] Extracted attributes:`,
+                            `[JobProcessor] Extracted attributes with normalized names:`,
                             attributes
                         )
                     }
