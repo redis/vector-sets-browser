@@ -228,6 +228,23 @@ export default function VectorSetNav({
             }
         }
 
+        const handleDimensionsChanged = async (data: {
+            vectorSetName: string
+            dimensions: number
+        }) => {
+            console.log(`Dimensions changed for ${data.vectorSetName} to ${data.dimensions}`)
+
+            if (vectorSetInfo[data.vectorSetName]) {
+                setVectorSetInfo((prev) => ({
+                    ...prev,
+                    [data.vectorSetName]: {
+                        ...prev[data.vectorSetName],
+                        dimensions: data.dimensions,
+                    },
+                }))
+            }
+        }
+
         let unsubscribes: Array<() => void> = []
 
         if (isConnected) {
@@ -235,6 +252,7 @@ export default function VectorSetNav({
                 eventBus.on(AppEvents.VECTOR_ADDED, handleVectorAdded),
                 eventBus.on(AppEvents.VECTOR_DELETED, handleVectorDeleted),
                 eventBus.on(AppEvents.VECTORS_IMPORTED, handleVectorsImported),
+                eventBus.on(AppEvents.VECTORSET_DIMENSIONS_CHANGED, handleDimensionsChanged),
             ]
 
             if (!refreshingRef.current) {

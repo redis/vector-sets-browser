@@ -1,17 +1,26 @@
+import { vectorSets } from "@/app/api/vector-sets"
 import EditEmbeddingConfigModal from "@/app/components/EmbeddingConfig/EditEmbeddingConfigDialog"
-import { EmbeddingConfig, getEmbeddingDataFormat, getModelName } from "@/app/embeddings/types/embeddingModels"
+import {
+    EmbeddingConfig,
+    getEmbeddingDataFormat,
+    getExpectedDimensions,
+    getModelName,
+} from "@/app/embeddings/types/embeddingModels"
+import { vadd, vcard, vrem, vsim } from "@/app/redis-server/api"
 import { VectorSetMetadata } from "@/app/types/vectorSetMetaData"
+import eventBus, { AppEvents } from "@/app/utils/eventEmitter"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
     Dialog,
     DialogContent,
+    DialogDescription,
+    DialogFooter,
     DialogHeader,
     DialogTitle,
 } from "@/components/ui/dialog"
 import { useState } from "react"
 import AdvancedConfigEdit from "../AdvancedConfigEdit"
-import { vectorSets } from "@/app/api/vector-sets"
 import { DEFAULT_EMBEDDING, DEFAULT_EMBEDDING_CONFIG } from "../constants"
 
 interface VectorSettingsProps {
@@ -26,34 +35,131 @@ export default function VectorSettings({
     onMetadataUpdate,
 }: VectorSettingsProps) {
     const [isEditConfigModalOpen, setIsEditConfigModalOpen] = useState(false)
-    const [isAdvancedConfigPanelOpen, setIsAdvancedConfigPanelOpen] = useState(false)
-    const [workingMetadata, setWorkingMetadata] = useState<VectorSetMetadata | null>(null)
+    const [isAdvancedConfigPanelOpen, setIsAdvancedConfigPanelOpen] =
+        useState(false)
+    const [workingMetadata, setWorkingMetadata] =
+        useState<VectorSetMetadata | null>(null)
+    const [isWarningDialogOpen, setIsWarningDialogOpen] = useState(false)
+    const [pendingEmbeddingConfig, setPendingEmbeddingConfig] =
+        useState<EmbeddingConfig | null>(null)
 
     const handleEditConfig = async (newConfig: EmbeddingConfig) => {
-        console.log(`[handleEditConfig] New config: ${JSON.stringify(newConfig)}`)
         try {
             if (!vectorSetName) {
                 throw new Error("No vector set selected")
             }
 
-            const updatedMetadata: VectorSetMetadata = {
-                ...metadata,
-                embedding: newConfig,
-                created: metadata?.created || new Date().toISOString(),
-                lastUpdated: new Date().toISOString(),
+            // Check if this is a different embedding model
+            const isEmbeddingModelChange =
+                metadata?.embedding &&
+                (metadata.embedding.provider !== newConfig.provider ||
+                    getModelName(metadata.embedding) !==
+                        getModelName(newConfig))
+
+            if (isEmbeddingModelChange) {
+                // Check vector count
+                const countResponse = await vcard({ keyName: vectorSetName })
+                if (!countResponse.success) {
+                    throw new Error("Failed to get vector count")
+                }
+
+                if (countResponse.result === 1) {
+                    // Check if it's the default vector
+                    const searchResult = await vsim({
+                        keyName: vectorSetName,
+                        count: 1,
+                        searchElement: "First Vector (Default)",
+                    })
+
+                    if (
+                        searchResult.success &&
+                        searchResult.result &&
+                        searchResult.result.length > 0
+                    ) {
+                        const recordName = searchResult.result[0][0]
+                        if (recordName === "First Vector (Default)") {
+                            // Delete the default vector
+                            await vrem({
+                                keyName: vectorSetName,
+                                element: recordName,
+                            })
+
+                            // Add back the default vector (with the new config)
+                            const dimensions =
+                                getExpectedDimensions(newConfig) ||
+                                DEFAULT_EMBEDDING.DIMENSIONS
+
+                            const addResponse = await vadd({
+                                keyName: vectorSetName,
+                                element: "First Vector (Default)",
+                                vector: Array(dimensions).fill(0),
+                                reduceDimensions:
+                                    metadata?.redisConfig?.reduceDimensions,
+                                quantization:
+                                    metadata?.redisConfig?.quantization,
+                            })
+
+                            if (!addResponse.success) {
+                                throw new Error(
+                                    `Failed to add default vector: ${addResponse.error}`
+                                )
+                            }
+
+                            // Proceed with the update
+                            await saveEmbeddingConfig(newConfig)
+
+                            // Notify that dimensions have changed
+                            eventBus.emit(
+                                AppEvents.VECTORSET_DIMENSIONS_CHANGED,
+                                {
+                                    vectorSetName,
+                                    dimensions,
+                                }
+                            )
+
+                            return
+                        }
+                    }
+                }
+
+                // If we get here, we need to show the warning dialog
+                setPendingEmbeddingConfig(newConfig)
+                setIsWarningDialogOpen(true)
+                setIsEditConfigModalOpen(false)
+                return
             }
 
-            await vectorSets.setMetadata({
-                name: vectorSetName,
-                metadata: updatedMetadata,
-            })
-
-            // Notify parent of metadata update
-            onMetadataUpdate?.(updatedMetadata)
-
-            setIsEditConfigModalOpen(false)
+            // If no warning needed, proceed with the update
+            await saveEmbeddingConfig(newConfig)
         } catch (error) {
             console.error("[VectorSetPage] Error saving config:", error)
+        }
+    }
+
+    const saveEmbeddingConfig = async (newConfig: EmbeddingConfig) => {
+        const updatedMetadata: VectorSetMetadata = {
+            ...metadata,
+            embedding: newConfig,
+            created: metadata?.created || new Date().toISOString(),
+            lastUpdated: new Date().toISOString(),
+        }
+
+        await vectorSets.setMetadata({
+            name: vectorSetName,
+            metadata: updatedMetadata,
+        })
+
+        // Notify parent of metadata update
+        onMetadataUpdate?.(updatedMetadata)
+
+        setIsEditConfigModalOpen(false)
+        setIsWarningDialogOpen(false)
+        setPendingEmbeddingConfig(null)
+    }
+
+    const handleConfirmEmbeddingChange = async () => {
+        if (pendingEmbeddingConfig) {
+            await saveEmbeddingConfig(pendingEmbeddingConfig)
         }
     }
 
@@ -70,9 +176,11 @@ export default function VectorSettings({
                     provider: DEFAULT_EMBEDDING.PROVIDER,
                     none: {
                         model: DEFAULT_EMBEDDING.MODEL,
-                        dimensions: workingMetadata.dimensions || DEFAULT_EMBEDDING.DIMENSIONS,
-                    }
-                }
+                        dimensions:
+                            workingMetadata.dimensions ||
+                            DEFAULT_EMBEDDING.DIMENSIONS,
+                    },
+                },
             }
 
             await vectorSets.setMetadata({
@@ -86,7 +194,10 @@ export default function VectorSettings({
             console.log("Advanced config saved successfully")
             setIsAdvancedConfigPanelOpen(false)
         } catch (error) {
-            console.error("[VectorSettings] Error saving advanced config:", error)
+            console.error(
+                "[VectorSettings] Error saving advanced config:",
+                error
+            )
         }
     }
 
@@ -112,30 +223,65 @@ export default function VectorSettings({
                                     Quantization:
                                 </div>
                                 <div>
-                                    {metadata?.redisConfig?.quantization || <span>Default: <span className="font-bold">Q8</span></span>}
+                                    {metadata?.redisConfig?.quantization || (
+                                        <span>
+                                            Default:{" "}
+                                            <span className="font-bold">
+                                                Q8
+                                            </span>
+                                        </span>
+                                    )}
                                 </div>
 
-                                    <div className="text-gray-600">
-                                        Reduced Dimensions:
-                                    </div>
-                                    <div>
-                                        {metadata?.redisConfig?.reduceDimensions || <span>Default: <span className="font-bold">None (No dimension reduction)</span></span>}
-                                    </div>
+                                <div className="text-gray-600">
+                                    Reduced Dimensions:
+                                </div>
+                                <div>
+                                    {metadata?.redisConfig
+                                        ?.reduceDimensions || (
+                                        <span>
+                                            Default:{" "}
+                                            <span className="font-bold">
+                                                None (No dimension reduction)
+                                            </span>
+                                        </span>
+                                    )}
+                                </div>
 
-                                    <div className="text-gray-600">
-                                        Default CAS:
-                                    </div>
-                                    <div>
-                                        {metadata?.redisConfig?.defaultCAS !== undefined
-                                            ? (metadata?.redisConfig.defaultCAS ? "Enabled" : "Disabled")
-                                            : <span>Default: <span className="font-bold">Disabled</span></span>}
-                                    </div>
+                                <div className="text-gray-600">
+                                    Default CAS:
+                                </div>
+                                <div>
+                                    {metadata?.redisConfig?.defaultCAS !==
+                                    undefined ? (
+                                        metadata?.redisConfig.defaultCAS ? (
+                                            "Enabled"
+                                        ) : (
+                                            "Disabled"
+                                        )
+                                    ) : (
+                                        <span>
+                                            Default:{" "}
+                                            <span className="font-bold">
+                                                Disabled
+                                            </span>
+                                        </span>
+                                    )}
+                                </div>
 
                                 <div className="text-gray-600">
                                     Build Exploration Factor:
                                 </div>
                                 <div>
-                                    {metadata?.redisConfig?.buildExplorationFactor || <span>Default: <span className="font-bold">200</span></span>}
+                                    {metadata?.redisConfig
+                                        ?.buildExplorationFactor || (
+                                        <span>
+                                            Default:{" "}
+                                            <span className="font-bold">
+                                                200
+                                            </span>
+                                        </span>
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -146,26 +292,29 @@ export default function VectorSettings({
                             variant="default"
                             onClick={() => {
                                 // For CLI-created vector sets, create a proper metadata structure
-                                let initialMetadata: VectorSetMetadata;
+                                let initialMetadata: VectorSetMetadata
 
                                 if (metadata) {
                                     // If metadata exists, use it as a base
-                                    initialMetadata = {...metadata};
+                                    initialMetadata = { ...metadata }
 
                                     // If embedding doesn't exist, add a placeholder one to satisfy the type requirements
                                     if (!initialMetadata.embedding) {
                                         initialMetadata.embedding = {
-                                            provider: DEFAULT_EMBEDDING.PROVIDER,
+                                            provider:
+                                                DEFAULT_EMBEDDING.PROVIDER,
                                             none: {
                                                 model: DEFAULT_EMBEDDING.MODEL,
-                                                dimensions: metadata.dimensions || DEFAULT_EMBEDDING.DIMENSIONS
-                                            }
-                                        };
+                                                dimensions:
+                                                    metadata.dimensions ||
+                                                    DEFAULT_EMBEDDING.DIMENSIONS,
+                                            },
+                                        }
                                     }
 
                                     // If redisConfig doesn't exist, initialize it as an empty object
                                     if (!initialMetadata.redisConfig) {
-                                        initialMetadata.redisConfig = {};
+                                        initialMetadata.redisConfig = {}
                                     }
                                 } else {
                                     // If no metadata at all, create a minimal valid structure
@@ -174,12 +323,12 @@ export default function VectorSettings({
                                         created: new Date().toISOString(),
                                         lastUpdated: new Date().toISOString(),
                                         description: "",
-                                        redisConfig: {}
-                                    };
+                                        redisConfig: {},
+                                    }
                                 }
 
-                                setWorkingMetadata(initialMetadata);
-                                setIsAdvancedConfigPanelOpen(true);
+                                setWorkingMetadata(initialMetadata)
+                                setIsAdvancedConfigPanelOpen(true)
                             }}
                         >
                             Edit
@@ -213,7 +362,8 @@ export default function VectorSettings({
                                         Provider:
                                     </div>
                                     <div className="font-bold">
-                                        {metadata?.embedding?.provider || "None"}
+                                        {metadata?.embedding?.provider ||
+                                            "None"}
                                     </div>
                                 </div>
                                 <div className="flex space-x-2">
@@ -227,7 +377,9 @@ export default function VectorSettings({
                                         Data Format:
                                     </div>
                                     <div className="font-bold">
-                                        {getEmbeddingDataFormat(metadata?.embedding)}
+                                        {getEmbeddingDataFormat(
+                                            metadata?.embedding
+                                        )}
                                     </div>
                                 </div>
                             </div>
@@ -241,10 +393,15 @@ export default function VectorSettings({
                     ) : (
                         <div className="flex flex-col items-start gap-4 p-4">
                             <div className="text-sm bg-yellow-50 border border-yellow-200 rounded p-4 w-full">
-                                <p className="font-medium text-yellow-800">No Embedding Configuration</p>
+                                <p className="font-medium text-yellow-800">
+                                    No Embedding Configuration
+                                </p>
                                 <p className="text-yellow-700">
-                                This vector set was created outside of the browser and doesn{`'`}t have an embedding configuration.
-                                Adding one will enable VSIM search and VADD operations in the web interface.
+                                    This vector set was created outside of the
+                                    browser and doesn{`'`}t have an embedding
+                                    configuration. Adding one will enable VSIM
+                                    search and VADD operations in the web
+                                    interface.
                                 </p>
                             </div>
                             <Button
@@ -268,13 +425,13 @@ export default function VectorSettings({
                     </DialogHeader>
                     {workingMetadata && (
                         <div className="flex flex-col gap-4">
-                            <AdvancedConfigEdit
-                                redisConfig={workingMetadata}
-                            />
+                            <AdvancedConfigEdit redisConfig={workingMetadata} />
                             <div className="flex justify-end gap-2 mt-4">
                                 <Button
                                     variant="ghost"
-                                    onClick={() => setIsAdvancedConfigPanelOpen(false)}
+                                    onClick={() =>
+                                        setIsAdvancedConfigPanelOpen(false)
+                                    }
                                 >
                                     Cancel
                                 </Button>
@@ -294,16 +451,57 @@ export default function VectorSettings({
                 <EditEmbeddingConfigModal
                     isOpen={isEditConfigModalOpen}
                     onClose={() => setIsEditConfigModalOpen(false)}
-                    config={metadata?.embedding || {
-                        provider: DEFAULT_EMBEDDING.PROVIDER,
-                        none: {
-                            model: DEFAULT_EMBEDDING.MODEL,
-                            dimensions: metadata?.dimensions || DEFAULT_EMBEDDING.DIMENSIONS,
-                        },
-                    }}
+                    config={
+                        metadata?.embedding || {
+                            provider: DEFAULT_EMBEDDING.PROVIDER,
+                            none: {
+                                model: DEFAULT_EMBEDDING.MODEL,
+                                dimensions:
+                                    metadata?.dimensions ||
+                                    DEFAULT_EMBEDDING.DIMENSIONS,
+                            },
+                        }
+                    }
                     onSave={handleEditConfig}
                 />
             )}
+
+            <Dialog
+                open={isWarningDialogOpen}
+                onOpenChange={setIsWarningDialogOpen}
+            >
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>
+                            Warning: Embedding Model Change
+                        </DialogTitle>
+                        <DialogDescription>
+                            You are changing the vector embedding model, and
+                            there are already vectors in this vectorset which
+                            are possibly using a different model. Using vectors
+                            from different embedding models in a single vector
+                            set is not recommended and does not make sense.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                        <Button
+                            variant="ghost"
+                            onClick={() => {
+                                setIsWarningDialogOpen(false)
+                                setPendingEmbeddingConfig(null)
+                            }}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            variant="destructive"
+                            onClick={handleConfirmEmbeddingChange}
+                        >
+                            Change it anyway
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     )
 }

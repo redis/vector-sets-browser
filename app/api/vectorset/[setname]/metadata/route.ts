@@ -97,8 +97,6 @@ export async function PUT(
     { params }: any
 ) {
     try {
-        console.log("PUT /api/vectorset/[setname]/metadata", params)
-
         const parsedParams = await params
 
         if (!parsedParams || !parsedParams.setname) {

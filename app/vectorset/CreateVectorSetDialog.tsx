@@ -158,6 +158,7 @@ export default function CreateVectorSetModal({
                 }
 
                 const result = await vadd(request)
+                
                 if (result.executedCommand) {
                     setPreviewCommand(result.executedCommand)
                 }

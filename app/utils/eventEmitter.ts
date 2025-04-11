@@ -11,6 +11,7 @@ export enum AppEvents {
     VECTORS_IMPORTED = "vectors_imported",
     JOB_STATUS_CHANGED = "job_status_changed",
     METADATA_UPDATED = "metadata_updated",
+    VECTORSET_DIMENSIONS_CHANGED = "vectorset_dimensions_changed",
 }
 
 class EventEmitter {

@@ -12,19 +12,23 @@ let tfInitialized = false
 // Check if code is running in browser environment
 const isBrowser = typeof window !== "undefined"
 
-// Import node-specific packages conditionally
+// Initialize canvas in non-browser environments
+async function initializeCanvas() {
+    if (!isBrowser) {
+        try {
+            // Dynamic import for node-canvas in server environment
+            await import('canvas')
+        } catch (error) {
+            console.error("[TensorFlow.js] Failed to load canvas package:", error)
+        }
+    }
+}
+
+// Call initialization
+initializeCanvas().catch(console.error)
 
 // Don't try to load tfjs-node directly, as it causes webpack issues
 // We'll use dynamic imports instead when needed
-
-if (!isBrowser) {
-    try {
-        // Dynamic import for node-canvas in server environment
-        await import('canvas')
-    } catch (error) {
-        console.error("[TensorFlow.js] Failed to load canvas package:", error)
-    }
-}
 
 /**
  * Load a TensorFlow.js image model

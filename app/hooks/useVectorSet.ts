@@ -6,10 +6,12 @@ import {
     VectorTuple,
     vadd,
     vcard,
+    vdim,
     vemb,
     vgetattr,
     vinfo,
-    vrem
+    vrem,
+    vsim
 } from "@/app/redis-server/api"
 import { VectorSetMetadata } from "@/app/types/vectorSetMetaData"
 
@@ -192,23 +194,45 @@ const useVectorSet = (): UseVectorSetReturn => {
             // Validate the vector (no normalization)
             const validationResult = validateVector(
                 newVector,
-                metadata?.embedding ? getExpectedDimensions(metadata?.embedding) : undefined,
+                metadata?.embedding
+                    ? getExpectedDimensions(metadata?.embedding)
+                    : undefined
             )
 
             // If the vector is not valid, throw an error
             if (!validationResult.isValid) {
-                throw new Error(`Invalid vector: ${validationResult.error || "contains NaN or Infinity values"}`)
+                throw new Error(
+                    `Invalid vector: ${
+                        validationResult.error ||
+                        "contains NaN or Infinity values"
+                    }`
+                )
             }
 
-            // Create an empty attributes object
-            const attrs = {}
+            // special case for default vector.  IF the vector set contains only one vector
+            // and it is the default vector, then we should delete the First Vector (Default)
+            // after adding the new vector.
+            const vectorCount = await vcard({ keyName: vectorSetName })
+            let emptyVectorSet = false
+            console.log("cardResponse", vectorCount)
+            if (vectorCount.success && vectorCount.result === 1) {
+                const defaultVector = await vsim({
+                    keyName: vectorSetName,
+                    searchElement: "First Vector (Default)",
+                })
+                console.log("dimensions", vectorCount.result)
+                if (defaultVector.success && defaultVector.result) {
+                    emptyVectorSet = true
+                    console.log("emptyVectorSet === true")
+                }
+            }
 
             // Use original vector
             const result = await vadd({
                 keyName: vectorSetName,
                 element,
                 vector: newVector as number[],
-                attributes: JSON.stringify(attrs),
+                attributes: "",
                 useCAS: useCAS || metadata?.redisConfig?.defaultCAS,
                 reduceDimensions: metadata?.redisConfig?.reduceDimensions,
                 ef: metadata?.redisConfig?.buildExplorationFactor,
@@ -218,15 +242,15 @@ const useVectorSet = (): UseVectorSetReturn => {
                 throw new Error(result.error || "Failed to add vector")
             }
 
-            // Get the attributes for the element
-            const attributes = await vgetattr({
-                keyName: vectorSetName,
-                element,
-                returnCommandOnly: false
-            })
-
-            if (!attributes.success) {
-                throw new Error(attributes.error || "Failed to get attributes")
+            // special case for default vector.  IF the vector set contains only one vector
+            // and it is the default vector, then we should delete the First Vector (Default)
+            // after adding the new vector.
+            if (emptyVectorSet) {
+                await vrem({
+                    keyName: vectorSetName,
+                    element: "First Vector (Default)",
+                })
+                console.log("defaultVector removed")
             }
 
             // Get the new record count
@@ -234,22 +258,29 @@ const useVectorSet = (): UseVectorSetReturn => {
                 keyName: vectorSetName,
             })
 
-            if (!newRecordCountResponse.success || newRecordCountResponse.result === undefined) {
-                throw new Error(newRecordCountResponse.error || "Failed to get updated record count")
+            if (
+                !newRecordCountResponse.success ||
+                newRecordCountResponse.result === undefined
+            ) {
+                throw new Error(
+                    newRecordCountResponse.error ||
+                        "Failed to get updated record count"
+                )
             }
 
             setRecordCount(newRecordCountResponse.result)
 
             // Update the cache
             if (vectorSetCacheRef.current[vectorSetName]) {
-                vectorSetCacheRef.current[vectorSetName].recordCount = newRecordCountResponse.result
+                vectorSetCacheRef.current[vectorSetName].recordCount =
+                    newRecordCountResponse.result
             }
 
             // Emit the vector added event
             eventBus.emit(AppEvents.VECTOR_ADDED, {
                 vectorSetName,
                 element,
-                newCount: newRecordCountResponse.result
+                newCount: newRecordCountResponse.result,
             })
 
             setStatusMessage("Vector created successfully")
@@ -257,7 +288,12 @@ const useVectorSet = (): UseVectorSetReturn => {
             // Add to results with attributes
             setResults((prevResults) => [
                 ...prevResults,
-                [element, 1.0, newVector, attributes.result || ""] as VectorTuple
+                [
+                    element,
+                    1.0,
+                    newVector,
+                    "",
+                ] as VectorTuple,
             ])
         } catch (error) {
             console.error("Error creating vector:", error)
