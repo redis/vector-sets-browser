@@ -134,14 +134,14 @@ export function SampleDataImporter({
                 const searchResult = await vsim({
                     keyName: vectorSetName,
                     count: 1,
-                    searchElement: "First Vector (Default)"
+                    searchElement: "Placeholder (Vector)"
                 })
 
                 if (searchResult.result) {
                     const recordName = searchResult.result[0][0]; // First element, element name
 
                     // Check if it's the default placeholder record
-                    if (recordName === "First Vector (Default)") {
+                    if (recordName === "Placeholder (Vector)") {
                         console.log("Removing placeholder record before import:", recordName);
 
                         // Delete the default record

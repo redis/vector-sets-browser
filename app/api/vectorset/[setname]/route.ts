@@ -117,7 +117,7 @@ export async function POST(
                 // Create the vector set with either the custom vector or a dummy vector
                 const vector =
                     customData?.vector || Array(effectiveDimensions).fill(0)
-                const element = customData?.element || "First Vector (Default)"
+                const element = customData?.element || "Placeholder (Vector)"
 
                 // Ensure vector is an array of numbers
                 if (!Array.isArray(vector)) {

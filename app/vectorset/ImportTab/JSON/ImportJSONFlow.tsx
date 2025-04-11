@@ -98,7 +98,7 @@ export default function ImportJSONFlow({
         )
     }
 
-    // Function to check if the vectorset has only one record with "First Vector (Default)"
+    // Function to check if the vectorset has only one record with "Placeholder (Vector)"
     // and delete it if found to prevent issues with embedding type or REDUCE option
     const checkAndRemovePlaceholderRecord = async () => {
         try {
@@ -111,14 +111,14 @@ export default function ImportJSONFlow({
                 const searchResult = await vsim({
                     keyName: vectorSetName,
                     count: 1,
-                    searchElement: "First Vector (Default)"
+                    searchElement: "Placeholder (Vector)"
                 })
 
                 if (searchResult.success && searchResult.result && searchResult.result.length > 0) {
                     const recordName = searchResult.result[0][0]; // First element, element name
 
                     // Check if it's the default placeholder record
-                    if (recordName === "First Vector (Default)") {
+                    if (recordName === "Placeholder (Vector)") {
                         console.log("Removing placeholder record before import:", recordName);
 
                         // Delete the default record

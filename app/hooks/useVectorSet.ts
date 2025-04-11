@@ -211,7 +211,7 @@ const useVectorSet = (): UseVectorSetReturn => {
             }
 
             // special case for default vector.  IF the vector set contains only one vector
-            // and it is the default vector, then we should delete the First Vector (Default)
+            // and it is the default vector, then we should delete the Placeholder (Vector)
             // after adding the new vector.
             const vectorCountResponse = await vcard({ keyName: vectorSetName })
             let vectorCount = vectorCountResponse.success ? vectorCountResponse.result : 0
@@ -232,16 +232,16 @@ const useVectorSet = (): UseVectorSetReturn => {
             }
 
             // special case for default vector.  IF the vector set contains only one vector
-            // and it is the default vector, then we should delete the First Vector (Default)
+            // and it is the default vector, then we should delete the Placeholder (Vector)
             // after adding the new vector.
             if (vectorCount === 1) {
                 await vrem({
                     keyName: vectorSetName,
-                    element: "First Vector (Default)",
+                    element: "Placeholder (Vector)",
                 })
                 console.log("attempted to remove defaultVector")
                 // Also remove the default vector from the results array
-                setResults((prevResults) => prevResults.filter(result => result[0] !== "First Vector (Default)"))
+                setResults((prevResults) => prevResults.filter(result => result[0] !== "Placeholder (Vector)"))
             }
 
             // Get the new record count
@@ -311,7 +311,7 @@ const useVectorSet = (): UseVectorSetReturn => {
             // special case for default vector.  IF the vector set contains only one vector
             // and the record we are deleting is NOT the default vector, then we should add a default vector
             // before deleting the record. This way the placeholder is maintained and the vector set stays valid 
-            if (element !== "First Vector (Default)") {
+            if (element !== "Placeholder (Vector)") {
                 const vectorCountResponse = await vcard({ keyName: vectorSetName })
                 
                 if (vectorCountResponse.success && vectorCountResponse.result === 1) {
@@ -319,7 +319,7 @@ const useVectorSet = (): UseVectorSetReturn => {
                     if (dimResponse.success && dimResponse.result) {
                         await vadd({
                             keyName: vectorSetName,
-                            element: "First Vector (Default)",
+                            element: "Placeholder (Vector)",
                             vector: Array(dimResponse.result).fill(0),
                             attributes: "",
                             useCAS: metadata?.redisConfig?.defaultCAS,

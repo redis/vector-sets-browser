@@ -241,7 +241,7 @@ export default function CreateVectorSetModal({
             let customData = undefined
             if (vectorDataChoice === "manual") {
                 customData = {
-                    element: `First Vector (Default)`,
+                    element: `Placeholder (Vector)`,
                     vector: Array(effectiveDimensions).fill(0),
                 }
             }

@@ -70,7 +70,7 @@ export default function VectorSettings({
                     const searchResult = await vsim({
                         keyName: vectorSetName,
                         count: 1,
-                        searchElement: "First Vector (Default)",
+                        searchElement: "Placeholder (Vector)",
                     })
 
                     if (
@@ -79,7 +79,7 @@ export default function VectorSettings({
                         searchResult.result.length > 0
                     ) {
                         const recordName = searchResult.result[0][0]
-                        if (recordName === "First Vector (Default)") {
+                        if (recordName === "Placeholder (Vector)") {
                             // Delete the default vector
                             await vrem({
                                 keyName: vectorSetName,
@@ -93,7 +93,7 @@ export default function VectorSettings({
 
                             const addResponse = await vadd({
                                 keyName: vectorSetName,
-                                element: "First Vector (Default)",
+                                element: "Placeholder (Vector)",
                                 vector: Array(dimensions).fill(0),
                                 reduceDimensions:
                                     metadata?.redisConfig?.reduceDimensions,

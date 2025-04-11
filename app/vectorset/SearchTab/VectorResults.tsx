@@ -583,7 +583,7 @@ export default function VectorResults({
     // Check if the only result is the default first vector
     const isEmptyVectorSet = useMemo(() => {
         return (
-            results.length === 1 && results[0][0] === "First Vector (Default)"
+            results.length === 1 && results[0][0] === "Placeholder (Vector)"
         )
     }, [results])
 

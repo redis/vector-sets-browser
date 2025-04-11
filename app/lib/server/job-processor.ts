@@ -104,7 +104,7 @@ export class JobProcessor {
 
         const vectorSetName = this.metadata.vectorSetName
 
-        // Check if this is the first vector being added (excluding First Vector (Default))
+        // Check if this is the first vector being added (excluding Placeholder (Vector))
         const countResult = await RedisConnection.withClient(
             this.url,
             async (client) => {
@@ -149,19 +149,19 @@ export class JobProcessor {
 
         // If this was the second vector added (count was 1), try to remove the default vector
         if (countResult.success && countResult.result === 1) {
-            console.log("[JobProcessor] Attempting to remove First Vector (Default)")
+            console.log("[JobProcessor] Attempting to remove Placeholder (Vector)")
             try {
                 await RedisConnection.withClient(
                     this.url,
                     async (client) => {
-                        await client.sendCommand(["VREM", vectorSetName, "First Vector (Default)"])
-                        console.log("[JobProcessor] Successfully removed First Vector (Default)")
+                        await client.sendCommand(["VREM", vectorSetName, "Placeholder (Vector)"])
+                        console.log("[JobProcessor] Successfully removed Placeholder (Vector)")
                         return true
                     }
                 )
             } catch (error) {
                 // Log but don't throw - this is a best-effort operation
-                console.error("[JobProcessor] Error removing First Vector (Default):", error)
+                console.error("[JobProcessor] Error removing Placeholder (Vector):", error)
             }
         }
     }
