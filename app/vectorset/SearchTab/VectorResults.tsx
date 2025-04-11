@@ -649,33 +649,21 @@ export default function VectorResults({
         if (!keyName) {
             return null // Don't show anything if no vector set is selected
         }
-        if (searchQuery === "") {
+        if (searchQuery === "" && !searchFilter) {
             return (
                 <div className="flex flex-col items-center justify-center py-12 space-y-4 text-gray-500">
-                    <p className="text-sm">
-                        Enter an element or vector to search on
+                    <p className="">
+                        No results to display
                     </p>
                 </div>
             )
         } else {
             return (
                 <div className="flex flex-col items-center justify-center py-12 space-y-4 text-gray-500">
-                    <svg
-                        className="w-8 h-8 text-gray-400"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                    >
-                        <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={1.5}
-                            d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                        />
-                    </svg>
-                    <p className="text-sm">No results to display.</p>
+
+                    <p className="">No results to display.</p>
                     {searchFilter && (
-                        <p className="text-xs">
+                        <p className="">
                             Try adjusting your search filter or query.
                         </p>
                     )}

@@ -30,18 +30,24 @@ export async function POST(request: NextRequest) {
 
         // Build the system prompt
         let systemPrompt = `Convert the following natural language query to a Redis vector filter expression. 
-Only return the filter expression, nothing else.
 
+        only return the filter expression, nothing else. 
+        
 ##Filter syntax rules:
-- Arithmetic operators: +, -, *, /, % (modulo), ** (exponentiation)
-- Comparison operators: >, >=, <, <=, ==, !=
-- Logical operators: and/&&, or/||, !/not
-- Containment operator: in
-- Grouping: use parentheses (...) to group expressions clearly
-- Use dot notation to access attributes: .attributeName
-- Only use attributes provided in *Available attributes* (listed below)
+1. Arithmetic operators: +, -, *, /, % (modulo), ** (exponentiation)
+2. Comparison operators: >, >=, <, <=, ==, !=
+3. Logical operators: and/&&, or/||, !/not
+4. Containment operator: in
+5. Grouping: use parentheses (...) to group expressions clearly
+6. Use dot notation to access attributes: .attributeName
+7. Only use attributes provided in *Available attributes* (listed below)
 
-DO NOT USE MAX or other functions. ONLY USE THE SYNTAX STATED ABOVE.
+This is critical: The only valid syntax are the 7 rules listed above.
+
+It is important that the filter query is a valid query that complies with the above syntax.
+
+You can get creative with the filter query, for example if the user asks for "recent movies", you can use the .createdAt attribute to generate a filter query and pick a recent date. Or if the user asks for biggest companies, you can take a guess as what that might mean, and put a number in the filter query.  For example: .revenue > (a big number like 100000) The numbers you choose should be realistic given the context of the query and the name of the attribute field.
+You cannot use any other syntax or functions which are not expressed above (like MAX, MIN, etc.). You may not include a query with an attribute that is not explicity listed below.
 `
 
         // Add available attributes if provided

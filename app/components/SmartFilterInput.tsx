@@ -23,6 +23,7 @@ import {
     X,
 } from "lucide-react"
 import React, { useEffect, useRef, useState } from "react"
+import { div } from "@tensorflow/tfjs"
 
 interface SmartFilterInputProps {
     value: string
@@ -80,10 +81,10 @@ export default function SmartFilterInput({
                     elements,
                     returnCommandOnly: false,
                 })
-                if (!response || !response.success) { 
-                    return 
+                if (!response || !response.success) {
+                    return
                 }
-                const attributesResults = response.result 
+                const attributesResults = response.result
 
                 if (attributesResults && attributesResults.length > 0) {
                     // Process each attribute JSON string
@@ -210,8 +211,18 @@ export default function SmartFilterInput({
 
             // Update filter value
             const filterQuery = result.filterQuery
-            setInputValue(filterQuery)
-            onChange(filterQuery)
+
+            // Validate if the response is a valid filter query (should start with a dot)
+            if (!filterQuery.trim().startsWith(".")) {
+                // If it's not a valid filter, show it as an error message
+                setError(filterQuery)
+                setInputValue("")
+                onChange("")
+            } else {
+                // Valid filter query
+                setInputValue(filterQuery)
+                onChange(filterQuery)
+            }
         } catch (err) {
             setError(
                 "Failed to process natural language query. Please try again or use direct syntax."
@@ -460,12 +471,12 @@ export default function SmartFilterInput({
                                                     &lt; 1990
                                                 </p>
                                                 <p className="font-mono text-[10px]">
-                                                    .genre == {'"'}action{'"'} and
-                                                    .rating &gt; 8.0
+                                                    .genre == {'"'}action{'"'}{" "}
+                                                    and .rating &gt; 8.0
                                                 </p>
                                                 <p className="font-mono text-[10px]">
-                                                    .director in [{'"'}Spielberg{'"'},
-                                                    {'"'}Nolan{'"'}]
+                                                    .director in [{'"'}Spielberg
+                                                    {'"'},{'"'}Nolan{'"'}]
                                                 </p>
                                             </div>
                                         </div>
@@ -492,11 +503,13 @@ export default function SmartFilterInput({
                                 ? placeholder
                                 : "Describe what you want to filter in plain English..."
                         }
-                        className={`${propError || error ? "border-red-500" : ""
-                            } ${className || ""} ${activeTab === "natural" && inputValue
+                        className={`${
+                            propError || error ? "border-red-500" : ""
+                        } ${className || ""} ${
+                            activeTab === "natural" && inputValue
                                 ? "pr-20"
                                 : "pr-12"
-                            }`}
+                        }`}
                         disabled={isProcessingNL}
                     />
 
@@ -563,11 +576,39 @@ export default function SmartFilterInput({
                 )}
 
                 {activeTab === "natural" && inputValue && !isProcessingNL && (
-                    <div className="mt-2 p-2 bg-muted/50 rounded-md">
-                        <p className="text-xs font-medium mb-1">
-                            Generated Filter:
-                        </p>
-                        <code className="text-xs font-mono">{inputValue}</code>
+                    <div className="flex gap-2 items-center w-full mt-2">
+                        <div className="text-xs font-medium">
+                            Generated filter:
+                        </div>
+                        <div className="p-2 bg-muted/75 rounded-md w-full">
+                            <div className="flex items-center mb-1 w-full">
+                                
+                                <div className="text-sm">
+                                    {inputValue}
+                                </div>
+                                <div className="flex-grow"></div>
+                                <div className="flex items-center gap-2">
+                                    <Button
+                                        variant="outline"
+                                        className="text-sm hover:text-foreground"
+                                        onClick={() => setActiveTab("direct")}
+                                    >
+                                        Edit filter
+                                    </Button>
+                                    <Button
+                                        variant="outline"
+                                        className="text-sm hover:text-foreground"
+                                        onClick={() => {
+                                            setInputValue("")
+                                            setNlQuery("")
+                                            onChange("")
+                                        }}
+                                    >
+                                        Clear filter
+                                    </Button>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 )}
             </Tabs>
@@ -589,10 +630,11 @@ export default function SmartFilterInput({
                                         ? selectedItemRef
                                         : null
                                 }
-                                className={`block w-full px-4 py-2 text-left text-sm ${index === selectedIndex
-                                    ? "bg-gray-100"
-                                    : "hover:bg-gray-100"
-                                    } focus:outline-hidden`}
+                                className={`block w-full px-4 py-2 text-left text-sm ${
+                                    index === selectedIndex
+                                        ? "bg-gray-100"
+                                        : "hover:bg-gray-100"
+                                } focus:outline-hidden`}
                                 onClick={() => handleSelect(attr)}
                             >
                                 {attr}
