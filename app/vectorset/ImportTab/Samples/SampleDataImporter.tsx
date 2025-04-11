@@ -131,7 +131,6 @@ export function SampleDataImporter({
 
             // If there's only one record, check if it's the default placeholder
             if (count.result === 1) {
-                // Get the record using vsim with high count to ensure we get the record
                 const searchResult = await vsim({
                     keyName: vectorSetName,
                     count: 1,

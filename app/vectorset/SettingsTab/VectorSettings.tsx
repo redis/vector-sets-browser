@@ -40,8 +40,10 @@ export default function VectorSettings({
     const [workingMetadata, setWorkingMetadata] =
         useState<VectorSetMetadata | null>(null)
     const [isWarningDialogOpen, setIsWarningDialogOpen] = useState(false)
+    const [isSuccessDialogOpen, setIsSuccessDialogOpen] = useState(false)
     const [pendingEmbeddingConfig, setPendingEmbeddingConfig] =
         useState<EmbeddingConfig | null>(null)
+    const [successInfo, setSuccessInfo] = useState<{oldModel: string, newModel: string, dimensions: number} | null>(null)
 
     const handleEditConfig = async (newConfig: EmbeddingConfig) => {
         try {
@@ -105,6 +107,13 @@ export default function VectorSettings({
                                 )
                             }
 
+                            // Store success info before the update
+                            setSuccessInfo({
+                                oldModel: getModelName(metadata.embedding),
+                                newModel: getModelName(newConfig),
+                                dimensions
+                            })
+
                             // Proceed with the update
                             await saveEmbeddingConfig(newConfig)
 
@@ -116,6 +125,9 @@ export default function VectorSettings({
                                     dimensions,
                                 }
                             )
+
+                            // Show success dialog
+                            setIsSuccessDialogOpen(true)
 
                             return
                         }
@@ -154,6 +166,7 @@ export default function VectorSettings({
 
         setIsEditConfigModalOpen(false)
         setIsWarningDialogOpen(false)
+        setIsSuccessDialogOpen(false)
         setPendingEmbeddingConfig(null)
     }
 
@@ -498,6 +511,43 @@ export default function VectorSettings({
                             onClick={handleConfirmEmbeddingChange}
                         >
                             Change it anyway
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Success Dialog */}
+            <Dialog
+                open={isSuccessDialogOpen}
+                onOpenChange={setIsSuccessDialogOpen}
+            >
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>
+                            Embedding Model Updated Successfully
+                        </DialogTitle>
+                        <DialogDescription>
+                            <div className="space-y-2 pt-2">
+                                <p>
+                                    The vector set has been updated to use a new embedding model:
+                                </p>
+                                <div className="grid grid-cols-2 gap-2 text-sm">
+                                    <div className="text-gray-600">Previous Model:</div>
+                                    <div className="font-medium">{successInfo?.oldModel}</div>
+                                    <div className="text-gray-600">New Model:</div>
+                                    <div className="font-medium">{successInfo?.newModel}</div>
+                                    <div className="text-gray-600">Vector Dimensions:</div>
+                                    <div className="font-medium">{successInfo?.dimensions}</div>
+                                </div>
+                            </div>
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                        <Button
+                            variant="default"
+                            onClick={() => setIsSuccessDialogOpen(false)}
+                        >
+                            Close
                         </Button>
                     </DialogFooter>
                 </DialogContent>

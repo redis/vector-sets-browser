@@ -18,6 +18,7 @@ import { VectorSetMetadata } from "@/app/types/vectorSetMetaData"
 import { validateVector } from "@/app/embeddings/utils/validation"
 import eventBus, { AppEvents } from "@/app/utils/eventEmitter"
 import { useEffect, useRef, useState, useCallback } from "react"
+import { array } from "zod"
 
 interface UseVectorSetReturn {
     vectorSetName: string | null
@@ -251,6 +252,8 @@ const useVectorSet = (): UseVectorSetReturn => {
                     element: "First Vector (Default)",
                 })
                 console.log("defaultVector removed")
+                // Also remove the default vector from the results array
+                setResults((prevResults) => prevResults.filter(result => result[0] !== "First Vector (Default)"))
             }
 
             // Get the new record count
@@ -317,6 +320,27 @@ const useVectorSet = (): UseVectorSetReturn => {
         try {
             setStatusMessage(`Deleting element "${element}"...`)
 
+            // special case for default vector.  IF the vector set contains only one vector
+            // and the record we are deleting is NOT the default vector, then we should add a default vector
+            // before deleting the record. This way the placeholder is maintained and the vector set stays valid 
+            if (element !== "First Vector (Default)") {
+                const vectorCountResponse = await vcard({ keyName: vectorSetName })
+                
+                if (vectorCountResponse.success && vectorCountResponse.result === 1) {
+                    const dimResponse = await vdim({ keyName: vectorSetName })
+                    if (dimResponse.success && dimResponse.result) {
+                        await vadd({
+                            keyName: vectorSetName,
+                            element: "First Vector (Default)",
+                            vector: Array(dimResponse.result).fill(0),
+                            attributes: "",
+                            useCAS: metadata?.redisConfig?.defaultCAS,
+                            reduceDimensions: metadata?.redisConfig?.reduceDimensions,
+                            ef: metadata?.redisConfig?.buildExplorationFactor,
+                        })
+                    }
+                }
+            }
             // Delete the vector
             await vrem({
                 keyName: vectorSetName,

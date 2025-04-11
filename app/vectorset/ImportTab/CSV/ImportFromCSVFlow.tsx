@@ -91,9 +91,12 @@ export default function ImportFromCSVFlow({
                 csvPreview.fileName,
                 { type: "text/csv" }
             )
+            console.log("[ImportTab] File: ", file)
 
             await jobs.createImportJob(vectorSetName, file, config)
+
             setImportStarted(true)
+
             setIsImporting(false) // Set importing to false after job is created
         } catch (error) {
             console.error("Error starting import:", error)
