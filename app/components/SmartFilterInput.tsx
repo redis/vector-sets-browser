@@ -55,7 +55,7 @@ export default function SmartFilterInput({
     const selectedItemRef = useRef<HTMLButtonElement>(null)
 
     // Natural language query support
-    const [activeTab, setActiveTab] = useState("direct")
+    const [activeTab, setActiveTab] = useState("natural")
     const [nlQuery, setNlQuery] = useState("")
     const [isProcessingNL, setIsProcessingNL] = useState(false)
     const [error, setError] = useState<string | null>(null)
