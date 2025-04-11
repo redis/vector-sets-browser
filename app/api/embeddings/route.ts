@@ -15,10 +15,13 @@ export async function POST(request: NextRequest) {
             )
         }
 
+        // Get user-provided API key from headers if available
+        const userApiKey = request.headers.get("X-OpenAI-Key");
+
         // Handle text embedding
         if (body.text) {
             const startTime = performance.now()
-            const embedding = await embeddingService.getEmbedding(body.text, body.config, false)
+            const embedding = await embeddingService.getEmbedding(body.text, body.config, false, userApiKey)
             const endTime = performance.now()
             console.log("Embedding length:", embedding.length)
             return NextResponse.json({
@@ -31,7 +34,7 @@ export async function POST(request: NextRequest) {
         // Handle image embedding
         if (body.imageData) {
             const startTime = performance.now()
-            const embedding = await embeddingService.getEmbedding(body.imageData, body.config, true)
+            const embedding = await embeddingService.getEmbedding(body.imageData, body.config, true, userApiKey)
             const endTime = performance.now()
             
             return NextResponse.json({

@@ -39,7 +39,10 @@ Only return the filter expression, nothing else.
 - Containment operator: in
 - Grouping: use parentheses (...) to group expressions clearly
 - Use dot notation to access attributes: .attributeName
-- Only use attributes provided in *Available attributes* (listed below)`
+- Only use attributes provided in *Available attributes* (listed below)
+
+DO NOT USE MAX or other functions. ONLY USE THE SYNTAX STATED ABOVE.
+`
 
         // Add available attributes if provided
         if (attributes && attributes.length > 0) {

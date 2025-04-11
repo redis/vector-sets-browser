@@ -1,14 +1,20 @@
 import { EmbeddingConfig, getModelData } from "../types/embeddingModels"
 import { EmbeddingProvider } from "./base"
-import { getOpenAIKey } from "@/app/api/openai/helpers"
 
 export class OpenAIProvider implements EmbeddingProvider {
+    private apiKey: string | null = null;
+
+    setApiKey(apiKey: string | null) {
+        this.apiKey = apiKey;
+    }
+
     async getEmbedding(input: string, config: EmbeddingConfig): Promise<number[]> {
         if (!config.openai) {
             throw new Error("OpenAI configuration is missing")
         }
 
-        const apiKey = await getOpenAIKey()
+        // Use the instance API key if available, otherwise try to get it from the environment
+        const apiKey = this.apiKey || process.env.OPENAI_API_KEY;
         if (!apiKey) {
             throw new Error("OpenAI API key is missing. Please configure it in your user settings.")
         }
@@ -52,7 +58,8 @@ export class OpenAIProvider implements EmbeddingProvider {
             throw new Error("OpenAI configuration is missing")
         }
 
-        const apiKey = await getOpenAIKey()
+        // Use the instance API key if available, otherwise try to get it from the environment
+        const apiKey = this.apiKey || process.env.OPENAI_API_KEY;
         if (!apiKey) {
             throw new Error("OpenAI API key is missing. Please configure it in your user settings.")
         }

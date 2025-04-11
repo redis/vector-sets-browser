@@ -27,8 +27,11 @@ export async function POST(request: NextRequest) {
             )
         }
 
+        // Get user-provided API key from headers if available
+        const userApiKey = request.headers.get("X-OpenAI-Key");
+
         const startTime = performance.now()
-        const embeddings = await embeddingService.getBatchEmbeddings(body.texts, body.config)
+        const embeddings = await embeddingService.getBatchEmbeddings(body.texts, body.config, false, userApiKey)
         const endTime = performance.now()
         
         return NextResponse.json({

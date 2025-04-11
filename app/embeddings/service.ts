@@ -26,7 +26,8 @@ export class EmbeddingService {
     async getEmbedding(
         input: string,
         config: EmbeddingConfig,
-        isImage: boolean = false
+        isImage: boolean = false,
+        apiKey?: string | null
     ): Promise<number[]> {
         // For image data, ensure we're using the image provider
         if (isImage && config.provider !== PROVIDERS.IMAGE) {
@@ -47,6 +48,11 @@ export class EmbeddingService {
         const provider = this.providers.get(config.provider)
         if (!provider) {
             throw new Error(`Unsupported provider: ${config.provider}`)
+        }
+
+        // Pass the API key to the provider if it's OpenAI
+        if (config.provider === PROVIDERS.OPENAI && provider instanceof OpenAIProvider) {
+            provider.setApiKey(apiKey || null);
         }
 
         const embedding = await provider.getEmbedding(input, config)
@@ -79,7 +85,8 @@ export class EmbeddingService {
     async getBatchEmbeddings(
         inputs: string[],
         config: EmbeddingConfig,
-        areImages: boolean = false
+        areImages: boolean = false,
+        apiKey?: string | null
     ): Promise<number[][]> {
         // For image data, ensure we're using the image provider
         if (areImages && config.provider !== PROVIDERS.IMAGE) {
@@ -93,6 +100,11 @@ export class EmbeddingService {
         const provider = this.providers.get(config.provider)
         if (!provider) {
             throw new Error(`Unsupported provider: ${config.provider}`)
+        }
+
+        // Pass the API key to the provider if it's OpenAI
+        if (config.provider === PROVIDERS.OPENAI && provider instanceof OpenAIProvider) {
+            provider.setApiKey(apiKey);
         }
 
         // Check cache first if caching is enabled
@@ -131,7 +143,7 @@ export class EmbeddingService {
             // Fall back to sequential processing
             uncachedEmbeddings = []
             for (const input of uncachedInputs) {
-                const embedding = await this.getEmbedding(input, config, areImages)
+                const embedding = await this.getEmbedding(input, config, areImages, apiKey)
                 uncachedEmbeddings.push(embedding)
             }
         }
