@@ -6,6 +6,7 @@ import {
     VectorSetMetadata,
     createVectorSetMetadata,
 } from "@/app/types/vectorSetMetaData"
+import { ApiError } from "@/app/api/client"
 
 import { vadd } from "@/app/redis-server/api"
 import { getDefaultTextEmbeddingConfig } from "@/app/utils/embeddingUtils"
@@ -252,14 +253,18 @@ export default function CreateVectorSetModal({
                 metadata,
                 customData
             )
+            // Only close if successful
             onClose()
         } catch (err) {
             console.error("Error in CreateVectorSetModal handleSubmit:", err)
-            setError(
-                err instanceof Error
-                    ? err.message
-                    : "Failed to create vector set"
-            )
+            // Handle ApiError specifically since that's what we'll get from vectorSets.create
+            if (err instanceof ApiError) {
+                setError(err.message)
+            } else {
+                setError(
+                    err instanceof Error ? err.message : "Failed to create vector set"
+                )
+            }
         } finally {
             setIsCreating(false)
         }
@@ -270,11 +275,27 @@ export default function CreateVectorSetModal({
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div className="bg-[white] rounded-lg p-6 w-2xl min-h-[600px] max-h-[90vh] overflow-hidden relative">
+                {/* Error Alert */}
+                {error && (
+                    <div className="absolute top-0 left-0 right-0 bg-red-50 border-b border-red-200 p-4 rounded-t-lg">
+                        <div className="flex items-center">
+                            <div className="flex-shrink-0">
+                                <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                                </svg>
+                            </div>
+                            <div className="ml-3">
+                                <h3 className="text-sm font-medium text-red-800">Error Creating Vector Set</h3>
+                                <div className="mt-1 text-sm text-red-700">{error}</div>
+                            </div>
+                        </div>
+                    </div>
+                )}
                 {/* Main Content */}
                 <div
                     className={`transition-transform duration-300 ${
                         activePanel ? "transform -translate-x-full" : ""
-                    } w-full`}
+                    } w-full ${error ? "mt-20" : ""}`}
                 >
                     <div className="mb-4">
                         <h1 className="text-2xl font-semibold">
@@ -300,11 +321,7 @@ export default function CreateVectorSetModal({
                                         <label className="form-label">
                                             Vector Set Name
                                         </label>
-                                        {error && (
-                                            <div className="text-red-500 text-sm mt-1">
-                                                {error}
-                                            </div>
-                                        )}
+                                        
                                     </div>
                                     <Input
                                         ref={nameInputRef}

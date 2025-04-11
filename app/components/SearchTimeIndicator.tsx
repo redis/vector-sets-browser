@@ -70,8 +70,8 @@ const SearchTimeIndicator: React.FC<SearchTimeIndicatorProps> = ({
     }
 
     return (
-        <div className={`-ml-1 p-1 flex space-x-2 items-center rounded-md ${colorClass}`}>
-            <span className="text-gray-500 text-xs">Time</span>
+        <div className={`-ml-1 p-1 flex space-x-1 items-center rounded-lg text-xs ${colorClass}`}>
+            <span className="text-gray-500">Time</span>
             <div>{formattedTime}</div>
         </div>
     )

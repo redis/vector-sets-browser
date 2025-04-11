@@ -316,12 +316,7 @@ export default function VectorSetNav({
             await loadVectorSets()
             onVectorSetSelect(name)
         } catch (error) {
-            console.error("Error creating vector set:", error)
-            setError(
-                error instanceof ApiError
-                    ? error.message
-                    : "Failed to create vector set"
-            )
+            throw error
         }
     }
 

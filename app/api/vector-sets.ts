@@ -31,7 +31,10 @@ export const vectorSets = {
     async create(request: VectorSetCreateRequestBody
     ): Promise<void> {
         const encodedName = encodeURIComponent(request.name)
-        apiClient.post(`/api/vectorset/${encodedName}`, request)
+        const response = await apiClient.post(`/api/vectorset/${encodedName}`, request)
+        if (!response.success) {
+            throw new Error(response.error || 'Failed to create vector set')
+        }
     },
 
     async delete(name: string): Promise<void> {
