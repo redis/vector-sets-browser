@@ -213,20 +213,8 @@ const useVectorSet = (): UseVectorSetReturn => {
             // special case for default vector.  IF the vector set contains only one vector
             // and it is the default vector, then we should delete the First Vector (Default)
             // after adding the new vector.
-            const vectorCount = await vcard({ keyName: vectorSetName })
-            let emptyVectorSet = false
-            console.log("cardResponse", vectorCount)
-            if (vectorCount.success && vectorCount.result === 1) {
-                const defaultVector = await vsim({
-                    keyName: vectorSetName,
-                    searchElement: "First Vector (Default)",
-                })
-                console.log("dimensions", vectorCount.result)
-                if (defaultVector.success && defaultVector.result) {
-                    emptyVectorSet = true
-                    console.log("emptyVectorSet === true")
-                }
-            }
+            const vectorCountResponse = await vcard({ keyName: vectorSetName })
+            let vectorCount = vectorCountResponse.success ? vectorCountResponse.result : 0
 
             // Use original vector
             const result = await vadd({
@@ -246,12 +234,12 @@ const useVectorSet = (): UseVectorSetReturn => {
             // special case for default vector.  IF the vector set contains only one vector
             // and it is the default vector, then we should delete the First Vector (Default)
             // after adding the new vector.
-            if (emptyVectorSet) {
+            if (vectorCount === 1) {
                 await vrem({
                     keyName: vectorSetName,
                     element: "First Vector (Default)",
                 })
-                console.log("defaultVector removed")
+                console.log("attempted to remove defaultVector")
                 // Also remove the default vector from the results array
                 setResults((prevResults) => prevResults.filter(result => result[0] !== "First Vector (Default)"))
             }
