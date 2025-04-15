@@ -36,6 +36,64 @@ interface VectorSetInfo {
     metadata?: VectorSetMetadata
 }
 
+interface VectorSetState {
+    list: string[]
+    info: Record<string, VectorSetInfo>
+    loading: boolean
+    error: string | null
+    hasLoadedOnce: boolean
+}
+
+function useVectorSetEvents(
+    isConnected: boolean,
+    onUpdate: () => void
+) {
+    useEffect(() => {
+        if (!isConnected) return
+
+        const handleVectorAdded = async (data: {
+            vectorSetName: string
+            element: string
+            newCount: number
+        }) => {
+            onUpdate()
+        }
+
+        const handleVectorDeleted = async (data: {
+            vectorSetName: string
+            element?: string
+            elements?: string[]
+            newCount: number
+        }) => {
+            onUpdate()
+        }
+
+        const handleVectorsImported = async (data: {
+            vectorSetName: string
+        }) => {
+            onUpdate()
+        }
+
+        const handleDimensionsChanged = async (data: {
+            vectorSetName: string
+            dimensions: number
+        }) => {
+            onUpdate()
+        }
+
+        const unsubscribes = [
+            eventBus.on(AppEvents.VECTOR_ADDED, handleVectorAdded),
+            eventBus.on(AppEvents.VECTOR_DELETED, handleVectorDeleted),
+            eventBus.on(AppEvents.VECTORS_IMPORTED, handleVectorsImported),
+            eventBus.on(AppEvents.VECTORSET_DIMENSIONS_CHANGED, handleDimensionsChanged),
+        ]
+
+        return () => {
+            unsubscribes.forEach(unsubscribe => unsubscribe())
+        }
+    }, [isConnected, onUpdate])
+}
+
 export default function VectorSetNav({
     redisUrl,
     redisName,
@@ -44,50 +102,44 @@ export default function VectorSetNav({
     onBack,
     isConnected,
 }: VectorSetNavProps) {
-    const [vectorSetList, setVectorSetList] = useState<string[]>([])
-    const [vectorSetInfo, setVectorSetInfo] = useState<
-        Record<string, VectorSetInfo>
-    >({})
-    const [loading, setLoading] = useState(false)
-    const [error, setError] = useState<string | null>(null)
+    const [vectorSetState, setVectorSetState] = useState<VectorSetState>({
+        list: [],
+        info: {},
+        loading: false,
+        error: null,
+        hasLoadedOnce: false
+    })
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
     const [statusMessage, setStatusMessage] = useState<string | null>(null)
     const [isEditConfigModalOpen, setIsEditConfigModalOpen] = useState(false)
-    const [editingVectorSet, setEditingVectorSet] = useState<string | null>(
-        null
-    )
+    const [editingVectorSet, setEditingVectorSet] = useState<string | null>(null)
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
-    const [vectorSetToDelete, setVectorSetToDelete] = useState<string | null>(
-        null
-    )
+    const [vectorSetToDelete, setVectorSetToDelete] = useState<string | null>(null)
     const [isInitialLoad, setIsInitialLoad] = useState(true)
-    const [hasLoadedOnce, setHasLoadedOnce] = useState(false)
 
     const refreshingRef = useRef(false)
 
     const loadVectorSets = useCallback(async () => {
-        if (!isConnected) {
-            console.error("Not connected, can't load vector sets")
+        if (!isConnected || refreshingRef.current) {
+            console.debug("Skipping vector sets load - not connected or already refreshing")
             return
         }
 
-        if (loading) {
-            console.log("Already loading vector sets, skipping request")
-            return
-        }
-
-        setLoading(true)
-        setError(null)
+        setVectorSetState(prev => ({ ...prev, loading: true, error: null }))
+        refreshingRef.current = true
 
         try {
             const sets = await vectorSets.list() || []
 
             // If there are no vector sets, just set empty state and return
             if (sets.length === 0) {
-                setVectorSetList([])
-                setVectorSetInfo({})
-                setHasLoadedOnce(true)
-                setLoading(false)
+                setVectorSetState(prev => ({
+                    ...prev,
+                    list: [],
+                    info: {},
+                    hasLoadedOnce: true,
+                    loading: false
+                }))
                 return
             }
 
@@ -113,8 +165,13 @@ export default function VectorSetNav({
                 sets.forEach(set => {
                     info[set] = createDefaultInfo(set)
                 })
-                setVectorSetInfo(info)
-                setHasLoadedOnce(true)
+                setVectorSetState(prev => ({
+                    ...prev,
+                    list: [],
+                    info,
+                    hasLoadedOnce: true,
+                    loading: false
+                }))
                 return
             }
 
@@ -147,161 +204,63 @@ export default function VectorSetNav({
 
             // Only include vector sets that we successfully got info for
             const validSets = sets.filter(set => info[set])
-            setVectorSetList(validSets)
-            setVectorSetInfo(info)
-            setHasLoadedOnce(true)
+            setVectorSetState(prev => ({
+                ...prev,
+                list: validSets,
+                info,
+                hasLoadedOnce: true,
+                loading: false
+            }))
         } catch (error) {
             console.error("Error fetching vector sets:", error)
-            setError(
-                error instanceof ApiError
-                    ? error.message
-                    : "Failed to fetch vector sets"
-            )
-            setVectorSetList([])
-            setVectorSetInfo({})
-            setHasLoadedOnce(true)
+            setVectorSetState(prev => ({
+                ...prev,
+                list: [],
+                info: {},
+                hasLoadedOnce: true,
+                loading: false,
+                error: error instanceof ApiError ? error.message : "Failed to fetch vector sets"
+            }))
         } finally {
-            setLoading(false)
+            setTimeout(() => {
+                refreshingRef.current = false
+            }, 1000)
         }
-    }, [isConnected, loading])
+    }, [isConnected])
 
-    useEffect(() => {
-        const debouncedRefresh = debounce(() => {
-            if (!refreshingRef.current) {
-                refreshingRef.current = true
-                loadVectorSets().finally(() => {
-                    setTimeout(() => {
-                        refreshingRef.current = false
-                    }, 5000)
-                })
+    const debouncedLoadVectorSets = useCallback(
+        debounce(() => {
+            if (isConnected) {
+                loadVectorSets()
             }
-        }, 1000)
+        }, 300),
+        [isConnected, loadVectorSets]
+    )
 
-        const handleVectorAdded = async (data: {
-            vectorSetName: string
-            element: string
-            newCount: number
-        }) => {
-            console.log(`Vector added to ${data.vectorSetName}`, data)
-
-            if (vectorSetInfo[data.vectorSetName]) {
-                setVectorSetInfo((prev) => ({
-                    ...prev,
-                    [data.vectorSetName]: {
-                        ...prev[data.vectorSetName],
-                        vectorCount: data.newCount,
-                    },
-                }))
-            }
-        }
-
-        const handleVectorDeleted = async (data: {
-            vectorSetName: string
-            element?: string
-            elements?: string[]
-            newCount: number
-        }) => {
-            console.log(`Vector(s) deleted from ${data.vectorSetName}`, data)
-
-            if (vectorSetInfo[data.vectorSetName]) {
-                setVectorSetInfo((prev) => ({
-                    ...prev,
-                    [data.vectorSetName]: {
-                        ...prev[data.vectorSetName],
-                        vectorCount: data.newCount,
-                    },
-                }))
-            }
-        }
-
-        const handleVectorsImported = async (data: {
-            vectorSetName: string
-        }) => {
-            console.log(`Vectors imported to ${data.vectorSetName}`, data)
-
-            try {
-                // Just get the cardinality for this specific vector set
-                const cardinalityResponse = await vcard({
-                    keyName: data.vectorSetName,
-                })
-
-                const existingInfo = vectorSetInfo[data.vectorSetName]
-                if (cardinalityResponse.success &&
-                    typeof cardinalityResponse.result === 'number' &&
-                    existingInfo) {
-                    setVectorSetInfo((prev) => ({
-                        ...prev,
-                        [data.vectorSetName]: {
-                            ...existingInfo,
-                            vectorCount: cardinalityResponse.result as number,
-                        },
-                    }))
-                }
-            } catch (error) {
-                console.error("Error updating vector count after import:", error)
-            }
-        }
-
-        const handleDimensionsChanged = async (data: {
-            vectorSetName: string
-            dimensions: number
-        }) => {
-            console.log(`Dimensions changed for ${data.vectorSetName} to ${data.dimensions}`)
-
-            if (vectorSetInfo[data.vectorSetName]) {
-                setVectorSetInfo((prev) => ({
-                    ...prev,
-                    [data.vectorSetName]: {
-                        ...prev[data.vectorSetName],
-                        dimensions: data.dimensions,
-                    },
-                }))
-            }
-        }
-
-        let unsubscribes: Array<() => void> = []
-
-        if (isConnected) {
-            unsubscribes = [
-                eventBus.on(AppEvents.VECTOR_ADDED, handleVectorAdded),
-                eventBus.on(AppEvents.VECTOR_DELETED, handleVectorDeleted),
-                eventBus.on(AppEvents.VECTORS_IMPORTED, handleVectorsImported),
-                eventBus.on(AppEvents.VECTORSET_DIMENSIONS_CHANGED, handleDimensionsChanged),
-            ]
-
-            if (!refreshingRef.current) {
-                debouncedRefresh()
-            }
-        }
-
-        return () => {
-            unsubscribes.forEach((unsubscribe) => unsubscribe())
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isConnected, vectorSetInfo])
+    useVectorSetEvents(isConnected, debouncedLoadVectorSets)
 
     useEffect(() => {
         if (isConnected && redisUrl) {
-            const timer = setTimeout(() => {
-                loadVectorSets()
-                setIsInitialLoad(true)
-            }, 500)
-
-            return () => clearTimeout(timer)
+            loadVectorSets()
+            setIsInitialLoad(true)
         } else {
-            setVectorSetList([])
-            setVectorSetInfo({})
+            setVectorSetState(prev => ({
+                ...prev,
+                list: [],
+                info: {},
+                loading: false,
+                error: null
+            }))
             setIsInitialLoad(true)
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [redisUrl, isConnected])
+    }, [redisUrl, isConnected, loadVectorSets])
 
     useEffect(() => {
-        if (isInitialLoad && vectorSetList.length > 0 && !selectedVectorSet) {
-            onVectorSetSelect(vectorSetList[0])
+        if (isInitialLoad && vectorSetState.list.length > 0 && !selectedVectorSet) {
+            onVectorSetSelect(vectorSetState.list[0])
             setIsInitialLoad(false)
         }
-    }, [vectorSetList, selectedVectorSet, onVectorSetSelect, isInitialLoad])
+    }, [vectorSetState.list, selectedVectorSet, onVectorSetSelect, isInitialLoad])
 
     useEffect(() => {
         if (statusMessage) {
@@ -343,11 +302,10 @@ export default function VectorSetNav({
             await loadVectorSets()
         } catch (error) {
             console.error("Error deleting vector set:", error)
-            setError(
-                error instanceof ApiError
-                    ? error.message
-                    : "Failed to delete vector set"
-            )
+            setVectorSetState(prev => ({
+                ...prev,
+                error: error instanceof ApiError ? error.message : "Failed to delete vector set"
+            }))
         }
     }
 
@@ -358,18 +316,17 @@ export default function VectorSetNav({
         try {
             await vectorSets.create({
                 name,
-                dimensions: vectorSetInfo[name]?.dimensions || 0,
+                dimensions: vectorSetState.info[name]?.dimensions || 0,
                 metadata,
             })
             setStatusMessage(`Updated metadata for ${name}`)
             await loadVectorSets()
         } catch (error) {
             console.error("Error updating metadata:", error)
-            setError(
-                error instanceof ApiError
-                    ? error.message
-                    : "Failed to update metadata"
-            )
+            setVectorSetState(prev => ({
+                ...prev,
+                error: error instanceof ApiError ? error.message : "Failed to update metadata"
+            }))
         }
     }
 
@@ -469,12 +426,12 @@ export default function VectorSetNav({
                             </Button>
                         </div>
                     </div>
-                    {error && (
+                    {vectorSetState.error && (
                         <div className="text-sm text-red-500 mb-4 p-2 bg-red-50 rounded border border-red-200">
-                            {error}
+                            {vectorSetState.error}
                         </div>
                     )}
-                    {hasLoadedOnce && !loading && !error && vectorSetList.length === 0 && (
+                    {vectorSetState.hasLoadedOnce && !vectorSetState.loading && vectorSetState.list.length === 0 && (
                         <div 
                             onClick={() => setIsCreateModalOpen(true)}
                             className="p-6 rounded-lg border-2 border-dashed border-gray-300 hover:border-gray-400 bg-white hover:bg-gray-50 cursor-pointer transition-all duration-200 flex flex-col items-center justify-center space-y-2"
@@ -500,8 +457,8 @@ export default function VectorSetNav({
                             </div>
                         </div>
                     )}
-                    {vectorSetList.map((setName, index) => {
-                        const info = vectorSetInfo[setName]
+                    {vectorSetState.list.map((setName, index) => {
+                        const info = vectorSetState.info[setName]
                         return (
                             <div
                                 key={setName}
@@ -569,7 +526,7 @@ export default function VectorSetNav({
                         )
                     })}
                     <div className="grow"></div>
-                    {loading && (
+                    {vectorSetState.loading && (
                         <div className="text-sm text-gray-500">Loading...</div>
                     )}
                     {statusMessage && (
@@ -596,11 +553,11 @@ export default function VectorSetNav({
                         setEditingVectorSet(null)
                     }}
                     config={
-                        vectorSetInfo[editingVectorSet]?.metadata?.embedding
+                        vectorSetState.info[editingVectorSet]?.metadata?.embedding
                     }
                     onSave={(config) =>
                         handleSaveMetadata(editingVectorSet, {
-                            ...vectorSetInfo[editingVectorSet]?.metadata,
+                            ...vectorSetState.info[editingVectorSet]?.metadata,
                             embedding: config,
                         })
                     }
