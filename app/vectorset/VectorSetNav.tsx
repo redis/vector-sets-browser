@@ -61,6 +61,7 @@ export default function VectorSetNav({
         null
     )
     const [isInitialLoad, setIsInitialLoad] = useState(true)
+    const [hasLoadedOnce, setHasLoadedOnce] = useState(false)
 
     const refreshingRef = useRef(false)
 
@@ -85,6 +86,7 @@ export default function VectorSetNav({
             if (sets.length === 0) {
                 setVectorSetList([])
                 setVectorSetInfo({})
+                setHasLoadedOnce(true)
                 setLoading(false)
                 return
             }
@@ -112,6 +114,7 @@ export default function VectorSetNav({
                     info[set] = createDefaultInfo(set)
                 })
                 setVectorSetInfo(info)
+                setHasLoadedOnce(true)
                 return
             }
 
@@ -146,6 +149,7 @@ export default function VectorSetNav({
             const validSets = sets.filter(set => info[set])
             setVectorSetList(validSets)
             setVectorSetInfo(info)
+            setHasLoadedOnce(true)
         } catch (error) {
             console.error("Error fetching vector sets:", error)
             setError(
@@ -155,6 +159,7 @@ export default function VectorSetNav({
             )
             setVectorSetList([])
             setVectorSetInfo({})
+            setHasLoadedOnce(true)
         } finally {
             setLoading(false)
         }
@@ -469,7 +474,7 @@ export default function VectorSetNav({
                             {error}
                         </div>
                     )}
-                    {!loading && !error && vectorSetList.length === 0 && (
+                    {hasLoadedOnce && !loading && !error && vectorSetList.length === 0 && (
                         <div 
                             onClick={() => setIsCreateModalOpen(true)}
                             className="p-6 rounded-lg border-2 border-dashed border-gray-300 hover:border-gray-400 bg-white hover:bg-gray-50 cursor-pointer transition-all duration-200 flex flex-col items-center justify-center space-y-2"
