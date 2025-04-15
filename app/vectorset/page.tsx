@@ -218,7 +218,9 @@ function VectorSetPageContent() {
                         />
                     </div>
                 ) : (
-                    <div></div>
+                    <div className="text-center py-12 text-gray-500">
+                        No vector sets, create a new vector set to get started
+                    </div>
                 )}
                 {vectorSetName ? (
                     <Tabs
@@ -288,8 +290,7 @@ function VectorSetPageContent() {
                         </TabsContent>
                     </Tabs>
                 ) : (
-                    <div className="text-center py-12 text-gray-500">
-                        Select a vector set from the left navigation to begin
+                    <div>
                     </div>
                 )}
 

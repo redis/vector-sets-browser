@@ -75,7 +75,14 @@ export class RedisConnection {
                 },
             })
 
-            client.on("error", (err) => console.error("Redis Client Error:", err))
+            client.on("error", (err) => {
+                console.error("Redis Client Error:", err)
+                // If this is an authentication error, make it clear in the error message
+                if (err.message.includes("NOAUTH") || err.message.includes("AUTH")) {
+                    throw new Error("Authentication failed: Please check your Redis password")
+                }
+            })
+            
             await client.connect()
 
             connectionInfo.client = client as RedisClient
@@ -93,6 +100,12 @@ export class RedisConnection {
         } catch (error) {
             connectionInfo.isConnecting = false
             this.connectionPool.delete(url)
+            // Enhance error message for authentication errors
+            if (error instanceof Error) {
+                if (error.message.includes("NOAUTH") || error.message.includes("AUTH")) {
+                    throw new Error("Authentication failed: Please check your Redis password")
+                }
+            }
             throw error
         }
     }

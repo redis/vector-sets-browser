@@ -80,6 +80,14 @@ export default function VectorSetNav({
         try {
             const sets = await vectorSets.list() || []
 
+            // If there are no vector sets, just set empty state and return
+            if (sets.length === 0) {
+                setVectorSetList([])
+                setVectorSetInfo({})
+                setLoading(false)
+                return
+            }
+
             const info: Record<string, VectorSetInfo> = {}
 
             // Create default info object for a vector set
@@ -457,8 +465,29 @@ export default function VectorSetNav({
                         </div>
                     )}
                     {!loading && !error && vectorSetList.length === 0 && (
-                        <div className="text-sm text-gray-500">
-                            No vector sets found
+                        <div 
+                            onClick={() => setIsCreateModalOpen(true)}
+                            className="p-6 rounded-lg border-2 border-dashed border-gray-300 hover:border-gray-400 bg-white hover:bg-gray-50 cursor-pointer transition-all duration-200 flex flex-col items-center justify-center space-y-2"
+                        >
+                            <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center">
+                                <svg
+                                    className="w-6 h-6 text-blue-600"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                >
+                                    <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={2}
+                                        d="M12 4v16m8-8H4"
+                                    />
+                                </svg>
+                            </div>
+                            <div className="text-center">
+                                <h3 className="font-medium text-gray-900">Get Started</h3>
+                                <p className="text-sm text-gray-500 mt-1">create a new vector set</p>
+                            </div>
                         </div>
                     )}
                     {vectorSetList.map((setName, index) => {

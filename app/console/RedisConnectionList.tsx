@@ -26,6 +26,7 @@ interface RedisConnection {
     name: string
     host: string
     port: number
+    password?: string
     lastConnected: string | null
 }
 
@@ -63,6 +64,7 @@ const RedisConnectionList = forwardRef<
             name: "",
             host: "",
             port: 6379,
+            password: "",
             lastConnected: null,
         })
         const [connectionError, setConnectionError] = useState<string | null>(
@@ -129,6 +131,7 @@ const RedisConnectionList = forwardRef<
                     name: "Local Redis",
                     host: "localhost",
                     port: 6379,
+                    password: "",
                     lastConnected: null,
                 },
             ]
@@ -157,7 +160,11 @@ const RedisConnectionList = forwardRef<
                 setConnectionError(null)
                 setIsConnectingLocal(true)
 
-                const url = `redis://${newConnection.host}:${newConnection.port}`
+                // Construct URL with password if provided
+                const url = newConnection.password
+                    ? `redis://:${encodeURIComponent(newConnection.password)}@${newConnection.host}:${newConnection.port}`
+                    : `redis://${newConnection.host}:${newConnection.port}`
+
                 const connection: RedisConnection = {
                     ...newConnection,
                     id: url,
@@ -209,6 +216,7 @@ const RedisConnectionList = forwardRef<
                     name: "",
                     host: "",
                     port: 6379,
+                    password: "",
                     lastConnected: null,
                 })
                 setConnectionError(null)
@@ -226,7 +234,10 @@ const RedisConnectionList = forwardRef<
 
         const handleConnect = async (connection: RedisConnection) => {
             try {
-                const url = `redis://${connection.host}:${connection.port}`
+                // Construct URL with password if provided
+                const url = connection.password
+                    ? `redis://:${encodeURIComponent(connection.password)}@${connection.host}:${connection.port}`
+                    : `redis://${connection.host}:${connection.port}`
 
                 // Try to connect with retries
                 let attempts = 0
@@ -261,6 +272,7 @@ const RedisConnectionList = forwardRef<
                 }
 
                 // Update last connected timestamp only after successful connection
+                // Don't expose password in the connection list
                 const updatedConnection = {
                     ...connection,
                     lastConnected: new Date().toISOString(),
@@ -271,8 +283,7 @@ const RedisConnectionList = forwardRef<
                 saveConnections(updatedConnections)
             } catch (error) {
                 toast.error(
-                    `Failed to connect: ${error instanceof Error ? error.message : "Unknown error"
-                    }`
+                    `Failed to connect: ${error instanceof Error ? error.message : "Unknown error"}`
                 )
                 console.error("Failed to connect:", error)
             }
@@ -368,6 +379,7 @@ const RedisConnectionList = forwardRef<
                                     name: "",
                                     host: "",
                                     port: 6379,
+                                    password: "",
                                     lastConnected: null,
                                 })
                             }
@@ -429,6 +441,22 @@ const RedisConnectionList = forwardRef<
                                         placeholder="6379"
                                     />
                                 </div>
+                                <div className="grid gap-2">
+                                    <Label htmlFor="password">Password (optional)</Label>
+                                    <Input
+                                        id="password"
+                                        type="password"
+                                        value={newConnection.password || ""}
+                                        onChange={(e) =>
+                                            setNewConnection({
+                                                ...newConnection,
+                                                password: e.target.value,
+                                            })
+                                        }
+                                        placeholder="Redis password"
+                                        className="w-full"
+                                    />
+                                </div>
                             </div>
                             <DialogFooter>
                                 <Button
@@ -441,6 +469,7 @@ const RedisConnectionList = forwardRef<
                                             name: "",
                                             host: "",
                                             port: 6379,
+                                            password: "",
                                             lastConnected: null,
                                         })
                                     }}
@@ -500,6 +529,7 @@ const RedisConnectionList = forwardRef<
                                         <TableHead>Name</TableHead>
                                         <TableHead>Host</TableHead>
                                         <TableHead>Port</TableHead>
+                                        {editingConnection && <TableHead>Password</TableHead>}
                                         <TableHead>Last Connected</TableHead>
                                         <TableHead className="text-right">
                                             Actions
@@ -575,6 +605,24 @@ const RedisConnectionList = forwardRef<
                                                                 )
                                                             }
                                                             className="w-full"
+                                                        />
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <Input
+                                                            type="password"
+                                                            value={
+                                                                editingConnection.password || ""
+                                                            }
+                                                            onChange={(e) =>
+                                                                setEditingConnection(
+                                                                    {
+                                                                        ...editingConnection,
+                                                                        password: e.target.value,
+                                                                    }
+                                                                )
+                                                            }
+                                                            className="w-full"
+                                                            placeholder="Redis password"
                                                         />
                                                     </TableCell>
                                                     <TableCell>
