@@ -7,6 +7,7 @@ import {
     estimateVectorSetMemoryUsage,
     formatBytes,
 } from "@/app/utils/vectorSetMemory"
+import { sanitizeRedisUrl } from "@/app/utils/redisUrl"
 import { Button } from "@/components/ui/button"
 import { Sidebar, SidebarContent, SidebarHeader } from "@/components/ui/sidebar"
 import { debounce } from "lodash"
@@ -402,10 +403,14 @@ export default function VectorSetNav({
                                 d="M10 19l-7-7m0 0l7-7m-7 7h18"
                             />
                         </svg>
-                        <span className="">{redisName}</span>
-                        <span className="text-sm text-gray-500">
-                            ({redisUrl})
-                        </span>
+                        <div className="flex flex-col items-start ml-2">
+                            <span className="font-medium">{redisName || 'Redis Server'}</span>
+                            {redisUrl && (
+                                <span className="text-xs text-gray-500">
+                                    {sanitizeRedisUrl(redisUrl)}
+                                </span>
+                            )}
+                        </div>
                     </Button>
                 </div>
             </SidebarHeader>
