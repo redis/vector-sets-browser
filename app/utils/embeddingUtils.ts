@@ -1,12 +1,17 @@
 import { EmbeddingConfig } from "@/app/embeddings/types/embeddingModels";
 
+
+export function defaultOllamaUrl(): string {
+  return process.env.NEXT_PUBLIC_OLLAMA_URL ?? "http://localhost:11434";
+}
+
 /**
  * Checks if Ollama is available on the default port
  * @returns Promise<boolean> - true if Ollama is available
  */
 export async function isOllamaAvailable(): Promise<boolean> {
   try {
-    const response = await fetch("http://localhost:11434/api/tags", {
+    const response = await fetch(defaultOllamaUrl() + "/api/tags", {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
@@ -47,7 +52,7 @@ export async function getDefaultTextEmbeddingConfig(): Promise<EmbeddingConfig> 
     return {
       provider: "ollama",
       ollama: {
-        apiUrl: "http://localhost:11434",
+        apiUrl: defaultOllamaUrl(),
         modelName: "mxbai-embed-large",
       },
     };
