@@ -468,6 +468,7 @@ export default function SearchBox({
                                             : false
                                     }
                                     vectorSetName={vectorSetName}
+                                    clearError={clearError}
                                 />
                             </div>
                         </div>

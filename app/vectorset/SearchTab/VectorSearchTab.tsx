@@ -94,6 +94,7 @@ export default function VectorSearchTab({
         searchFilter,
         setSearchFilter,
         error,
+        clearError: hookClearError,
         expansionFactor,
         setExpansionFactor,
         executedCommand,
@@ -107,6 +108,12 @@ export default function VectorSearchTab({
         onSearchStateChange: handleSearchStateChange,
         fetchEmbeddings: false, // Always fetch embeddings for visualization
     })
+
+    const clearError = useCallback(() => {
+        if (error && hookClearError) {
+            hookClearError();
+        }
+    }, [error, hookClearError]);
 
     const handleSearchQueryChange = (query: string) => {
         setSearchQuery(query)

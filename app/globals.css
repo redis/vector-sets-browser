@@ -31,11 +31,11 @@ layer(base);
 }
 
 @utility text-column {
-    /* 
+    /*
   .redis-mono {
     font-family: "Geist Mono", "Space Mono", monospace;
   }
-    
+
   .redis-grotesk {
     font-family: "Geist", "Space Grotesk", sans-serif;
   } */
@@ -66,10 +66,10 @@ layer(base);
 
 @utility card {
     /* Base button styles that all buttons share */
-    @apply bg-[white] 
-      rounded-none 
-      shadow-none 
-      dark:bg-(--slate-700) 
+    @apply bg-[white]
+      rounded-none
+      shadow-none
+      dark:bg-(--slate-700)
       dark:border-(--slate-300)
       dark:text-(--lime-500);
 }
@@ -296,4 +296,8 @@ layer(base);
     width: 2px;
     background-color: rgba(100, 100, 200, 0.8);
     border-radius: 1px;
+}
+
+button {
+    cursor: pointer;
 }
