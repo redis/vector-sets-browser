@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import * as THREE from "three"
-import { COLORS_REDIS_DARK, ColorScheme } from "../constants"
+import { COLORS_REDIS_DARK, COLORS_REDIS_LIGHT, ColorScheme } from "../constants"
 
+// Default to dark mode for initial setup
 const COLORS: ColorScheme = COLORS_REDIS_DARK
 
 export function useThreeScene() {
@@ -27,6 +28,27 @@ export function useThreeScene() {
         horizontalTicks: [],
         verticalTicks: [],
     })
+
+    // Function to set the scene's background color
+    const updateSceneBackground = useCallback((isDark: boolean) => {
+        if (!scene) return;
+        
+        // Use the appropriate color scheme based on dark mode
+        const backgroundHex = isDark 
+            ? COLORS_REDIS_DARK.BACKGROUND 
+            : COLORS_REDIS_LIGHT.BACKGROUND;
+            
+        // Convert CSS color string to THREE.js color
+        if (backgroundHex.startsWith('#')) {
+            // Handle hex color string
+            scene.background = new THREE.Color(backgroundHex);
+        } else {
+            // Handle numeric color value
+            scene.background = new THREE.Color(parseInt(backgroundHex));
+        }
+        
+        console.log("Scene background updated to:", backgroundHex, "isDark:", isDark);
+    }, [scene]);
 
     // Function to create guide lines
     const createGuideLines = useCallback((scene: THREE.Scene) => {
@@ -278,7 +300,7 @@ export function useThreeScene() {
 
         // Create scene
         const scene = new THREE.Scene()
-        scene.background = new THREE.Color(COLORS.BACKGROUND)
+        // Don't set background color here - it will be set via the updateSceneBackground function
 
         // Add guide lines at the origin
         createGuideLines(scene)
@@ -410,6 +432,7 @@ export function useThreeScene() {
         _toggleAutoZoom: toggleAutoZoom,
         resetView,
         updateGuideLineColors,
+        updateSceneBackground,
         handleZoom,
     }
 }

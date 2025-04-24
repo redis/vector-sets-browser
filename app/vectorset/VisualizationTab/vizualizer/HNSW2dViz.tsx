@@ -19,11 +19,7 @@ import {
 } from "./hooks"
 import type { HNSWVizPureProps } from "./types"
 import { vemb } from "@/app/redis-server/api"
-
-// Comment out the old implementation
-/* Original implementation...
-[Previous implementation goes here]
-*/
+import { COLORS_REDIS_DARK, COLORS_REDIS_LIGHT, NODE_SIZE } from "./constants"
 
 // Add error message display
 const ErrorMessage = ({ message }: { message: string }) => (
@@ -89,6 +85,7 @@ const HNSWVizPure: React.FC<HNSWVizPureProps> = ({
         fitCameraToNodes,
         updateGuideLineColors,
         handleZoom: originalHandleZoom,
+        updateSceneBackground,
     } = useThreeScene()
 
     // Cast the ref to the required non-null type for compatibility with other hooks
@@ -121,24 +118,37 @@ const HNSWVizPure: React.FC<HNSWVizPureProps> = ({
     const handleZoom = useCallback(
         (zoomIn: boolean) => {
             if (!camera) return
-            const currentFrustumSize = camera.top - camera.bottom
-            const newFrustumSize = zoomIn
-                ? Math.max(currentFrustumSize * 0.8, 5)
-                : currentFrustumSize * 1.2
-
-            const aspect = window.innerWidth / window.innerHeight
-            camera.left = (-newFrustumSize * aspect) / 2
-            camera.right = (newFrustumSize * aspect) / 2
-            camera.top = newFrustumSize / 2
-            camera.bottom = -newFrustumSize / 2
+            
+            // Use the same approach as the wheel zoom in useCanvasEvents
+            // Define a zoom factor similar to the wheel event
+            const zoomFactor = zoomIn ? 0.9 : 1.1  // 0.9 for zoom in, 1.1 for zoom out
+            
+            // Get current dimensions
+            const currentWidth = camera.right - camera.left
+            const currentHeight = camera.top - camera.bottom
+            
+            // Calculate new dimensions
+            const newWidth = currentWidth * zoomFactor
+            const newHeight = currentHeight * zoomFactor
+            
+            // Calculate how much to adjust the dimensions
+            const widthDelta = (newWidth - currentWidth) / 2
+            const heightDelta = (newHeight - currentHeight) / 2
+            
+            // Update camera frustum
+            camera.left = camera.left - widthDelta
+            camera.right = camera.right + widthDelta
+            camera.top = camera.top + heightDelta
+            camera.bottom = camera.bottom - heightDelta
+            
             camera.updateProjectionMatrix()
-
+            
+            // Update label scales and anything else needed
             updateLabelScales()
-            if (originalHandleZoom) {
-                originalHandleZoom(zoomIn)
-            }
+            
+            // No need to call originalHandleZoom as it's now redundant
         },
-        [camera, updateLabelScales, originalHandleZoom]
+        [camera, updateLabelScales]
     )
 
     // Animation loop ref
@@ -148,9 +158,6 @@ const HNSWVizPure: React.FC<HNSWVizPureProps> = ({
     useEffect(() => {
         const animate = () => {
             if (camera && renderer && scene) {
-                // Update renderer clear color to match the canvas background
-                renderer.setClearColor(isDarkMode ? 0x0d1e26 : 0xf5f5f5)
-
                 updateLabelScales()
                 renderer.render(scene, camera)
             }
@@ -164,7 +171,7 @@ const HNSWVizPure: React.FC<HNSWVizPureProps> = ({
                 cancelAnimationFrame(animationFrameRef.current)
             }
         }
-    }, [camera, renderer, scene, updateLabelScales, isDarkMode])
+    }, [camera, renderer, scene, updateLabelScales])
 
     // Initialize force simulation
     const { nodesRef, edgesRef, addNode, addEdge, startSimulation } =
@@ -194,9 +201,9 @@ const HNSWVizPure: React.FC<HNSWVizPureProps> = ({
 
     // Function to create a node mesh
     const createNodeMesh = (element: string, vector?: number[]) => {
-        const geometry = new THREE.SphereGeometry(0.5, 32, 32)
+        const geometry = new THREE.SphereGeometry(NODE_SIZE.DEFAULT, 32, 32)
         const material = new THREE.MeshBasicMaterial({
-            color: isDarkMode ? 0xffffff : 0x1a3b4c,
+            color: isDarkMode ? COLORS_REDIS_DARK.NODE.DEFAULT : COLORS_REDIS_LIGHT.NODE.DEFAULT,
         })
         const mesh = new THREE.Mesh(geometry, material)
         mesh.userData = {
@@ -225,11 +232,11 @@ const HNSWVizPure: React.FC<HNSWVizPureProps> = ({
 
         if (mesh && mesh.userData.isNode) {
             // Create hover highlight mesh
-            const geometry = new THREE.SphereGeometry(0.6, 32, 32)
+            const geometry = new THREE.SphereGeometry(NODE_SIZE.HIGHLIGHT, 32, 32)
             const material = new THREE.MeshBasicMaterial({
-                color: isDarkMode ? 0xd6ff18 : 0xff4438,
+                color: isDarkMode ? COLORS_REDIS_DARK.NODE.HOVER_HIGHLIGHT : COLORS_REDIS_LIGHT.NODE.HOVER_HIGHLIGHT,
                 transparent: true,
-                opacity: 0.3,
+                opacity: 1,
             })
             const highlight = new THREE.Mesh(geometry, material)
             highlight.position.copy(mesh.position)
@@ -238,21 +245,23 @@ const HNSWVizPure: React.FC<HNSWVizPureProps> = ({
 
             // Update hover label text
             const elementName = mesh.userData.element
-            const truncatedText =
-                elementName.length > 50
-                    ? elementName.substring(0, 47) + "..."
-                    : elementName
+            
+            // Truncate long text but handle multi-line content properly
+            // Check if the element name contains newlines
+            const lines = elementName.split('\n');
+            const truncatedLines = lines.map((line: string) => 
+                line.length > 80 ? line.substring(0, 77) + "..." : line
+            );
+            const truncatedText = truncatedLines.join('\n');
 
-            let labelText = truncatedText
+            let labelText = truncatedText;
 
             // Add similarity if available
             if (
                 mesh.userData.similarity !== null &&
                 mesh.userData.similarity !== undefined
             ) {
-                labelText += `\n - Similarity: ${mesh.userData.similarity.toFixed(
-                    4
-                )}`
+                labelText += `\nSimilarity: ${mesh.userData.similarity.toFixed(4)}`
             }
 
             setHoverLabel({
@@ -293,9 +302,20 @@ const HNSWVizPure: React.FC<HNSWVizPureProps> = ({
     ) => {
         if (!scene || !mesh.userData.element) return
 
+        // Clear hover highlight if it exists
+        if (hoverHighlightRef.current) {
+            scene.remove(hoverHighlightRef.current)
+            hoverHighlightRef.current = null
+        }
+
         // Update selected node
         selectedNodeRef.current = mesh
         setSelectedNode(mesh)
+
+        // Set selected node color
+        const material = mesh.material as THREE.MeshBasicMaterial
+        material.color.set(isDarkMode ? COLORS_REDIS_DARK.NODE.SELECTED : COLORS_REDIS_LIGHT.NODE.SELECTED)
+        material.needsUpdate = true
 
         // Start pulse animation for selected node
         const animatePulse = () => {
@@ -396,9 +416,9 @@ const HNSWVizPure: React.FC<HNSWVizPureProps> = ({
                     points
                 )
                 const material = new THREE.LineBasicMaterial({
-                    color: isDarkMode ? 0xf3ffbb : 0x4a90e2,
+                    color: isDarkMode ? COLORS_REDIS_DARK.EDGE.DEFAULT : COLORS_REDIS_LIGHT.EDGE.DEFAULT,
                     transparent: true,
-                    opacity: showLines ? 0.5 : 0,
+                    opacity: showLines ? 1 : 0,
                 })
                 const line = new THREE.Line(geometry, material)
                 scene.add(line)
@@ -457,23 +477,29 @@ const HNSWVizPure: React.FC<HNSWVizPureProps> = ({
         // Reset all previously highlighted edges to default
         highlightedEdgesRef.current.forEach((line) => {
             const material = line.material as THREE.LineBasicMaterial
-            material.color.set(isDarkMode ? 0xf3ffbb : 0x4a90e2)
+            material.color.set(isDarkMode ? COLORS_REDIS_DARK.EDGE.DEFAULT : COLORS_REDIS_LIGHT.EDGE.DEFAULT)
             material.opacity = showLines ? 0.5 : 0
         })
         highlightedEdgesRef.current.clear()
 
         if (mesh) {
-            // Create node highlight effect
-            const geometry = new THREE.SphereGeometry(0.6, 32, 32)
-            const material = new THREE.MeshBasicMaterial({
-                color: isDarkMode ? 0xd6ff18 : 0xff4438,
-                transparent: true,
-                opacity: 0.3,
-            })
-            const highlight = new THREE.Mesh(geometry, material)
-            highlight.position.copy(mesh.position)
-            scene.add(highlight)
-            hoverHighlightRef.current = highlight
+            // Don't create hover highlight for the currently selected node
+            // Just highlight its edges but keep the selected state visually distinct
+            const isSelectedNode = selectedNodeRef.current === mesh;
+            
+            if (!isSelectedNode) {
+                // Create node highlight effect (only for non-selected nodes)
+                const geometry = new THREE.SphereGeometry(NODE_SIZE.HIGHLIGHT, 32, 32)
+                const material = new THREE.MeshBasicMaterial({
+                    color: isDarkMode ? COLORS_REDIS_DARK.NODE.HOVER_HIGHLIGHT : COLORS_REDIS_LIGHT.NODE.HOVER_HIGHLIGHT,
+                    transparent: true,
+                    opacity: 1,
+                })
+                const highlight = new THREE.Mesh(geometry, material)
+                highlight.position.copy(mesh.position)
+                scene.add(highlight)
+                hoverHighlightRef.current = highlight
+            }
 
             // Highlight edges connected to this node
             edgesRef.current.forEach((edge) => {
@@ -481,7 +507,7 @@ const HNSWVizPure: React.FC<HNSWVizPureProps> = ({
                     const material = edge.line
                         .material as THREE.LineBasicMaterial
                     // Use a brighter color for the highlighted edges
-                    material.color.set(isDarkMode ? 0xffffff : 0xff4438)
+                    material.color.set(isDarkMode ? COLORS_REDIS_DARK.NODE.SELECTED : COLORS_REDIS_LIGHT.NODE.SELECTED)
                     // Increase opacity for better visibility
                     material.opacity = 0.8
                     // Track this edge as highlighted
@@ -501,12 +527,21 @@ const HNSWVizPure: React.FC<HNSWVizPureProps> = ({
         updateHoverLabel
     )
 
-    // Load user preferences
+    // Update colors of previously selected nodes when a new selection is made
     useEffect(() => {
-        loadColorScheme()
-        loadLineVisibility()
-        loadCardPinState()
-    }, [loadColorScheme, loadLineVisibility, loadCardPinState])
+        if (!scene) return
+        
+        // Reset all node colors to default first
+        nodesRef.current.forEach((node) => {
+            // Skip the currently selected node
+            if (node.mesh === selectedNodeRef.current) return;
+            
+            const material = node.mesh.material as THREE.MeshBasicMaterial;
+            material.color.set(isDarkMode ? COLORS_REDIS_DARK.NODE.DEFAULT : COLORS_REDIS_LIGHT.NODE.DEFAULT);
+            material.needsUpdate = true;
+        });
+        
+    }, [selectedNode, isDarkMode, scene]);
 
     // Save preferences when they change
     useEffect(() => {
@@ -640,16 +675,18 @@ const HNSWVizPure: React.FC<HNSWVizPureProps> = ({
 
     // Update colors when dark mode changes
     useEffect(() => {
-        if (!scene) return
+        if (!scene || !renderer) return
+
+        console.log("Dark mode changed to:", isDarkMode);
 
         // Update guide line colors
         updateGuideLineColors(isDarkMode)
 
         // Update node colors
         nodesRef.current.forEach((node) => {
-            ; (node.mesh.material as THREE.MeshBasicMaterial).color.set(
-                isDarkMode ? 0xffffff : 0x1a3b4c
-            )
+            const material = node.mesh.material as THREE.MeshBasicMaterial;
+            material.color.set(isDarkMode ? COLORS_REDIS_DARK.NODE.DEFAULT : COLORS_REDIS_LIGHT.NODE.DEFAULT);
+            material.needsUpdate = true;
         })
 
         // Update edge colors
@@ -657,12 +694,18 @@ const HNSWVizPure: React.FC<HNSWVizPureProps> = ({
             const material = edge.line.material as THREE.LineBasicMaterial
             // If this edge is currently highlighted, keep it highlighted
             if (highlightedEdgesRef.current.has(edge.line)) {
-                material.color.set(isDarkMode ? 0xffffff : 0xff4438)
+                material.color.set(isDarkMode ? COLORS_REDIS_DARK.NODE.SELECTED : COLORS_REDIS_LIGHT.NODE.SELECTED)
             } else {
-                material.color.set(isDarkMode ? 0xf3ffbb : 0x4a90e2)
+                material.color.set(isDarkMode ? COLORS_REDIS_DARK.EDGE.DEFAULT : COLORS_REDIS_LIGHT.EDGE.DEFAULT)
             }
+            material.needsUpdate = true
         })
-    }, [isDarkMode, scene, updateGuideLineColors])
+
+        // Force a render to update the scene
+        if (camera) {
+            renderer.render(scene, camera)
+        }
+    }, [isDarkMode, scene, renderer, camera, updateGuideLineColors])
 
     // Update line visibility
     useEffect(() => {
@@ -795,7 +838,7 @@ const HNSWVizPure: React.FC<HNSWVizPureProps> = ({
                         const geometry =
                             new THREE.BufferGeometry().setFromPoints(points)
                         const material = new THREE.LineBasicMaterial({
-                            color: isDarkMode ? 0xf3ffbb : 0x4a90e2,
+                            color: isDarkMode ? COLORS_REDIS_DARK.EDGE.DEFAULT : COLORS_REDIS_LIGHT.EDGE.DEFAULT,
                             transparent: true,
                             opacity: showLines ? 0.5 : 0,
                         })
@@ -950,6 +993,7 @@ const HNSWVizPure: React.FC<HNSWVizPureProps> = ({
         )
         initialMesh.userData.similarity = initialElement.similarity
         scene.add(initialMesh)
+        addNode(initialMesh)
 
         // Fit camera to the initial node
         fitCameraToNodes()
@@ -971,13 +1015,51 @@ const HNSWVizPure: React.FC<HNSWVizPureProps> = ({
         initialNodes,
     ])
 
-    // Update renderer background color when dark mode changes
+    // Update renderer and canvas background color directly
     useEffect(() => {
-        if (renderer) {
-            // Set the renderer clear color to match the canvas background
-            renderer.setClearColor(isDarkMode ? 0x0d1e26 : 0xf5f5f5)
+        console.log("Updating background colors for dark mode:", isDarkMode);
+        
+        // Update the THREE.js scene background
+        if (scene) {
+            updateSceneBackground(isDarkMode);
         }
-    }, [isDarkMode, renderer])
+        
+        // Update renderer
+        if (renderer) {
+            const backgroundHex = isDarkMode 
+                ? COLORS_REDIS_DARK.BACKGROUND 
+                : COLORS_REDIS_LIGHT.BACKGROUND;
+                
+            // Convert the background hex to a number if it's a string
+            let bgColor: number;
+            if (typeof backgroundHex === 'string' && backgroundHex.startsWith('#')) {
+                // Remove the # and convert hex string to number - need to cast to unknown first for TypeScript
+                bgColor = parseInt(backgroundHex.substring(1), 16);
+            } else if (typeof backgroundHex === 'number') {
+                bgColor = backgroundHex;
+            } else {
+                // Fallback to a default color if something goes wrong
+                bgColor = isDarkMode ? 0x0d1e26 : 0xffffff;
+                console.warn('Unexpected background color format:', backgroundHex);
+            }
+            
+            console.log("Setting renderer clear color:", bgColor.toString(16));
+            renderer.setClearColor(bgColor);
+        }
+        
+        // Update canvas background directly for consistency
+        if (canvasRef.current) {
+            // Use the same predefined values that we know work correctly
+            const cssColor = isDarkMode ? "#0d1e26" : "#ffffff";
+            console.log("Setting canvas background style:", cssColor);
+            canvasRef.current.style.background = cssColor;
+        }
+        
+        // Force a re-render if scene is available
+        if (scene && camera && renderer) {
+            renderer.render(scene, camera);
+        }
+    }, [isDarkMode, renderer, scene, camera, canvasRef, updateSceneBackground]);
 
     return (
         <div
@@ -990,7 +1072,6 @@ const HNSWVizPure: React.FC<HNSWVizPureProps> = ({
             <canvas
                 ref={canvasRef}
                 className="w-full h-full"
-                style={{ background: isDarkMode ? "#0d1e26" : "#f5f5f5" }}
             />
 
             {errorMessage && <ErrorMessage message={errorMessage} />}

@@ -92,20 +92,21 @@ export default function VectorSetVisualization({
         onSearchStateChange: handleSearchStateChange,
     })
 
-    const getNeighbors = async (
-        element: string,
-        count: number,
-    ) => {
+    const getNeighbors = async (element: string, count: number) => {
         try {
-            const data = await vlinks({
-                keyName: vectorSetName,
-                element,
-                count,
-                withEmbeddings: true, // Always fetch embeddings for visualization
-            }) || []
+            const data =
+                (await vlinks({
+                    keyName: vectorSetName,
+                    element,
+                    count,
+                    withEmbeddings: true, // Always fetch embeddings for visualization
+                })) || []
 
             if (!data || !data.success || data.result === undefined) {
-                console.log("[getNeighbors] No neighbors found for element:", element)
+                console.log(
+                    "[getNeighbors] No neighbors found for element:",
+                    element
+                )
                 return []
             }
             const neighbors = data.result
@@ -116,7 +117,9 @@ export default function VectorSetVisualization({
             // { element: string, similarity: number, vector: number[] }
             const response = neighbors.flat().map((item) => {
                 if (!item[2]) {
-                    console.warn(`[getNeighbors] Missing vector for element: ${item[0]}`)
+                    console.warn(
+                        `[getNeighbors] Missing vector for element: ${item[0]}`
+                    )
                 }
                 return {
                     element: item[0],
@@ -207,6 +210,7 @@ export default function VectorSetVisualization({
                         className="grow flex-1"
                         style={{ minHeight: "calc(100vh - 400px)" }}
                     >
+                        asdfasdfsadf
                         {results[0] && !isVectorSetChanging ? (
                             vizType === "2d" ? (
                                 <HNSWVizPure
@@ -214,7 +218,9 @@ export default function VectorSetVisualization({
                                     initialElement={{
                                         element: results[0][0],
                                         similarity: results[0][1],
-                                        vector: Array.isArray(results[0][2]) ? results[0][2] : [],
+                                        vector: Array.isArray(results[0][2])
+                                            ? results[0][2]
+                                            : [],
                                     }}
                                     maxNodes={500}
                                     initialNodes={Number(searchCount)}
@@ -224,8 +230,12 @@ export default function VectorSetVisualization({
                             ) : (
                                 <VectorViz3D
                                     data={results.map((result) => ({
-                                        label: `${result[0]} (${result[1].toFixed(3)})`,
-                                        vector: Array.isArray(result[2]) ? result[2] : [],
+                                        label: `${
+                                            result[0]
+                                        } (${result[1].toFixed(3)})`,
+                                        vector: Array.isArray(result[2])
+                                            ? result[2]
+                                            : [],
                                     }))}
                                     onVectorSelect={handleRowClick}
                                 />

@@ -1,10 +1,26 @@
-import { useState, useCallback } from "react"
+import { useState, useCallback, useEffect } from "react"
 import { userSettings } from "@/app/utils/userSettings"
 
 export function useVisualizationState() {
-    const [isDarkMode, setIsDarkMode] = useState<boolean>(true)
+    const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
+        // Load the initial dark mode setting synchronously
+        try {
+            const storedScheme = userSettings.get("colorScheme")
+            return storedScheme === "light" ? false : true // Default to dark mode if not found
+        } catch (error) {
+            console.error("Error loading initial color scheme:", error)
+            return true // Default to dark mode if error
+        }
+    })
     const [showLines, setShowLines] = useState<boolean>(false)
     const [isCardPinned, setIsCardPinned] = useState<boolean>(false)
+
+    // Load settings on component mount
+    useEffect(() => {
+        loadColorScheme()
+        loadLineVisibility()
+        loadCardPinState()
+    }, [])
 
     const loadColorScheme = useCallback(async () => {
         try {
@@ -17,9 +33,10 @@ export function useVisualizationState() {
         }
     }, [])
 
-    const saveColorScheme = useCallback(async () => {
+    const saveColorScheme = useCallback(() => {
         try {
             userSettings.set("colorScheme", isDarkMode ? "dark" : "light")
+            console.log("Saved color scheme:", isDarkMode ? "dark" : "light")
         } catch (error) {
             console.error("Error saving color scheme:", error)
         }
@@ -64,7 +81,13 @@ export function useVisualizationState() {
     }, [isCardPinned])
 
     const toggleDarkMode = useCallback(() => {
-        setIsDarkMode((prev) => !prev)
+        setIsDarkMode(prev => {
+            const newValue = !prev
+            // Immediately save the new value
+            userSettings.set("colorScheme", newValue ? "dark" : "light")
+            console.log("Toggled and saved dark mode:", newValue)
+            return newValue
+        })
     }, [])
 
     const toggleLineVisibility = useCallback(() => {
@@ -74,6 +97,13 @@ export function useVisualizationState() {
     const toggleCardPin = useCallback(() => {
         setIsCardPinned((prev) => !prev)
     }, [])
+
+    const resetDarkMode = useCallback((defaultToDark = true) => {
+        const newValue = defaultToDark;
+        setIsDarkMode(newValue);
+        userSettings.set("colorScheme", newValue ? "dark" : "light");
+        console.log("Reset dark mode to:", newValue);
+    }, []);
 
     return {
         isDarkMode,
@@ -88,5 +118,6 @@ export function useVisualizationState() {
         toggleDarkMode,
         toggleLineVisibility,
         toggleCardPin,
+        resetDarkMode,
     }
 } 
