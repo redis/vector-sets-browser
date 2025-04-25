@@ -239,7 +239,7 @@ function VectorSetPageContent() {
                                 Information
                             </TabsTrigger>
                             <TabsTrigger className="w-full" value="settings">
-                                Vector Settings
+                                Configuration
                             </TabsTrigger>
                             <TabsTrigger className="w-full" value="import">
                                 Import Data

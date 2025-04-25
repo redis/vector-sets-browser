@@ -5,8 +5,9 @@ import {
     getEmbeddingDataFormat,
     getExpectedDimensions,
     getModelName,
+    getProviderInfo
 } from "@/app/embeddings/types/embeddingModels"
-import { vadd, vcard, vrem, vsim } from "@/app/redis-server/api"
+import { vadd, vcard, vdim, vrem, vsim } from "@/app/redis-server/api"
 import { VectorSetMetadata } from "@/app/types/vectorSetMetaData"
 import eventBus, { AppEvents } from "@/app/utils/eventEmitter"
 import { Button } from "@/components/ui/button"
@@ -19,9 +20,19 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@/components/ui/dialog"
-import { useState } from "react"
+import { Switch } from "@/components/ui/switch"
+import { Label } from "@/components/ui/label"
+import { useState, useEffect } from "react"
 import AdvancedConfigEdit from "../AdvancedConfigEdit"
 import { DEFAULT_EMBEDDING, DEFAULT_EMBEDDING_CONFIG } from "../constants"
+import { 
+    getEmbeddingIcon, 
+    ImageEmbeddingIcon, 
+    MultiModalEmbeddingIcon, 
+    TextEmbeddingIcon 
+} from "@/app/components/EmbeddingConfig/EmbeddingIcons"
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert"
+import { AlertTriangle } from "lucide-react"
 
 interface VectorSettingsProps {
     vectorSetName: string
@@ -44,6 +55,32 @@ export default function VectorSettings({
     const [pendingEmbeddingConfig, setPendingEmbeddingConfig] =
         useState<EmbeddingConfig | null>(null)
     const [successInfo, setSuccessInfo] = useState<{oldModel: string, newModel: string, dimensions: number} | null>(null)
+    const [actualVectorDim, setActualVectorDim] = useState<number | null>(null)
+    const [dimensionMismatch, setDimensionMismatch] = useState(false)
+
+    // Fetch actual vector dimensions from Redis
+    useEffect(() => {
+        const fetchVectorDimensions = async () => {
+            if (!vectorSetName) return;
+            
+            try {
+                const dimResponse = await vdim({ keyName: vectorSetName });
+                if (dimResponse.success && dimResponse.result !== undefined) {
+                    setActualVectorDim(dimResponse.result);
+                    
+                    // Check for dimension mismatch
+                    if (metadata?.embedding) {
+                        const expectedDimensions = getExpectedDimensions(metadata.embedding);
+                        setDimensionMismatch(expectedDimensions > 0 && dimResponse.result !== expectedDimensions);
+                    }
+                }
+            } catch (error) {
+                console.error("[VectorSettings] Error fetching vector dimensions:", error);
+            }
+        };
+        
+        fetchVectorDimensions();
+    }, [vectorSetName, metadata]);
 
     const handleEditConfig = async (newConfig: EmbeddingConfig) => {
         try {
@@ -168,6 +205,12 @@ export default function VectorSettings({
         setIsWarningDialogOpen(false)
         setIsSuccessDialogOpen(false)
         setPendingEmbeddingConfig(null)
+        
+        // Check for dimension mismatch after updating config
+        if (actualVectorDim !== null) {
+            const expectedDimensions = getExpectedDimensions(newConfig);
+            setDimensionMismatch(expectedDimensions > 0 && actualVectorDim !== expectedDimensions);
+        }
     }
 
     const handleConfirmEmbeddingChange = async () => {
@@ -219,7 +262,7 @@ export default function VectorSettings({
             <Card>
                 <CardHeader>
                     <div className="flex items-center w-full space-x-2">
-                        <CardTitle>Vector Set Advanced Configuration</CardTitle>
+                        <CardTitle>Vector Set Options</CardTitle>
                         <div className="grow"></div>
                     </div>
                 </CardHeader>
@@ -353,7 +396,7 @@ export default function VectorSettings({
             <Card>
                 <CardHeader>
                     <div className="flex items-center w-full space-x-2">
-                        <CardTitle>Embedding Configuration</CardTitle>
+                        <CardTitle>Embedding Model Configuration</CardTitle>
                         <div className="grow"></div>
                     </div>
                 </CardHeader>
@@ -367,62 +410,162 @@ export default function VectorSettings({
                         <strong>VADD</strong> operations. It does not affect the
                         redis-server or the underlying vector-set data.
                     </p>
-                    {metadata?.embedding ? (
-                        <div className="flex items-center gap-4 p-4">
-                            <div>
-                                <div className="flex space-x-2">
+
+                    {/* Dimension mismatch warning */}
+                    {dimensionMismatch && metadata?.embedding && metadata.embedding.provider !== "none" && (
+                        <Alert variant="destructive" className="mt-4 mb-2">
+                            <AlertTriangle className="h-4 w-4" />
+                            <AlertTitle>Dimension Mismatch</AlertTitle>
+                            <AlertDescription>
+                                The selected embedding model produces vectors with {getExpectedDimensions(metadata.embedding)} dimensions, 
+                                but the VectorSet contains vectors with {actualVectorDim} dimensions. 
+                                This will cause compatibility issues when adding new items.
+                            </AlertDescription>
+                        </Alert>
+                    )}
+
+                    {/* Toggle for using embedding model or not */}
+                    <div className="flex items-center justify-between bg-slate-50 p-4 rounded-lg mt-4 mb-2">
+                        <div className="flex gap-2 items-center">
+                            <span className="font-medium">
+                                Use embedding model
+                            </span>
+                            <span className="text-xs text-gray-500">
+                                (Required for search and import)
+                            </span>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                            <Label htmlFor="embedding-toggle" className="text-sm text-gray-600">
+                                {metadata?.embedding && metadata.embedding.provider === "none" ? "Disabled" : "Enabled"}
+                            </Label>
+                            <Switch
+                                id="embedding-toggle"
+                                checked={metadata?.embedding && metadata.embedding.provider !== "none"}
+                                onCheckedChange={(checked) => {
+                                    if (checked) {
+                                        // Toggle to use an embedding model
+                                        setIsEditConfigModalOpen(true)
+                                    } else if (metadata?.embedding && metadata.embedding.provider !== "none") {
+                                        // Set to none provider
+                                        const dimensions = metadata.embedding 
+                                            ? getExpectedDimensions(metadata.embedding) || DEFAULT_EMBEDDING.DIMENSIONS
+                                            : DEFAULT_EMBEDDING.DIMENSIONS;
+
+                                        handleEditConfig({
+                                            provider: "none",
+                                            none: {
+                                                model: "direct-vectors",
+                                                dimensions,
+                                            },
+                                        })
+                                    }
+                                }}
+                            />
+                        </div>
+                    </div>
+
+                    {metadata?.embedding &&
+                    metadata.embedding.provider !== "none" ? (
+                        <div className="flex items-center gap-4 p-4 border rounded-md">
+                            <div className="grow flex gap-2 flex-col">
+                                <div className="flex items-center space-x-2">
+                                    <div className="text-gray-600">
+                                        Data Format:
+                                    </div>
+                                    <div className="flex items-center space-x-1 font-bold">
+                                        {(() => {
+                                            const dataFormat =
+                                                getEmbeddingDataFormat(
+                                                    metadata.embedding
+                                                )
+                                            const Icon =
+                                                getEmbeddingIcon(dataFormat)
+                                            return (
+                                                <>
+                                                    <Icon />
+                                                    <span className="capitalize">
+                                                        {dataFormat.replace(
+                                                            "-",
+                                                            " & "
+                                                        )}
+                                                    </span>
+                                                </>
+                                            )
+                                        })()}
+                                    </div>
+                                </div>
+                                <div className="flex items-center space-x-2">
                                     <div className="text-gray-600">
                                         Provider:
                                     </div>
                                     <div className="font-bold">
-                                        {metadata?.embedding?.provider ||
+                                        {metadata?.embedding?.provider ? 
+                                            getProviderInfo(metadata.embedding.provider).displayName :
                                             "None"}
                                     </div>
                                 </div>
-                                <div className="flex space-x-2">
+                                <div className="flex items-center space-x-2">
                                     <div className="text-gray-600">Model:</div>
                                     <div className="font-bold">
-                                        {getModelName(metadata?.embedding)}
+                                        {getModelName(metadata.embedding)}
                                     </div>
                                 </div>
-                                <div className="flex space-x-2">
-                                    <div className="text-gray-600">
-                                        Data Format:
+                                {actualVectorDim !== null && (
+                                    <div className="flex items-center space-x-2">
+                                        <div className="text-gray-600">
+                                            Vector Dimensions:
+                                        </div>
+                                        <div className={`font-bold ${dimensionMismatch ? "text-red-600" : ""}`}>
+                                            {getExpectedDimensions(metadata.embedding)} 
+                                            {dimensionMismatch && actualVectorDim !== null && 
+                                             ` (VectorSet has ${actualVectorDim})`}
+                                        </div>
                                     </div>
-                                    <div className="font-bold">
-                                        {getEmbeddingDataFormat(
-                                            metadata?.embedding
-                                        )}
-                                    </div>
-                                </div>
+                                )}
                             </div>
                             <Button
                                 variant="default"
                                 onClick={() => setIsEditConfigModalOpen(true)}
                             >
-                                Edit
+                                Configure
                             </Button>
                         </div>
                     ) : (
-                        <div className="flex flex-col items-start gap-4 p-4">
-                            <div className="text-sm bg-yellow-50 border border-yellow-200 rounded p-4 w-full">
-                                <p className="font-medium text-yellow-800">
-                                    No Embedding Configuration
-                                </p>
-                                <p className="text-yellow-700">
-                                    This vector set was created outside of the
-                                    browser and doesn{`'`}t have an embedding
-                                    configuration. Adding one will enable VSIM
-                                    search and VADD operations in the web
-                                    interface.
-                                </p>
-                            </div>
-                            <Button
-                                variant="default"
-                                onClick={() => setIsEditConfigModalOpen(true)}
-                            >
-                                Add Embedding Config
-                            </Button>
+                        <div className="p-4 border rounded-md text-gray-600">
+                            {metadata?.embedding && 
+                             metadata.embedding.provider === "none" ? (
+                                <div className="flex flex-col">
+                                    <p className="mb-2">
+                                        <span className="font-medium">
+                                            Direct vector input mode.
+                                        </span>{" "}
+                                        No automatic encoding will be performed.
+                                    </p>
+                                    <p>
+                                        <span className="font-medium">
+                                            Vector dimensions:
+                                        </span>{" "}
+                                        {metadata.embedding.none
+                                            ?.dimensions ||
+                                            DEFAULT_EMBEDDING.DIMENSIONS}
+                                        {dimensionMismatch && actualVectorDim !== null && 
+                                         ` (VectorSet has ${actualVectorDim} - mismatch)`}
+                                    </p>
+                                </div>
+                            ) : (
+                                <div className="text-sm bg-yellow-50 border border-yellow-200 rounded p-4 w-full">
+                                    <p className="font-medium text-yellow-800">
+                                        No Embedding Configuration
+                                    </p>
+                                    <p className="text-yellow-700">
+                                        This vector set was created outside of
+                                        the browser and doesn{`'`}t have an
+                                        embedding configuration. Enable
+                                        embedding above to use VSIM search and
+                                        VADD operations in the web interface.
+                                    </p>
+                                </div>
+                            )}
                         </div>
                     )}
                 </CardContent>
@@ -465,15 +608,17 @@ export default function VectorSettings({
                     isOpen={isEditConfigModalOpen}
                     onClose={() => setIsEditConfigModalOpen(false)}
                     config={
-                        metadata?.embedding || {
-                            provider: DEFAULT_EMBEDDING.PROVIDER,
-                            none: {
-                                model: DEFAULT_EMBEDDING.MODEL,
-                                dimensions:
-                                    metadata?.dimensions ||
-                                    DEFAULT_EMBEDDING.DIMENSIONS,
-                            },
-                        }
+                        metadata?.embedding &&
+                        metadata.embedding.provider !== "none"
+                            ? metadata.embedding 
+                            : {
+                                // Default to a reasonable embedding config like OpenAI
+                                provider: "openai",
+                                openai: {
+                                    model: "text-embedding-3-small",
+                                    batchSize: 100,
+                                },
+                            }
                     }
                     onSave={handleEditConfig}
                 />
@@ -529,15 +674,28 @@ export default function VectorSettings({
                         <DialogDescription>
                             <div className="space-y-2 pt-2">
                                 <p>
-                                    The vector set has been updated to use a new embedding model:
+                                    The vector set has been updated to use a new
+                                    embedding model:
                                 </p>
                                 <div className="grid grid-cols-2 gap-2 text-sm">
-                                    <div className="text-gray-600">Previous Model:</div>
-                                    <div className="font-medium">{successInfo?.oldModel}</div>
-                                    <div className="text-gray-600">New Model:</div>
-                                    <div className="font-medium">{successInfo?.newModel}</div>
-                                    <div className="text-gray-600">Vector Dimensions:</div>
-                                    <div className="font-medium">{successInfo?.dimensions}</div>
+                                    <div className="text-gray-600">
+                                        Previous Model:
+                                    </div>
+                                    <div className="font-medium">
+                                        {successInfo?.oldModel}
+                                    </div>
+                                    <div className="text-gray-600">
+                                        New Model:
+                                    </div>
+                                    <div className="font-medium">
+                                        {successInfo?.newModel}
+                                    </div>
+                                    <div className="text-gray-600">
+                                        Vector Dimensions:
+                                    </div>
+                                    <div className="font-medium">
+                                        {successInfo?.dimensions}
+                                    </div>
                                 </div>
                             </div>
                         </DialogDescription>

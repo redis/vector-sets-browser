@@ -1,6 +1,9 @@
 import {
     EmbeddingConfig,
     getExpectedDimensions,
+    getEmbeddingDataFormat,
+    getModelName,
+    getProviderInfo
 } from "@/app/embeddings/types/embeddingModels"
 import {
     VectorSetMetadata,
@@ -13,12 +16,18 @@ import { getDefaultTextEmbeddingConfig } from "@/app/utils/embeddingUtils"
 import { userSettings } from "@/app/utils/userSettings"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { ArrowLeft, ChevronRight } from "lucide-react"
+import { ArrowLeft, ChevronRight, MessageSquareText } from "lucide-react"
 import { useEffect, useRef, useState } from "react"
 import EditEmbeddingConfigModal from "../components/EmbeddingConfig/EditEmbeddingConfigDialog"
 import RedisCommandBox from "../components/RedisCommandBox"
 import AdvancedConfigEdit from "./AdvancedConfigEdit"
 import { DEFAULT_EMBEDDING } from "./constants"
+import { 
+    getEmbeddingIcon, 
+    ImageEmbeddingIcon, 
+    MultiModalEmbeddingIcon, 
+    TextEmbeddingIcon 
+} from "@/app/components/EmbeddingConfig/EmbeddingIcons"
 
 interface CreateVectorSetModalProps {
     isOpen: boolean
@@ -274,19 +283,31 @@ export default function CreateVectorSetModal({
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-[white] rounded-lg p-6 w-2xl min-h-[600px] max-h-[90vh] overflow-hidden relative">
+            <div className="bg-[white] rounded-lg p-6 w-4xl min-h-[600px] max-h-[90vh] overflow-hidden relative">
                 {/* Error Alert */}
                 {error && (
                     <div className="absolute top-0 left-0 right-0 bg-red-50 border-b border-red-200 p-4 rounded-t-lg">
                         <div className="flex items-center">
                             <div className="flex-shrink-0">
-                                <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
-                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                                <svg
+                                    className="h-5 w-5 text-red-400"
+                                    viewBox="0 0 20 20"
+                                    fill="currentColor"
+                                >
+                                    <path
+                                        fillRule="evenodd"
+                                        d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                                        clipRule="evenodd"
+                                    />
                                 </svg>
                             </div>
                             <div className="ml-3">
-                                <h3 className="text-sm font-medium text-red-800">Error Creating Vector Set</h3>
-                                <div className="mt-1 text-sm text-red-700">{error}</div>
+                                <h3 className="text-sm font-medium text-red-800">
+                                    Error Creating Vector Set
+                                </h3>
+                                <div className="mt-1 text-sm text-red-700">
+                                    {error}
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -321,7 +342,6 @@ export default function CreateVectorSetModal({
                                         <label className="form-label">
                                             Vector Set Name
                                         </label>
-                                        
                                     </div>
                                     <Input
                                         ref={nameInputRef}
@@ -339,30 +359,55 @@ export default function CreateVectorSetModal({
                             <div className="form-section">
                                 {/* Vector Data Button */}
                                 <div
-                                    className="w-full cursor-pointer"
+                                    className="w-full cursor-pointer p-2"
                                     onClick={() => setActivePanel("vectorData")}
                                 >
-                                    <div className="flex w-full space-x-2 items-center">
-                                        <label className="form-label">
-                                            Vector Data (Embedding size & model)
-                                        </label>
-                                        <div className="grow"></div>
-                                        <div className="text-right text-gray-500 flex flex-col">
-                                            <div className="font-bold">
-                                                {vectorDataChoice ===
-                                                    "manual" && "Manual"}
-                                                {vectorDataChoice ===
-                                                    "embedding" && "Automatic"}
-                                            </div>
-                                            {vectorDataChoice ===
-                                                "embedding" && (
-                                                    <div>
-                                                        Using{" "}
-                                                        {embeddingConfig.provider}
-                                                    </div>
-                                                )}
+                                    <div className="flex w-full">
+                                        <div className="flex-1">
+                                            <label className="form-label">
+                                                Vector Data (Embedding size & model)
+                                            </label>
                                         </div>
-                                        <div>
+                                        <div className="flex-1 flex flex-col items-end pr-2">
+                                            <div className="font-bold text-right">
+                                                {vectorDataChoice === "manual" && "Manual"}
+                                                {vectorDataChoice === "embedding" && (() => {
+                                                    const dataFormat = getEmbeddingDataFormat(embeddingConfig);
+                                                    switch(dataFormat) {
+                                                        case "text": return "Text Embedding Model";
+                                                        case "image": return "Image Embedding Model";
+                                                        case "text-and-image": return "Multi-Modal Embedding Model";
+                                                        default: return "Embedding Model";
+                                                    }
+                                                })()}
+                                            </div>
+                                            {vectorDataChoice === "manual" && (
+                                                <div className="text-sm text-gray-500 text-right">
+                                                    {dimensions} dimensions
+                                                </div>
+                                            )}
+                                            {vectorDataChoice === "embedding" && (
+                                                <div className="flex flex-col text-xs text-gray-500 text-right">
+                                                    <div>
+                                                        Provider: {
+                                                            getProviderInfo(
+                                                                embeddingConfig.provider
+                                                            ).displayName
+                                                        }
+                                                        {getProviderInfo(
+                                                            embeddingConfig.provider
+                                                        ).isBuiltIn && " (Built-in)"}
+                                                    </div>
+                                                    <div>
+                                                        Model: {getModelName(embeddingConfig)}
+                                                    </div>
+                                                    <div>
+                                                        Dimensions: {getExpectedDimensions(embeddingConfig)}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div className="flex items-center">
                                             <ChevronRight className="h-5 w-5" />
                                         </div>
                                     </div>
@@ -428,10 +473,11 @@ export default function CreateVectorSetModal({
 
                 {/* Vector Data Panel */}
                 <div
-                    className={`absolute top-0 left-0 w-full h-full bg-[white] p-6 transition-transform duration-300 transform ${activePanel === "vectorData"
-                        ? "translate-x-0"
-                        : "translate-x-full"
-                        } overflow-y-auto`}
+                    className={`absolute top-0 left-0 w-full h-full bg-[white] p-6 transition-transform duration-300 transform ${
+                        activePanel === "vectorData"
+                            ? "translate-x-0"
+                            : "translate-x-full"
+                    } overflow-y-auto`}
                 >
                     <div className="flex items-center mb-4 border-b pb-4">
                         <Button
@@ -455,22 +501,24 @@ export default function CreateVectorSetModal({
                         </p>
                     </div>
 
-                    <div className="flex space-x-4 w-full min-h-[350px]">
+                    <div className="grid grid-cols-2 gap-6 w-full min-h-[350px]">
                         {/* Manual Option Panel */}
                         <div
-                            className={`border w-full rounded-lg p-6 cursor-pointer transition-all duration-200 ${vectorDataChoice === "manual"
+                            className={`border w-full rounded-lg p-6 cursor-pointer transition-all duration-200 ${
+                                vectorDataChoice === "manual"
                                     ? "border-primary ring-2 ring-primary/20 shadow-md"
                                     : "hover:border-gray-400"
-                                }`}
+                            }`}
                             onClick={() => setVectorDataChoice("manual")}
                         >
                             <div className="flex justify-between items-start">
                                 <div className="flex items-start">
                                     <div
-                                        className={`w-5 h-5 shrink-0 rounded-full border flex items-center justify-center mr-3 mt-1 ${vectorDataChoice === "manual"
+                                        className={`w-5 h-5 shrink-0 rounded-full border flex items-center justify-center mr-3 mt-1 ${
+                                            vectorDataChoice === "manual"
                                                 ? "border-primary"
                                                 : "border-gray-300"
-                                            }`}
+                                        }`}
                                     >
                                         {vectorDataChoice === "manual" && (
                                             <div className="w-3 h-3 rounded-full bg-red-500"></div>
@@ -490,14 +538,31 @@ export default function CreateVectorSetModal({
 
                             {vectorDataChoice === "manual" && (
                                 <div className="mt-6 border-t pt-4">
-                                    <div className="flex-col">
-                                        <div className="flex items-center gap-2">
-                                            <label className="form-label">
-                                                Vector Dimensions
+                                    <div className="bg-gray-50 rounded p-4 flex flex-col gap-3">
+                                        <div className="flex items-center space-x-2">
+                                            <div className="text-gray-600">
+                                                Data Format:
+                                            </div>
+                                            <div className="flex items-center space-x-1 font-bold">
+                                                <MessageSquareText className="h-5 w-5 text-blue-500" />
+                                                <span>Direct Vector Input</span>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center space-x-2">
+                                            <div className="text-gray-600">
+                                                Vector Dimensions:
+                                            </div>
+                                            <div className="font-bold">
+                                                {dimensions}
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-2 mt-2">
+                                            <label className="text-gray-600">
+                                                Change Dimensions:
                                             </label>
                                             <Input
                                                 type="number"
-                                                className="border-gray-300"
+                                                className="border-gray-300 w-32"
                                                 placeholder={DEFAULT_EMBEDDING.DIMENSIONS.toString()}
                                                 min="2"
                                                 value={dimensions}
@@ -508,9 +573,6 @@ export default function CreateVectorSetModal({
                                                 }
                                             />
                                         </div>
-                                        <p className="text-sm text-gray-500 mt-1">
-                                            Number of dimensions for each vector
-                                        </p>
                                     </div>
                                 </div>
                             )}
@@ -518,19 +580,21 @@ export default function CreateVectorSetModal({
 
                         {/* Embedding Model Option Panel */}
                         <div
-                            className={`w-full border rounded-lg p-6 cursor-pointer transition-all duration-200 ${vectorDataChoice === "embedding"
+                            className={`w-full border rounded-lg p-6 cursor-pointer transition-all duration-200 ${
+                                vectorDataChoice === "embedding"
                                     ? "border-primary ring-2 ring-primary/20 shadow-md"
                                     : "hover:border-gray-400"
-                                }`}
+                            }`}
                             onClick={() => setVectorDataChoice("embedding")}
                         >
                             <div className="flex justify-between items-start">
                                 <div className="flex items-start">
                                     <div
-                                        className={`w-5 h-5 shrink-0 rounded-full border flex items-center justify-center mr-3 mt-1 ${vectorDataChoice === "embedding"
+                                        className={`w-5 h-5 shrink-0 rounded-full border flex items-center justify-center mr-3 mt-1 ${
+                                            vectorDataChoice === "embedding"
                                                 ? "border-primary"
                                                 : "border-gray-300"
-                                            }`}
+                                        }`}
                                     >
                                         {vectorDataChoice === "embedding" && (
                                             <div className="w-3 h-3 rounded-full bg-red-500"></div>
@@ -553,49 +617,67 @@ export default function CreateVectorSetModal({
 
                             {vectorDataChoice === "embedding" && (
                                 <div className="mt-6 border-t pt-4">
-                                    <div className="bg-gray-50 rounded p-4 flex flex-col gap-2">
-                                        <div className="text-sm text-black font-bold">
-                                            Text Embeddings (default)
+                                    <div className="bg-gray-50 rounded p-4 flex flex-col gap-3  text-sm">
+                                        <div className="flex items-center space-x-2">
+                                            <div className="text-gray-600">
+                                                Data Format:
+                                            </div>
+                                            <div className="flex items-center space-x-1 font-bold">
+                                                {(() => {
+                                                    const dataFormat =
+                                                        getEmbeddingDataFormat(
+                                                            embeddingConfig
+                                                        )
+                                                    const Icon =
+                                                        getEmbeddingIcon(
+                                                            dataFormat
+                                                        )
+                                                    return (
+                                                        <>
+                                                            <Icon />
+                                                            <span className="capitalize">
+                                                                {dataFormat.replace(
+                                                                    "-",
+                                                                    " & "
+                                                                )}
+                                                            </span>
+                                                        </>
+                                                    )
+                                                })()}
+                                            </div>
                                         </div>
-                                        <div className="flex flex-col gap-2">
-                                            {isOllamaAvailable && (
-                                                <div className="text-xs text-green-600 font-medium mb-2">
-                                                    ✓ Using locally installed
-                                                    Ollama
-                                                </div>
-                                            )}
-                                            {embeddingConfig.provider ===
-                                                "openai" &&
-                                                embeddingConfig.openai && (
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="px-2 py-1 rounded bg-green-100 text-green-800 text-xs font-medium">
-                                                            OpenAI
-                                                        </span>
-                                                        <p className="text-sm text-gray-600">
-                                                            {
-                                                                embeddingConfig
-                                                                    .openai
-                                                                    .model
-                                                            }
-                                                        </p>
-                                                    </div>
+                                        <div className="flex items-center space-x-2">
+                                            <div className="text-gray-600">
+                                                Provider:
+                                            </div>
+                                            <div className="font-bold">
+                                                {embeddingConfig.provider
+                                                    ? getProviderInfo(
+                                                          embeddingConfig.provider
+                                                      ).displayName
+                                                    : "None"}
+                                                {embeddingConfig.provider && 
+                                                 getProviderInfo(embeddingConfig.provider).isBuiltIn && 
+                                                 " (Built-in)"}
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center space-x-2">
+                                            <div className="text-gray-600">
+                                                Model:
+                                            </div>
+                                            <div className="font-bold">
+                                                {getModelName(embeddingConfig)}
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center space-x-2">
+                                            <div className="text-gray-600">
+                                                Vector Dimensions:
+                                            </div>
+                                            <div className="font-bold">
+                                                {getExpectedDimensions(
+                                                    embeddingConfig
                                                 )}
-                                            {embeddingConfig.provider ===
-                                                "ollama" &&
-                                                embeddingConfig.ollama && (
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="px-2 py-1 rounded bg-blue-100 text-blue-800 text-xs font-medium">
-                                                            Ollama
-                                                        </span>
-                                                        <p className="text-sm text-gray-600">
-                                                            {
-                                                                embeddingConfig
-                                                                    .ollama
-                                                                    .modelName
-                                                            }
-                                                        </p>
-                                                    </div>
-                                                )}
+                                            </div>
                                         </div>
                                         <Button
                                             type="button"
@@ -604,6 +686,7 @@ export default function CreateVectorSetModal({
                                                 e.stopPropagation()
                                                 setIsEditConfigModalOpen(true)
                                             }}
+                                            className="mt-2"
                                         >
                                             Change
                                         </Button>
@@ -622,10 +705,11 @@ export default function CreateVectorSetModal({
 
                 {/* Advanced Configuration Panel */}
                 <div
-                    className={`absolute top-0 left-0 w-full h-full bg-[white] p-6 transition-transform duration-300 transform ${activePanel === "advancedConfiguration"
+                    className={`absolute top-0 left-0 w-full h-full bg-[white] p-6 transition-transform duration-300 transform ${
+                        activePanel === "advancedConfiguration"
                             ? "translate-x-0"
                             : "translate-x-full"
-                        } overflow-y-auto`}
+                    } overflow-y-auto`}
                 >
                     <div className="flex items-center mb-4 border-b pb-4">
                         <Button
