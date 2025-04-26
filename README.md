@@ -4,18 +4,14 @@ A modern web-based visualization and interaction tool for Redis Vector Sets. Thi
 
 ## Overview
 
-Vector Sets Browser is a Next.js application that provides real-time visualization of vector embeddings and their relationships. It features multiple visualization layouts including:
+Vector Sets Browser is a Next.js application that provides real-time visualization of vector embeddings and their relationships. It features multiple visualization options, the ability to seamlessly tie in an embedding model with several built-in and support for OpenAI and Ollama. Import options and full support for all options for creating and working with Vector Sets.
 
-- Force-directed graph layout
-- UMAP dimensionality reduction
-- PCA (Principal Component Analysis) visualization
-- 3D vector space visualization
-
+  
 ## Prerequisites
 
 - Node.js (Latest LTS version recommended)
 - A Redis server with vector sets. (([Available in Beta with the latest Redis 8](https://hub.docker.com/_/redis)))
-- (optional) OpenAI API key (for AI-assisted template generation)
+- (optional) OpenAI API key (for AI-assisted imports)
 - (optional) Ollama for embedding generation
 
 ## Installation
@@ -66,14 +62,9 @@ npm run dev
 
 ## Features
 
-- **Interactive Visualization**: Real-time visualization of vector embeddings with multiple layout algorithms
-- **Multiple Projection Methods**:
-  - UMAP for preserving both local and global structure
-  - PCA for linear dimensionality reduction
-  - Force-directed layout for graph visualization
+- **Interactive Visualization**: 2D visualization of vector embeddings with multiple layout algorithms
 - **AI-Assisted CSV Import**: Automatically generate optimal templates for CSV imports using OpenAI
 - **Modern UI**: Built with modern React components and Tailwind CSS
-- **Real-time Updates**: Live visualization updates as vector sets change
 - **Flexible Integration**: Works with any vector embeddings stored in Redis vector-sets
 
 ## Technology Stack
@@ -82,9 +73,9 @@ npm run dev
 - React 18
 - Three.js for visualization
 - Transformers.js (for built-in embedding models)
-- Redis vector sets
+- Redis vector sets (Part of Redis v8)
 - Tailwind CSS for styling
-- Various data visualization libraries (D3.js, UMAP, PCA)
+- Various data visualization libraries (D3.js, PCA)
 
 ## Redis Vector Sets Integration
 
