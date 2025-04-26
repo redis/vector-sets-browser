@@ -19,6 +19,7 @@ import { validateVector } from "@/app/embeddings/utils/validation"
 import eventBus, { AppEvents } from "@/app/utils/eventEmitter"
 import { useEffect, useRef, useState, useCallback } from "react"
 import { array } from "zod"
+import { debounce } from "lodash"
 
 interface UseVectorSetReturn {
     vectorSetName: string | null
@@ -92,8 +93,18 @@ const useVectorSet = (): UseVectorSetReturn => {
 
     // Load vector set data when name changes
     const loadVectorSet = useCallback(async () => {
-        if (!vectorSetName) return
-
+        if (!vectorSetName) return;
+        
+        // Check if data is cached and still valid
+        const cache = vectorSetCacheRef.current[vectorSetName];
+        if (cache?.loaded) {
+            setDim(cache.dim);
+            setRecordCount(cache.recordCount);
+            setMetadata(cache.metadata);
+            setStatusMessage("");
+            return;
+        }
+        
         try {
             // Clear any previous results
             setResults([])

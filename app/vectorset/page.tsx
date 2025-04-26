@@ -2,7 +2,7 @@
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useRouter, useSearchParams } from "next/navigation"
-import { Suspense, useEffect, useState } from "react"
+import React, { Suspense, useEffect, useState, useMemo } from "react"
 import { useRedisConnection } from "../hooks/useRedisConnection"
 import { useVectorSet } from "../hooks/useVectorSet"
 import { getConnection, removeConnection } from "../redis-server/connectionManager"
@@ -14,6 +14,12 @@ import VectorSearchTab from "./SearchTab/VectorSearchTab"
 import VectorSetHeader from "./VectorSetHeader"
 import VectorSetNav from "./VectorSetNav"
 import VectorSettings from "./SettingsTab/VectorSettings"
+
+// Memoize the header component to prevent unnecessary re-renders
+const MemoizedVectorSetHeader = React.memo(VectorSetHeader);
+
+// Memoize the navigation component
+const MemoizedVectorSetNav = React.memo(VectorSetNav);
 
 /**
  * VectorSetPage handles the display and management of vector sets.
@@ -177,26 +183,67 @@ function VectorSetPageContent() {
         setTimeout(() => setIsVectorSetChanging(false), 100)
     }
 
-    if (isInitializing || isRestoring) {
-        return (
-            <div className="flex items-center justify-center w-full h-screen">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-            </div>
-        )
-    }
+    // Memoize loading and connection states to prevent unnecessary rerenders
+    const loadingState = useMemo(() => {
+        if (isInitializing || isRestoring) {
+            return (
+                <div className="flex items-center justify-center w-full h-screen">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+                </div>
+            );
+        }
+        
+        if (!isConnected) {
+            return (
+                <div className="flex items-center justify-center w-full h-screen">
+                    <div className="text-gray-500">Connecting to Redis...</div>
+                </div>
+            );
+        }
+        
+        return null;
+    }, [isInitializing, isRestoring, isConnected]);
 
-    // Don't render content until we're connected
-    if (!isConnected) {
+    // Memoize search tab content to prevent unnecessary rerenders
+    const searchTabContent = useMemo(() => {
+        if (isVectorSetChanging || !vectorSetName) return null;
+        
         return (
-            <div className="flex items-center justify-center w-full h-screen">
-                <div className="text-gray-500">Connecting to Redis...</div>
-            </div>
-        )
+            <VectorSearchTab
+                vectorSetName={vectorSetName}
+                dim={dim}
+                metadata={metadata}
+                onAddVector={() => setIsAddVectorModalOpen(true)}
+                onShowVector={handleShowVector}
+                onDeleteVector={handleDeleteVector}
+                onDeleteVector_multi={handleDeleteVector_multi}
+                isLoading={isVectorSetChanging}
+                results={results}
+                setResults={setResults}
+                changeTab={changeTab}
+            />
+        );
+    }, [
+        isVectorSetChanging,
+        vectorSetName,
+        dim,
+        metadata,
+        handleShowVector,
+        handleDeleteVector,
+        handleDeleteVector_multi,
+        results,
+        setResults,
+        changeTab
+    ]);
+
+    // If in loading state, return the loading UI
+    if (loadingState) {
+        return loadingState;
     }
 
     return (
         <div className="flex flex-1 h-screen">
-            <VectorSetNav
+            <MemoizedVectorSetNav
                 redisUrl={redisUrl}
                 redisName={redisName}
                 selectedVectorSet={vectorSetName}
@@ -210,7 +257,7 @@ function VectorSetPageContent() {
             <div className="flex-1 p-4 overflow-y-auto flex flex-col">
                 {vectorSetName ? (
                     <div className="mb-4 border-b border-gray-500">
-                        <VectorSetHeader
+                        <MemoizedVectorSetHeader
                             vectorSetName={vectorSetName}
                             recordCount={recordCount}
                             dim={dim}
@@ -270,23 +317,7 @@ function VectorSetPageContent() {
                         </TabsContent>
 
                         <TabsContent value="search">
-                            {!isVectorSetChanging && (
-                                <VectorSearchTab
-                                    vectorSetName={vectorSetName}
-                                    dim={dim}
-                                    metadata={metadata}
-                                    onAddVector={() =>
-                                        setIsAddVectorModalOpen(true)
-                                    }
-                                    onShowVector={handleShowVector}
-                                    onDeleteVector={handleDeleteVector}
-                                    onDeleteVector_multi={handleDeleteVector_multi}
-                                    isLoading={isVectorSetChanging}
-                                    results={results}
-                                    setResults={setResults}
-                                    changeTab={changeTab}
-                                />
-                            )}
+                            {searchTabContent}
                         </TabsContent>
                     </Tabs>
                 ) : (

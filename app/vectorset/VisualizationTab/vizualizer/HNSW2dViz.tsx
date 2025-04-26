@@ -1061,6 +1061,34 @@ const HNSWVizPure: React.FC<HNSWVizPureProps> = ({
         }
     }, [isDarkMode, renderer, scene, camera, canvasRef, updateSceneBackground]);
 
+    // Add better cleanup for THREE.js resources
+    useEffect(() => {
+        return () => {
+            // Dispose of all geometries and materials
+            
+            if (scene) {
+                scene.traverse((object) => {
+                    if (object instanceof THREE.Mesh) {
+                        if (object.geometry) object.geometry.dispose();
+                        if (object.material) {
+                            if (Array.isArray(object.material)) {
+                                object.material.forEach(material => material.dispose());
+                            } else {
+                                object.material.dispose();
+                            }
+                        }
+                    }
+                });
+            }
+            
+            // Dispose of renderer
+            if (renderer) {
+                renderer.dispose();
+                renderer.forceContextLoss();
+            }
+        };
+    }, []);
+
     return (
         <div
             className="relative w-full"
