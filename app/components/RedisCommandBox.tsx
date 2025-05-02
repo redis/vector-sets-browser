@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button"
 import { Copy } from "lucide-react"
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 
 interface RedisCommandBoxProps {
     vectorSetName: string
@@ -19,11 +19,12 @@ export default function RedisCommandBox({
     searchFilter,
     showRedisCommand,
 }: RedisCommandBoxProps) {
+    const [showFullVector, setShowFullVector] = useState(false);
 
     // Helper function to get and format the Redis command
-    const getRedisCommand = (includeFullEmbedding: boolean = false) => {
+    const getRedisCommand = (forClipboard: boolean = false) => {
         // If copying the full command, return as a simple string
-        if (includeFullEmbedding && executedCommand) {
+        if (forClipboard && executedCommand) {
             return executedCommand;
         }
         // For display purposes, we'll return a structured object
@@ -111,7 +112,7 @@ export default function RedisCommandBox({
         <div className="flex gap-2 items-center w-full bg-gray-100 rounded-md">
             <div className="text-grey-400 p-2 font-mono overflow-x-scroll text-sm grow">
                 {(() => {
-                    const commandData = getRedisCommand();
+                    const commandData = getRedisCommand(false);
                     if (!commandData) {
                         return "Enter search parameters to see the Redis command";
                     }
@@ -128,16 +129,31 @@ export default function RedisCommandBox({
                     return (
                         <div className="text-gray-500 font-mono text-xs">
                             {commandData.prefix}
-                            <span
-                                className="inline-flex items-center bg-yellow-50 rounded mx-1"
-                                title="Vector values truncated, click copy to see the whole command"
-                            >
-                                <span className="px-1 max-w-[100px] overflow-hidden whitespace-nowrap relative">
+                            {showFullVector ? (
+                                <span 
+                                    className="inline-flex border border-gray-300 p-0.5 items-center rounded mx-1 cursor-pointer hover:bg-gray-100"
+                                    onClick={() => setShowFullVector(false)}
+                                    title="Click to collapse vector values"
+                                >
                                     {commandData.vectors}
-                                    <span className="absolute inset-y-0 right-0 w-8 bg-linear-to-r from-transparent to-yellow-50"></span>
                                 </span>
-                                <span className="text-yellow-800 px-1 bg-yellow-50 rounded-r">...</span>
-                            </span>
+                            ) : (
+                                <span
+                                    className="inline-flex border border-gray-300 p-0.5 items-center rounded mx-1"
+                                    title="Vector values truncated, click to see the whole vector"
+                                >
+                                    <span className="max-w-[75px] overflow-hidden whitespace-nowrap relative">
+                                        {commandData.vectors}
+                                        <span className="absolute inset-y-0 right-0 w-8 bg-linear-to-r from-transparent to-gray-100"></span>
+                                    </span>
+                                    <span 
+                                        className="text-black rounded-r cursor-pointer hover:bg-gray-200 px-1"
+                                        onClick={() => setShowFullVector(true)}
+                                    >
+                                        ...
+                                    </span>
+                                </span>
+                            )}
                             {commandData.suffix}
                         </div>
                     );

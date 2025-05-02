@@ -24,15 +24,16 @@ export default function EmptyVectorSet({ onAddVector, onChangeTab }: EmptyVector
                     Vector Set is Empty
                 </h2>
                 <p className="text-sm text-gray-500 max-w-md">
-                    This vector set doesn{`'`}t contain any vectors yet. You can add
-                    vectors in several ways:
+                    This vector set doesn{`'`}t contain any vectors yet. You can
+                    add vectors in several ways:
                 </p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-4xl">
                 <div
                     onClick={onAddVector}
-                    className="bg-white p-6 hover:border-red-500 hover:border-1 rounded-md border flex flex-col items-center text-center space-y-4">
+                    className="bg-white p-6 cursor-pointer hover:border-red-500 hover:border-1 rounded-md border flex flex-col items-center text-center space-y-4"
+                >
                     <div className="p-3 bg-blue-50 rounded-full">
                         <Plus className="h-8 w-8 text-blue-500" />
                     </div>
@@ -52,7 +53,8 @@ export default function EmptyVectorSet({ onAddVector, onChangeTab }: EmptyVector
 
                 <div
                     onClick={handleImportSamples}
-                    className="bg-white p-6 hover:border-red-500 hover:border-1 rounded-md border flex flex-col items-center text-center space-y-4">
+                    className="bg-white p-6 hover:border-red-500 hover:border-1 cursor-pointer rounded-md border flex flex-col items-center text-center space-y-4"
+                >
                     <div className="p-3 bg-green-50 rounded-full">
                         <Database className="h-8 w-8 text-green-500" />
                     </div>

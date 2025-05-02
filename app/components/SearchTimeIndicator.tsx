@@ -71,7 +71,21 @@ const SearchTimeIndicator: React.FC<SearchTimeIndicatorProps> = ({
 
     return (
         <div className={`-ml-1 p-1 flex space-x-1 items-center rounded-lg text-xs ${colorClass}`}>
-            <span className="text-gray-500">Time</span>
+            <svg 
+                xmlns="http://www.w3.org/2000/svg" 
+                width="12" 
+                height="12" 
+                viewBox="0 0 24 24" 
+                fill="none" 
+                stroke="currentColor" 
+                strokeWidth="2" 
+                strokeLinecap="round" 
+                strokeLinejoin="round" 
+                className="text-gray-500"
+            >
+                <circle cx="12" cy="12" r="10" />
+                <polyline points="12 6 12 12 16 14" />
+            </svg>
             <div>{formattedTime}</div>
         </div>
     )
