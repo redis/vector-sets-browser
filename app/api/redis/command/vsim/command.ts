@@ -1,20 +1,7 @@
 import { validateKeyName } from '@/app/redis-server/utils'
+import { VsimRequestBody } from '@/app/redis-server/api'
 
-export interface VsimRequest {
-    keyName: string
-    searchVector?: number[]
-    searchElement?: string
-    count?: number
-    filter?: string
-    searchExplorationFactor?: number
-    filterExplorationFactor?: number
-    returnCommandOnly?: boolean
-    withEmbeddings?: boolean
-    forceLinearScan?: boolean
-    noThread?: boolean
-}
-
-export function validateVsimRequest(body: any): { isValid: boolean; error?: string; value?: VsimRequest } {
+export function validateVsimRequest(body: any): { isValid: boolean; error?: string; value?: VsimRequestBody } {
     if (!validateKeyName(body.keyName)) {
         return { isValid: false, error: 'Key name is required' }
     }
@@ -74,7 +61,7 @@ export function validateVsimRequest(body: any): { isValid: boolean; error?: stri
     }
 }
 
-export function buildVsimCommand(request: VsimRequest): string[][] {
+export function buildVsimCommand(request: VsimRequestBody): string[][] {
     const baseCommand = ["VSIM", request.keyName]
 
     if (request.searchVector) {

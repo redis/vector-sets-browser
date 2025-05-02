@@ -1,15 +1,10 @@
 import { validateKeyName } from "@/app/redis-server/utils"
-
-export interface VembRequest {
-    keyName: string
-    element: string
-    returnCommandOnly?: boolean
-}
+import { VembRequestBody } from "@/app/redis-server/api"
 
 export function validateVembRequest(body: any): {
     isValid: boolean
     error?: string
-    value?: VembRequest
+    value?: VembRequestBody
 } {
     if (!validateKeyName(body.keyName)) {
         return { isValid: false, error: "Key name is required" }
@@ -25,7 +20,7 @@ export function validateVembRequest(body: any): {
     }
 }
 
-export function buildVembCommand(request: VembRequest): string[] {
+export function buildVembCommand(request: VembRequestBody): string[] {
     return ["VEMB", request.keyName, request.element]
 }
 

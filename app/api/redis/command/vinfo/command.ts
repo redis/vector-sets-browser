@@ -1,11 +1,7 @@
 import { validateKeyName } from '@/app/redis-server/utils'
+import { VinfoRequestBody } from '@/app/redis-server/api'
 
-export interface VinfoRequest {
-    keyName: string
-    returnCommandOnly?: boolean
-}
-
-export function validateVinfoRequest(body: any): { isValid: boolean; error?: string; value?: VinfoRequest } {
+export function validateVinfoRequest(body: any): { isValid: boolean; error?: string; value?: VinfoRequestBody } {
     if (!validateKeyName(body.keyName)) {
         return { isValid: false, error: 'Key name is required' }
     }
@@ -19,6 +15,6 @@ export function validateVinfoRequest(body: any): { isValid: boolean; error?: str
     }
 }
 
-export function buildVinfoCommand(request: VinfoRequest): string[][] {
+export function buildVinfoCommand(request: VinfoRequestBody): string[][] {
     return [['VINFO', request.keyName]]
 } 

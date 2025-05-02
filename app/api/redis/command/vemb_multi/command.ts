@@ -1,13 +1,8 @@
 import { validateKeyName, validateElement } from '@/app/redis-server/utils'
+import { VembMultiRequestBody } from '@/app/redis-server/api'
 import { RedisConnection, RedisOperationResult } from "@/app/redis-server/RedisConnection"
 
-export interface VembMultiRequest {
-    keyName: string
-    elements: string[]
-    returnCommandOnly?: boolean
-}
-
-export function validateVembMultiRequest(body: any): { isValid: boolean; error?: string; value?: VembMultiRequest } {
+export function validateVembMultiRequest(body: any): { isValid: boolean; error?: string; value?: VembMultiRequestBody } {
     if (!validateKeyName(body.keyName)) {
         return { isValid: false, error: 'Key name is required' }
     }
@@ -37,7 +32,7 @@ export function validateVembMultiRequest(body: any): { isValid: boolean; error?:
     }
 }
 
-export function buildVembMultiCommand(request: VembMultiRequest): string[][] {
+export function buildVembMultiCommand(request: VembMultiRequestBody): string[][] {
     // Return an array of VEMB commands, one for each element
     return request.elements.map(element => ['VEMB', request.keyName, element])
 }

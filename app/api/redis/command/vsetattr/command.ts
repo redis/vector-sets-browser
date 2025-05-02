@@ -1,13 +1,7 @@
 import { validateKeyName, validateElement } from '@/app/redis-server/utils'
+import { VsetAttrRequestBody } from '@/app/redis-server/api'
 
-export interface VsetattrRequest {
-    keyName: string
-    element: string
-    attributes: string
-    returnCommandOnly?: boolean
-}
-
-export function validateVsetattrRequest(body: any): { isValid: boolean; error?: string; value?: VsetattrRequest } {
+export function validateVsetattrRequest(body: any): { isValid: boolean; error?: string; value?: VsetAttrRequestBody } {
     if (!validateKeyName(body.keyName)) {
         return { isValid: false, error: 'Key name is required' }
     }
@@ -38,6 +32,6 @@ export function validateVsetattrRequest(body: any): { isValid: boolean; error?: 
     }
 }
 
-export function buildVsetattrCommand(request: VsetattrRequest): string[] {
+export function buildVsetattrCommand(request: VsetAttrRequestBody): string[] {
     return ['VSETATTR', request.keyName, request.element, request.attributes]
 } 

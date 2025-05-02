@@ -1,10 +1,10 @@
 import { validateKeyName } from "@/app/redis-server/utils"
-import { VlinksRequestBody } from "@/app/redis-server/api"
+import { VrandMemberRequestBody } from "@/app/redis-server/api"
 
-export function validateVlinksRequest(body: any): {
+export function validateVrandMemberRequest(body: any): {
     isValid: boolean
     error?: string
-    value?: VlinksRequestBody
+    value?: VrandMemberRequestBody
 } {
     if (!validateKeyName(body.keyName)) {
         return { isValid: false, error: "Key name is required" }
@@ -14,14 +14,12 @@ export function validateVlinksRequest(body: any): {
         isValid: true,
         value: {
             keyName: body.keyName,
-            element: body.element,
-            withEmbeddings: body.withEmbeddings === true,
             count: body.count,
             returnCommandOnly: body.returnCommandOnly === true,
         },
     }
 }
 
-export function buildVlinksCommand(request: VlinksRequestBody): string[] {
-    return ["VLINKS", request.keyName, request.element, "WITHSCORES"]
+export function buildVrandMemberCommand(request: VrandMemberRequestBody): string[] {
+    return ["VRANDMEMBER", request.keyName, request.count.toString()]
 }

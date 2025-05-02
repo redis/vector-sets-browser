@@ -1,13 +1,7 @@
 import { validateKeyName, validateElement } from '@/app/redis-server/utils'
+import { VremRequestBody } from '@/app/redis-server/api'
 
-export interface VremRequest {
-    keyName: string
-    element?: string
-    elements?: string[]
-    returnCommandOnly?: boolean
-}
-
-export function validateVremRequest(body: any): { isValid: boolean; error?: string; value?: VremRequest } {
+export function validateVremRequest(body: any): { isValid: boolean; error?: string; value?: VremRequestBody } {
     if (!validateKeyName(body.keyName)) {
         return { isValid: false, error: 'Key name is required' }
     }
@@ -51,7 +45,7 @@ export function validateVremRequest(body: any): { isValid: boolean; error?: stri
     }
 }
 
-export function buildVremCommand(request: VremRequest): string[][] {
+export function buildVremCommand(request: VremRequestBody): string[][] {
     if (request.element) {
         // Single element removal
         return [['VREM', request.keyName, request.element]]

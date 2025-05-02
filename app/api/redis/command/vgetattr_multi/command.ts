@@ -1,12 +1,7 @@
 import { validateKeyName, validateElement } from '@/app/redis-server/utils'
+import { VgetAttrMultiRequestBody } from '@/app/redis-server/api'
 
-export interface VgetattrMultiRequest {
-    keyName: string
-    elements: string[]
-    returnCommandOnly?: boolean
-}
-
-export function validateVgetattrMultiRequest(body: any): { isValid: boolean; error?: string; value?: VgetattrMultiRequest } {
+export function validateVgetattrMultiRequest(body: any): { isValid: boolean; error?: string; value?: VgetAttrMultiRequestBody } {
     if (!validateKeyName(body.keyName)) {
         return { isValid: false, error: 'Key name is required' }
     }
@@ -36,7 +31,7 @@ export function validateVgetattrMultiRequest(body: any): { isValid: boolean; err
     }
 }
 
-export function buildVgetattrMultiCommand(request: VgetattrMultiRequest): string[][] {
+export function buildVgetattrMultiCommand(request: VgetAttrMultiRequestBody): string[][] {
     // Return an array of VGETATTR commands, one for each element
     return request.elements.map(element => ['VGETATTR', request.keyName, element])
 } 

@@ -248,6 +248,28 @@ export async function vsim(
     }
 }
 
+// VRANDMEMBER command
+export interface VrandMemberRequestBody {
+    keyName: string
+    count: number
+    returnCommandOnly?: boolean
+}
+
+export type VrandMemberResult = string[]
+
+export async function vrandmember(
+    request: VrandMemberRequestBody
+): Promise<ApiResponse<VrandMemberResult>> {
+    try {
+        return await apiClient.post<VrandMemberResult, VrandMemberRequestBody>(
+            "/api/redis/command/vrandmember",
+            request
+        )
+    } catch (error) {
+        return { success: false, error: String(error) }
+    }
+}
+
 // VSETATTR command
 export interface VsetAttrRequestBody {
     keyName: string

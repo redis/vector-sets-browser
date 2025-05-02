@@ -1,11 +1,7 @@
 import { validateKeyName } from '@/app/redis-server/utils'
+import { VcardRequestBody } from '@/app/redis-server/api'
 
-export interface VcardRequest {
-    keyName: string
-    returnCommandOnly?: boolean
-}
-
-export function validateVcardRequest(body: any): { isValid: boolean; error?: string; value?: VcardRequest } {
+export function validateVcardRequest(body: any): { isValid: boolean; error?: string; value?: VcardRequestBody } {
     if (!validateKeyName(body.keyName)) {
         return { isValid: false, error: 'Key name is required' }
     }
@@ -19,6 +15,6 @@ export function validateVcardRequest(body: any): { isValid: boolean; error?: str
     }
 }
 
-export function buildVcardCommand(request: VcardRequest): string[] {
+export function buildVcardCommand(request: VcardRequestBody): string[] {
     return ['VCARD', request.keyName]
 } 

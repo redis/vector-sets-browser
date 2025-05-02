@@ -1,23 +1,7 @@
 import { validateElement, validateKeyName, validateVector } from '@/app/redis-server/utils'
+import { VaddRequestBody } from '@/app/redis-server/api'
 
-export interface VaddOptions {
-    reduceDimensions?: number
-    useCAS?: boolean
-    ef?: number
-    quantization?: string
-    attributes?: string
-    maxConnections?: number
-}
-
-export interface VaddRequest {
-    keyName: string
-    element: string
-    vector: number[]
-    options?: VaddOptions
-    returnCommandOnly?: boolean
-}
-
-export function validateVaddRequest(body: any): { isValid: boolean; error?: string; value?: VaddRequest } {
+export function validateVaddRequest(body: any): { isValid: boolean; error?: string; value?: VaddRequestBody } {
     if (!validateKeyName(body.keyName)) {
         return { isValid: false, error: 'Key name is required' }
     }
@@ -31,44 +15,27 @@ export function validateVaddRequest(body: any): { isValid: boolean; error?: stri
         return { isValid: false, error: vectorValidation.error }
     }
 
-    // Extract options if present
-    const options: VaddOptions = {}
-    if (typeof body.reduceDimensions === 'number') {
-        options.reduceDimensions = body.reduceDimensions
-    }
-    if (typeof body.useCAS === 'boolean') {
-        options.useCAS = body.useCAS
-    }
-    if (typeof body.ef === 'number') {
-        options.ef = body.ef
-    }
-    if (typeof body.quantization === 'string') {
-        options.quantization = body.quantization
-    }
-    if (typeof body.attributes === 'string') {
-        options.attributes = body.attributes
-    }
-    if (typeof body.maxConnections === 'number') {
-        options.maxConnections = body.maxConnections
-    }
-
     return {
         isValid: true,
         value: {
             keyName: body.keyName,
             element: body.element,
             vector: body.vector,
-            options: Object.keys(options).length > 0 ? options : undefined,
+            attributes: body.attributes,
+            reduceDimensions: typeof body.reduceDimensions === 'number' ? body.reduceDimensions : undefined,
+            useCAS: typeof body.useCAS === 'boolean' ? body.useCAS : undefined,
+            ef: typeof body.ef === 'number' ? body.ef : undefined,
+            quantization: typeof body.quantization === 'string' ? body.quantization : undefined,
             returnCommandOnly: body.returnCommandOnly === true
         }
     }
 }
 
-export function buildVaddCommand(request: VaddRequest): string[] {
+export function buildVaddCommand(request: VaddRequestBody): string[] {
     const command = ['VADD', request.keyName]
 
-    if (request.options?.reduceDimensions) {
-        command.push('REDUCE', request.options.reduceDimensions.toString())
+    if (request.reduceDimensions) {
+        command.push('REDUCE', request.reduceDimensions.toString())
     }
 
     command.push(
@@ -78,24 +45,20 @@ export function buildVaddCommand(request: VaddRequest): string[] {
         request.element
     )
 
-    if (request.options?.attributes) {
-        command.push('SETATTR', request.options.attributes)
+    if (request.attributes) {
+        command.push('SETATTR', request.attributes)
     }
 
-    if (request.options?.useCAS) {
+    if (request.useCAS) {
         command.push('CAS')
     }
 
-    if (request.options?.quantization) {
-        command.push(request.options.quantization)
+    if (request.quantization) {
+        command.push(request.quantization)
     }
 
-    if (request.options?.ef) {
-        command.push('EF', request.options.ef.toString())
-    }
-
-    if (request.options?.maxConnections) {
-        command.push('M', request.options.maxConnections.toString())
+    if (request.ef) {
+        command.push('EF', request.ef.toString())
     }
 
     return command

@@ -1,11 +1,7 @@
 import { validateKeyName } from '@/app/redis-server/utils'
+import { VdimRequestBody } from '@/app/redis-server/api'
 
-export interface VdimRequest {
-    keyName: string
-    returnCommandOnly?: boolean
-}
-
-export function validateVdimRequest(body: any): { isValid: boolean; error?: string; value?: VdimRequest } {
+export function validateVdimRequest(body: any): { isValid: boolean; error?: string; value?: VdimRequestBody } {
     if (!validateKeyName(body.keyName)) {
         return { isValid: false, error: 'Key name is required' }
     }
@@ -19,6 +15,6 @@ export function validateVdimRequest(body: any): { isValid: boolean; error?: stri
     }
 }
 
-export function buildVdimCommand(request: VdimRequest): string[] {
+export function buildVdimCommand(request: VdimRequestBody): string[] {
     return ['VDIM', request.keyName]
 } 
