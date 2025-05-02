@@ -50,9 +50,14 @@ export class CLIPProvider implements EmbeddingProvider {
         }
 
         try {
-            const modelPath = config.clip.model 
-                ? CLIP_MODELS[config.clip.model].modelPath 
-                : 'Xenova/clip-vit-base-patch32'
+            let modelPath: string = 'Xenova/clip-vit-base-patch32'
+            
+            if (config.clip.model) {
+                const model = CLIP_MODELS.find(model => model.id === config.clip?.model)
+                if (model?.modelPath) {
+                    modelPath = model.modelPath
+                }
+            }
 
             if (!modelPath) {
                 throw new Error("Model path is undefined")
