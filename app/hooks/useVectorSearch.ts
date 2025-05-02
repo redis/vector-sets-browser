@@ -2,23 +2,12 @@ import { ApiError } from "@/app/api/client"
 import { embeddings } from "@/app/embeddings/client"
 import { VectorTuple, vdim, vsim, VsimResult } from "@/app/redis-server/api"
 import { useCallback, useEffect, useRef, useState } from "react"
-import { VectorSetMetadata } from "@/app/types/vectorSetMetaData"
+import { VectorSetMetadata, VectorSetSearchOptions } from "@/app/types/vectorSetMetaData"
+import { userSettings } from "@/app/utils/userSettings"
 
 // Helper to convert VsimResult to VectorTuple array
 const convertToVectorTuple = (results: VsimResult): VectorTuple[] => {
     return results.map(([element, score, vector, attributes]) => [element, score, vector, attributes]);
-}
-
-export interface VectorSetSearchState {
-    searchType: "Vector" | "Element" | "Image"
-    searchQuery: string
-    searchCount: string
-    resultsTitle: string
-    searchTime?: string // Add searchTime to store the search duration
-    searchFilter: string
-    expansionFactor?: number // Add expansionFactor
-    lastTextEmbedding?: number[] // Add lastTextEmbedding to store the last embedding vector for text
-    executedCommand?: string
 }
 
 interface UseVectorSearchProps {
@@ -27,8 +16,8 @@ interface UseVectorSearchProps {
     onSearchResults: (results: VectorTuple[]) => void
     onStatusChange: (status: string) => void
     onError?: (error: string | null) => void // Add dedicated error handler
-    searchState: VectorSetSearchState
-    onSearchStateChange: (state: Partial<VectorSetSearchState>) => void
+    searchState: VectorSetSearchOptions
+    onSearchStateChange: (state: Partial<VectorSetSearchOptions>) => void
     fetchEmbeddings?: boolean // Renamed from embeddings
 }
 
@@ -47,8 +36,14 @@ interface UseVectorSearchReturn {
     searchTime?: string
     error: string | null // Add error to the return type
     clearError: () => void // Add function to clear errors
-    expansionFactor?: number // Add expansionFactor
-    setExpansionFactor: (value: number | undefined) => void // Add setExpansionFactor
+    searchExplorationFactor?: number
+    setSearchExplorationFactor: (value: number | undefined) => void
+    filterExplorationFactor?: number
+    setFilterExplorationFactor: (value: number | undefined) => void
+    forceLinearScan: boolean
+    setForceLinearScan: (value: boolean) => void
+    noThread: boolean
+    setNoThread: (value: boolean) => void
     lastTextEmbedding?: number[] // Add lastTextEmbedding to the return type
     executedCommand?: string
 }
@@ -59,6 +54,7 @@ export function useVectorSearch({
     onSearchResults,
     onStatusChange,
     onError,
+    searchState,
     onSearchStateChange,
     fetchEmbeddings = false,
 }: UseVectorSearchProps): UseVectorSearchReturn {
@@ -75,24 +71,56 @@ export function useVectorSearch({
     // Add a ref to track the current vector set being searched
     const currentSearchVectorSetRef = useRef<string | null>(null)
 
+    // Load search options from userSettings
+    const getSearchOptionsFromUserSettings = useCallback(() => {
+        // Get search options from userSettings
+        const useCustomEF = userSettings.get("useCustomEF") ?? false;
+        const efValue = userSettings.get("efValue") ?? "200";
+        const useCustomFilterEF = userSettings.get("useCustomFilterEF") ?? false;
+        const filterEFValue = userSettings.get("filterEFValue") ?? "100";
+        
+        // Calculate exploration factors based on settings
+        const searchExplorationFactor = useCustomEF ? parseInt(efValue) : undefined;
+        const filterExplorationFactor = useCustomFilterEF ? parseInt(filterEFValue) : undefined;
+        
+        // Get linear scan and threading options
+        const forceLinearScan = userSettings.get("forceLinearScan") === true;
+        const noThread = userSettings.get("noThread") === true;
+        
+        return {
+            searchExplorationFactor,
+            filterExplorationFactor,
+            forceLinearScan,
+            noThread
+        };
+    }, []);
+
     // Internal search state management
     const [internalSearchState, setInternalSearchState] =
-        useState<VectorSetSearchState>({
-            searchType: "Vector",
-            searchQuery: "",
-            searchCount: "10",
-            searchFilter: "",
-            resultsTitle: "Search Results",
-            searchTime: undefined,
-            lastTextEmbedding: undefined,
-        })
+        useState<VectorSetSearchOptions>(() => {
+            const userSettingsOptions = getSearchOptionsFromUserSettings();
+            
+            return {
+                searchType: "Vector",
+                searchQuery: "",
+                searchCount: "10",
+                searchFilter: "",
+                resultsTitle: "Search Results",
+                searchTime: undefined,
+                searchExplorationFactor: userSettingsOptions.searchExplorationFactor,
+                filterExplorationFactor: userSettingsOptions.filterExplorationFactor,
+                forceLinearScan: userSettingsOptions.forceLinearScan,
+                noThread: userSettingsOptions.noThread,
+                lastTextEmbedding: undefined,
+            };
+        });
+        
     // Handle search state updates
     const updateSearchState = useCallback(
-        (update: Partial<VectorSetSearchState>) => {
+        (update: Partial<VectorSetSearchOptions>) => {
             setInternalSearchState((prev) => {
                 const next = { ...prev, ...update }
                 onSearchStateChange(next)
-
                 return next
             })
         },
@@ -138,7 +166,10 @@ export function useVectorSearch({
                     count,
                     withEmbeddings: fetchEmbeddings,
                     filter: internalSearchState.searchFilter,
-                    expansionFactor: internalSearchState.expansionFactor
+                    searchExplorationFactor: internalSearchState.searchExplorationFactor,
+                    filterExplorationFactor: internalSearchState.filterExplorationFactor,
+                    forceLinearScan: internalSearchState.forceLinearScan,
+                    noThread: internalSearchState.noThread,
                 })
 
                 if (!vsimResponse || !vsimResponse.success) {
@@ -177,7 +208,10 @@ export function useVectorSearch({
             onStatusChange,
             fetchEmbeddings,
             internalSearchState.searchFilter,
-            internalSearchState.expansionFactor,
+            internalSearchState.searchExplorationFactor,
+            internalSearchState.filterExplorationFactor,
+            internalSearchState.forceLinearScan,
+            internalSearchState.noThread,
             clearError,
             handleError,
             updateSearchState,
@@ -217,25 +251,27 @@ export function useVectorSearch({
             filter: currentFilter, // Preserve the filter
         }
 
-        setInternalSearchState({
-            searchType: "Vector",
-            searchQuery: "",
-            searchCount: "10",
-            searchFilter: currentFilter, // Preserve the filter
-            resultsTitle: "Search Results",
-            searchTime: undefined,
-            lastTextEmbedding: undefined,
-        })
+        // Load search options from userSettings
+        const userSettingsOptions = getSearchOptionsFromUserSettings();
 
-        onSearchStateChange({
-            searchType: "Vector",
+        // Create new state object with settings from userSettings
+        const newState: VectorSetSearchOptions = {
+            searchType: "Vector" as const,
             searchQuery: "",
             searchCount: "10",
             searchFilter: currentFilter, // Preserve the filter
             resultsTitle: "Search Results",
             searchTime: undefined,
             lastTextEmbedding: undefined,
-        })
+            // Initialize search options from userSettings
+            searchExplorationFactor: userSettingsOptions.searchExplorationFactor,
+            filterExplorationFactor: userSettingsOptions.filterExplorationFactor,
+            forceLinearScan: userSettingsOptions.forceLinearScan,
+            noThread: userSettingsOptions.noThread,
+        };
+
+        setInternalSearchState(newState)
+        onSearchStateChange(newState)
 
         // Clear results and status
         onSearchResults([])
@@ -269,7 +305,52 @@ export function useVectorSearch({
         performZeroVectorSearch,
         clearError,
         handleError,
+        internalSearchState.searchFilter,
+        getSearchOptionsFromUserSettings,
     ])
+
+    // Sync with userSettings when they change
+    useEffect(() => {
+        // Watch for changes to userSettings
+        const handleStorageChange = (e: StorageEvent) => {
+            if (!e.key) return;
+            
+            if (e.key.startsWith('user-settings:')) {
+                const settingKey = e.key.replace('user-settings:', '');
+                
+                // If the changed setting is related to search options, update internal state
+                if (['useCustomEF', 'efValue', 'useCustomFilterEF', 'filterEFValue', 
+                     'forceLinearScan', 'noThread'].includes(settingKey)) {
+                    const userSettingsOptions = getSearchOptionsFromUserSettings();
+                    updateSearchState({
+                        searchExplorationFactor: userSettingsOptions.searchExplorationFactor,
+                        filterExplorationFactor: userSettingsOptions.filterExplorationFactor,
+                        forceLinearScan: userSettingsOptions.forceLinearScan,
+                        noThread: userSettingsOptions.noThread,
+                    });
+                }
+            }
+        };
+        
+        window.addEventListener('storage', handleStorageChange);
+        return () => {
+            window.removeEventListener('storage', handleStorageChange);
+        };
+    }, [getSearchOptionsFromUserSettings, updateSearchState]);
+
+    // Sync the internalSearchState with the searchState props when they change
+    useEffect(() => {
+        if (searchState) {
+            // Update internal state from searchState props
+            setInternalSearchState((prev) => ({
+                ...prev,
+                searchExplorationFactor: searchState.searchExplorationFactor,
+                filterExplorationFactor: searchState.filterExplorationFactor,
+                forceLinearScan: searchState.forceLinearScan,
+                noThread: searchState.noThread
+            }));
+        }
+    }, [searchState]);
 
     // Debounced search effect
     useEffect(() => {
@@ -303,6 +384,10 @@ export function useVectorSearch({
         internalSearchState.searchType,
         internalSearchState.searchCount,
         internalSearchState.searchFilter,
+        internalSearchState.searchExplorationFactor,
+        internalSearchState.filterExplorationFactor,
+        internalSearchState.forceLinearScan,
+        internalSearchState.noThread,
     ])
 
     // Helper function to parse count from string
@@ -408,7 +493,10 @@ export function useVectorSearch({
                 count,
                 withEmbeddings: fetchEmbeddings,
                 filter: internalSearchState.searchFilter,
-                expansionFactor: internalSearchState.expansionFactor
+                searchExplorationFactor: internalSearchState.searchExplorationFactor,
+                filterExplorationFactor: internalSearchState.filterExplorationFactor,
+                forceLinearScan: internalSearchState.forceLinearScan,
+                noThread: internalSearchState.noThread
             })
 
             // Use the execution time from the server response
@@ -434,13 +522,15 @@ export function useVectorSearch({
         [
             vectorSetName,
             internalSearchState.searchQuery,
+            internalSearchState.searchFilter,
+            internalSearchState.searchExplorationFactor,
+            internalSearchState.forceLinearScan,
+            internalSearchState.noThread,
             getVectorFromText,
             onSearchResults,
             onStatusChange,
             fetchEmbeddings,
             updateSearchState,
-            internalSearchState.searchFilter,
-            internalSearchState.expansionFactor,
             clearError,
         ]
     )
@@ -461,7 +551,10 @@ export function useVectorSearch({
                 count,
                 withEmbeddings: fetchEmbeddings,
                 filter: internalSearchState.searchFilter,
-                expansionFactor: internalSearchState.expansionFactor
+                searchExplorationFactor: internalSearchState.searchExplorationFactor,
+                filterExplorationFactor: internalSearchState.filterExplorationFactor,
+                forceLinearScan: internalSearchState.forceLinearScan,
+                noThread: internalSearchState.noThread
             })
 
             // Use the execution time from the server response
@@ -487,12 +580,14 @@ export function useVectorSearch({
         [
             vectorSetName,
             internalSearchState.searchQuery,
+            internalSearchState.searchFilter,
+            internalSearchState.searchExplorationFactor,
+            internalSearchState.forceLinearScan,
+            internalSearchState.noThread,
             onSearchStateChange,
             onSearchResults,
             onStatusChange,
             fetchEmbeddings,
-            internalSearchState.searchFilter,
-            internalSearchState.expansionFactor,
             clearError,
         ]
     )
@@ -547,7 +642,10 @@ export function useVectorSearch({
                     count,
                     withEmbeddings: fetchEmbeddings,
                     filter: internalSearchState.searchFilter,
-                    expansionFactor: internalSearchState.expansionFactor
+                    searchExplorationFactor: internalSearchState.searchExplorationFactor,
+                    filterExplorationFactor: internalSearchState.filterExplorationFactor,
+                    forceLinearScan: internalSearchState.forceLinearScan,
+                    noThread: internalSearchState.noThread
                 })
 
                 // Use the execution time from the server response
@@ -579,11 +677,13 @@ export function useVectorSearch({
         [
             vectorSetName,
             internalSearchState.searchQuery,
+            internalSearchState.searchFilter,
+            internalSearchState.searchExplorationFactor,
+            internalSearchState.forceLinearScan,
+            internalSearchState.noThread,
             onSearchResults,
             onStatusChange,
             fetchEmbeddings,
-            internalSearchState.searchFilter,
-            internalSearchState.expansionFactor,
             clearError,
             handleError,
             updateSearchState,
@@ -674,9 +774,21 @@ export function useVectorSearch({
         searchTime: internalSearchState.searchTime,
         error, // Expose error state
         clearError, // Expose function to clear errors
-        expansionFactor: internalSearchState.expansionFactor,
-        setExpansionFactor: (value) =>
-            updateSearchState({ expansionFactor: value }),
+        searchExplorationFactor: internalSearchState.searchExplorationFactor,
+        setSearchExplorationFactor: (value) =>
+            updateSearchState({ searchExplorationFactor: value }),
+        filterExplorationFactor: internalSearchState.filterExplorationFactor,
+        setFilterExplorationFactor: (value) =>
+            updateSearchState({ filterExplorationFactor: value }),
+        forceLinearScan: internalSearchState.forceLinearScan,
+        setForceLinearScan: (value) => {
+            console.log("CHANGED", value)
+            updateSearchState({ forceLinearScan: value })
+        },
+        noThread: internalSearchState.noThread,
+        setNoThread: (value) => {
+            updateSearchState({ noThread: value })
+        },
         lastTextEmbedding: internalSearchState.lastTextEmbedding, // Expose the last text embedding
         executedCommand: internalSearchState.executedCommand,
     }

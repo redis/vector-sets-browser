@@ -26,7 +26,7 @@ import {
 } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { Check, Filter, Settings, Shuffle, X } from "lucide-react"
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState, useCallback } from "react"
 
 import { VectorTuple } from "@/app/redis-server/api"
 import ImageUploader from "./ImageUploader"
@@ -61,10 +61,15 @@ interface SearchBoxProps {
     searchCount?: string
     setSearchCount?: (value: string) => void
     error?: string | null
-    expansionFactor?: number
-    setExpansionFactor?: (value: number | undefined) => void
-    filterExpansionFactor?: number
-    setFilterExpansionFactor?: (value: number | undefined) => void
+    clearError?: () => void
+    searchExplorationFactor?: number
+    setSearchExplorationFactor?: (value: number | undefined) => void
+    filterExplorationFactor?: number
+    setFilterExplorationFactor?: (value: number | undefined) => void
+    forceLinearScan: boolean
+    setForceLinearScan: (value: boolean) => void
+    noThread: boolean
+    setNoThread: (value: boolean) => void
     executedCommand?: string
     results?: VectorTuple[]
 }
@@ -82,10 +87,15 @@ export default function SearchBox({
     searchCount,
     setSearchCount,
     error,
-    expansionFactor,
-    setExpansionFactor,
-    filterExpansionFactor,
-    setFilterExpansionFactor,
+    clearError,
+    searchExplorationFactor,
+    setSearchExplorationFactor,
+    filterExplorationFactor,
+    setFilterExplorationFactor,
+    forceLinearScan,
+    setForceLinearScan,
+    noThread,
+    setNoThread,
     executedCommand,
     results = [],
 }: SearchBoxProps) {
@@ -100,34 +110,29 @@ export default function SearchBox({
     // Add local filter state to debounce filter changes
     const [localFilter, setLocalFilter] = useState(searchFilter)
     const filterTimeoutRef = useRef<NodeJS.Timeout | null>(null)
-
-    // State for custom expansion factor
+    const [localForceLinearScan, setLocalForceLinearScan] = useState(forceLinearScan) 
+    const [localNoThread, setLocalNoThread] = useState(noThread)
+    // State for custom exploration factor
     const [useCustomEF, setUseCustomEF] = useState(() => {
-        // Get saved value or default to false
-        return userSettings.get("useCustomEF") ?? !!expansionFactor
+        // Initialize from userSettings instead of props
+        return userSettings.get("useCustomEF") ?? false
     })
     const [efValue, setEFValue] = useState(() => {
-        // Get saved value or default to expansion factor or 200
-        return (
-            userSettings.get("efValue")?.toString() ||
-            expansionFactor?.toString() ||
-            "200"
-        )
+        // Initialize from userSettings instead of props
+        return userSettings.get("efValue") ?? "200"
     })
 
     // Add a ref to track if we've initialized the search type
     const initialSearchTypeSetRef = useRef(false)
 
-    // State for custom filter expansion factor
+    // State for custom filter exploration factor
     const [useCustomFilterEF, setUseCustomFilterEF] = useState(() => {
-        return userSettings.get("useCustomFilterEF") ?? !!filterExpansionFactor
+        // Initialize from userSettings instead of props
+        return userSettings.get("useCustomFilterEF") ?? false
     })
     const [filterEFValue, setFilterEFValue] = useState(() => {
-        return (
-            userSettings.get("filterEFValue")?.toString() ||
-            filterExpansionFactor?.toString() ||
-            "100"
-        )
+        // Initialize from userSettings instead of props
+        return userSettings.get("filterEFValue") ?? "100"
     })
 
     // Update local filter when searchFilter prop changes, but only on initial mount
@@ -150,60 +155,82 @@ export default function SearchBox({
         }, 500)
     }
 
-    // Handle expansion factor changes
+    // Create a single function to handle search option changes and trigger search
+    const triggerSearchAfterOptionChange = useCallback(() => {
+        
+        // To ensure we force a search update, we'll add a small character to the end of the query
+        // and then immediately restore it.
+        const triggerChar = searchQuery.endsWith(" ") ? "x" : " ";
+        const originalQuery = searchQuery;
+        
+        // Modify the query to force update
+        setSearchQuery(originalQuery + triggerChar);
+        
+        // Restore the original query after a small delay
+        setTimeout(() => {
+            setSearchQuery(originalQuery);
+        }, 500);
+    }, [searchQuery, setSearchQuery]);
+
+    // Handle exploration factor changes - modified to always trigger a search
     const handleEFToggle = (checked: boolean) => {
-        setUseCustomEF(checked)
-        // Save the toggle state
-        userSettings.set("useCustomEF", checked)
-
-        if (setExpansionFactor) {
+        console.log("EF toggle changed:", checked);
+        
+        setUseCustomEF(checked);
+        
+        if (setSearchExplorationFactor) {
             if (checked) {
-                const value = parseInt(efValue)
-                const efNumber = isNaN(value) ? 200 : value
-                setExpansionFactor(efNumber)
-                // Also save the value
-                userSettings.set("efValue", efNumber)
+                const value = parseInt(efValue);
+                const efNumber = isNaN(value) ? 200 : value;
+                setSearchExplorationFactor(efNumber);
             } else {
-                setExpansionFactor(undefined)
+                setSearchExplorationFactor(undefined);
             }
+            // Always trigger the search when toggling, regardless of direction
+            triggerSearchAfterOptionChange();
         }
     }
-
+    
     const handleEFValueChange = (value: string) => {
-        setEFValue(value)
-        if (setExpansionFactor && useCustomEF) {
-            const numValue = parseInt(value)
-            const efNumber = isNaN(numValue) ? 200 : numValue
-            setExpansionFactor(efNumber)
-            // Save the value when it changes
-            userSettings.set("efValue", efNumber)
+        if (value === efValue) return; // Skip if no change
+        
+        setEFValue(value);
+        if (setSearchExplorationFactor && useCustomEF) {
+            const numValue = parseInt(value);
+            const efNumber = isNaN(numValue) ? 200 : numValue;
+            setSearchExplorationFactor(efNumber);
+            triggerSearchAfterOptionChange();
         }
     }
 
-    // Handle filter expansion factor changes
+    // Handle filter exploration factor changes - modified to always trigger a search
     const handleFilterEFToggle = (checked: boolean) => {
-        setUseCustomFilterEF(checked)
-        userSettings.set("useCustomFilterEF", checked)
-
-        if (setFilterExpansionFactor) {
+        console.log("Filter EF toggle changed:", checked);
+        
+        setUseCustomFilterEF(checked);
+        
+        if (setFilterExplorationFactor) {
             if (checked) {
-                const value = parseInt(filterEFValue)
-                const efNumber = isNaN(value) ? 100 : value
-                setFilterExpansionFactor(efNumber)
-                userSettings.set("filterEFValue", efNumber)
+                const value = parseInt(filterEFValue);
+                const efNumber = isNaN(value) ? 100 : value;
+                setFilterExplorationFactor(efNumber);
             } else {
-                setFilterExpansionFactor(undefined)
+                setFilterExplorationFactor(undefined);
             }
+            // Always trigger the search when toggling, regardless of direction
+            triggerSearchAfterOptionChange();
         }
     }
 
     const handleFilterEFValueChange = (value: string) => {
-        setFilterEFValue(value)
-        if (setFilterExpansionFactor && useCustomFilterEF) {
-            const numValue = parseInt(value)
-            const efNumber = isNaN(numValue) ? 100 : numValue
-            setFilterExpansionFactor(efNumber)
-            userSettings.set("filterEFValue", efNumber)
+        if (value === filterEFValue) return; // Skip if no change
+        
+        setFilterEFValue(value);
+        if (setFilterExplorationFactor && useCustomFilterEF) {
+            const numValue = parseInt(value);
+            const efNumber = isNaN(numValue) ? 100 : numValue;
+            setFilterExplorationFactor(efNumber);
+            triggerSearchAfterOptionChange();
         }
     }
 
@@ -271,7 +298,7 @@ export default function SearchBox({
         }
     }, [metadata, setSearchType, supportsEmbeddings])
 
-    // Save settings when they change
+    // Save settings to localStorage when they change
     useEffect(() => {
         userSettings.set("showFilters", showFilters)
     }, [showFilters])
@@ -280,10 +307,74 @@ export default function SearchBox({
         userSettings.set("showRedisCommand", showRedisCommand)
     }, [showRedisCommand])
 
-    // Add a useEffect to log when the executedCommand changes
+    // Save search settings to localStorage
     useEffect(() => {
-        //console.log("Executed command updated:", executedCommand);
-    }, [executedCommand])
+        userSettings.set("useCustomEF", useCustomEF)
+    }, [useCustomEF])
+
+    useEffect(() => {
+        userSettings.set("efValue", efValue)
+    }, [efValue])
+    
+    // Add missing useEffect for useCustomFilterEF
+    useEffect(() => {
+        userSettings.set("useCustomFilterEF", useCustomFilterEF)
+    }, [useCustomFilterEF])
+    
+    useEffect(() => {
+        userSettings.set("filterEFValue", filterEFValue)
+    }, [filterEFValue])
+
+    // Initialize props from localStorage on component mount - only runs once
+    const isFirstRun = useRef(true);
+    useEffect(() => {
+        // Only run once on mount to initialize the props
+        if (!isFirstRun.current) return;
+        isFirstRun.current = false;
+        
+        // Set initial values for props from localStorage
+        if (setSearchExplorationFactor && useCustomEF) {
+            const value = parseInt(efValue)
+            const efNumber = isNaN(value) ? 200 : value
+            setSearchExplorationFactor(efNumber)
+        } else if (setSearchExplorationFactor) {
+            setSearchExplorationFactor(undefined)
+        }
+
+        if (setFilterExplorationFactor && useCustomFilterEF) {
+            const value = parseInt(filterEFValue)
+            const efNumber = isNaN(value) ? 100 : value
+            setFilterExplorationFactor(efNumber)
+        } else if (setFilterExplorationFactor) {
+            setFilterExplorationFactor(undefined)
+        }
+        
+        // Also ensure forceLinearScan and noThread are initialized from props
+        if (setForceLinearScan) {
+            const stored = userSettings.get("forceLinearScan") ?? false;
+            if (stored !== forceLinearScan) {
+                setForceLinearScan(stored);
+            }
+        }
+        
+        if (setNoThread) {
+            const stored = userSettings.get("noThread") ?? false;
+            if (stored !== noThread) {
+                setNoThread(stored);
+            }
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    // Since forceLinearScan and noThread settings come in as props, we'll use these useEffects
+    // to save them to localStorage when they change
+    useEffect(() => {
+        userSettings.set("forceLinearScan", forceLinearScan);
+    }, [forceLinearScan]);
+
+    useEffect(() => {
+        userSettings.set("noThread", noThread);
+    }, [noThread]);
 
     // Handle image embedding generation
     const handleImageSelect = (base64Data: string) => {
@@ -294,6 +385,25 @@ export default function SearchBox({
     const handleImageEmbeddingGenerated = (embedding: number[]) => {
         // Set search query to a vector representation (needed for the search)
         setSearchQuery(embedding.join(", "))
+    }
+    const handleForceLinearScanToggle = (checked: boolean) => {
+        setLocalForceLinearScan(checked)
+        setForceLinearScan(checked)
+        
+        userSettings.set("forceLinearScan", checked)
+        triggerSearchAfterOptionChange()
+    }
+    const handleNoThreadToggle = (checked: boolean) => {
+        setLocalNoThread(checked)
+        setNoThread(checked)
+        userSettings.set("noThread", checked)
+        triggerSearchAfterOptionChange()
+    }
+
+    const handleDoneButtonClick = () => {
+        triggerSearchAfterOptionChange()
+        
+        setShowSearchOptions(false)
     }
 
     return (
@@ -357,7 +467,11 @@ export default function SearchBox({
                     </div>
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                            <Button variant="outline" size="icon" className="shrink-0">
+                            <Button
+                                variant="outline"
+                                size="icon"
+                                className="shrink-0"
+                            >
                                 <Settings className="h-4 w-4" />
                             </Button>
                         </DropdownMenuTrigger>
@@ -441,10 +555,11 @@ export default function SearchBox({
                             <Button
                                 variant="outline"
                                 size="icon"
-                                className={`h-9 ${showFilters
-                                    ? "bg-gray-500 hover:bg-gray-600 text-white"
-                                    : "bg-[white] hover:bg-gray-100"
-                                    }`}
+                                className={`h-9 ${
+                                    showFilters
+                                        ? "bg-gray-500 hover:bg-gray-600 text-white"
+                                        : "bg-[white] hover:bg-gray-100"
+                                }`}
                                 onClick={() => setShowFilters(!showFilters)}
                             >
                                 <Filter className="h-4 w-4" />
@@ -463,8 +578,8 @@ export default function SearchBox({
                                     error={
                                         error
                                             ? error.includes(
-                                                "syntax error in FILTER"
-                                            )
+                                                  "syntax error in FILTER"
+                                              )
                                             : false
                                     }
                                     vectorSetName={vectorSetName}
@@ -486,8 +601,9 @@ export default function SearchBox({
                     <div className="bg-[white] w-full px-2 py-2 rounded border-t border-gray-200 flex flex-col items-start mt-2">
                         <div className="flex items-center w-full">
                             <label className="text-xs font-medium text-gray-500">
-                                Redis Command
+                                Redis Command 
                             </label>
+                            
                             <div className="grow"></div>
                             <Button
                                 variant="ghost"
@@ -580,10 +696,10 @@ export default function SearchBox({
                             <div className="flex items-center justify-between">
                                 <div className="space-y-0.5">
                                     <Label htmlFor="custom-ef">
-                                        Custom Build Exploration Factor (EF)
+                                        Custom Search Exploration Factor (EF)
                                     </Label>
                                     <p className="text-sm text-gray-500">
-                                        Enable to set a custom HNSW expansion
+                                        Enable to set a custom HNSW exploration
                                         factor
                                     </p>
                                 </div>
@@ -608,7 +724,7 @@ export default function SearchBox({
                                         className="w-full"
                                     />
                                     <p className="text-sm text-gray-500">
-                                        The Expansion Factor (EF) controls the
+                                        The Exploration Factor (EF) controls the
                                         search quality in HNSW graphs. Higher
                                         values (100-500) improve search quality
                                         at the cost of performance. Lower values
@@ -626,8 +742,8 @@ export default function SearchBox({
                                         (FILTER-EF)
                                     </Label>
                                     <p className="text-sm text-gray-500">
-                                        Enable to set a custom filter expansion
-                                        factor
+                                        Enable to set a custom filter
+                                        exploration factor
                                     </p>
                                 </div>
                                 <Switch
@@ -654,9 +770,9 @@ export default function SearchBox({
                                         min="1"
                                         className="w-full"
                                     />
-                                    <div className="text-sm text-gray-500 space-y-2">
+                                    {/* <div className="text-sm text-gray-500 space-y-2">
                                         <p>
-                                            The Filter Expansion Factor
+                                            The Filter Exploration Factor
                                             (FILTER-EF) affects search quality
                                             when using filters:
                                         </p>
@@ -689,13 +805,53 @@ export default function SearchBox({
                                             increase if needed when you observe
                                             fewer results than expected.
                                         </p>
-                                    </div>
+                                    </div> */}
                                 </div>
                             )}
+
+                            {/* Force Linear Scan */}
+                            <div className="flex items-center justify-between pt-4 border-t">
+                                <div className="space-y-0.5">
+                                    <Label htmlFor="force-linear-scan">
+                                        Force Linear Scan (TRUTH)
+                                    </Label>
+                                    <p className="text-sm text-gray-500">
+                                        Forces the command to perform a linear
+                                        scan of all entries, without using the
+                                        graph O(N)
+                                    </p>
+                                </div>
+                                <Switch
+                                    id="force-linear-scan"
+                                    checked={localForceLinearScan}
+                                    onCheckedChange={handleForceLinearScanToggle}
+                                />
+                            </div>
+
+                            {/* No Threading */}
+                            <div className="flex items-center justify-between pt-4 border-t">
+                                <div className="space-y-0.5">
+                                    <Label htmlFor="no-thread">
+                                        No Threading (NOTHREAD)
+                                    </Label>
+                                    <p className="text-sm text-gray-500">
+                                        Forces main thread execution. Normally{" "}
+                                        <code>VSIM</code> spawns a thread
+                                        instead.
+                                    </p>
+                                </div>
+                                <Switch
+                                    id="no-thread"
+                                    checked={localNoThread}
+                                    onCheckedChange={handleNoThreadToggle}
+                                />
+                            </div>
                         </div>
                     </div>
                     <DialogFooter>
-                        <Button onClick={() => setShowSearchOptions(false)}>Done</Button>
+                        <Button onClick={handleDoneButtonClick}>
+                            Done
+                        </Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>

@@ -224,8 +224,11 @@ export interface VsimRequestBody {
     count?: number
     filter?: string
     withEmbeddings?: boolean
-    expansionFactor?: number
+    searchExplorationFactor?: number
+    filterExplorationFactor?: number
     returnCommandOnly?: boolean
+    forceLinearScan?: boolean
+    noThread?: boolean
 }
 
 export async function vsim(

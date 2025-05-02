@@ -6,9 +6,12 @@ export interface VsimRequest {
     searchElement?: string
     count?: number
     filter?: string
-    expansionFactor?: number
+    searchExplorationFactor?: number
+    filterExplorationFactor?: number
     returnCommandOnly?: boolean
     withEmbeddings?: boolean
+    forceLinearScan?: boolean
+    noThread?: boolean
 }
 
 export function validateVsimRequest(body: any): { isValid: boolean; error?: string; value?: VsimRequest } {
@@ -45,9 +48,9 @@ export function validateVsimRequest(body: any): { isValid: boolean; error?: stri
         }
     }
 
-    // Validate expansionFactor if provided
-    if (body.expansionFactor !== undefined) {
-        const ef = Number(body.expansionFactor)
+    // Validate searchExplorationFactor if provided
+    if (body.searchExplorationFactor !== undefined) {
+        const ef = Number(body.searchExplorationFactor)
         if (isNaN(ef) || ef < 0) {
             return { isValid: false, error: 'Expansion factor must be a non-negative number' }
         }
@@ -61,9 +64,12 @@ export function validateVsimRequest(body: any): { isValid: boolean; error?: stri
             searchElement: body.searchElement,
             count: body.count || 10, // Default to 10 if not specified
             filter: body.filter || '',
-            expansionFactor: body.expansionFactor,
+            searchExplorationFactor: body.searchExplorationFactor,
+            filterExplorationFactor: body.filterExplorationFactor,
             returnCommandOnly: body.returnCommandOnly === true,
-            withEmbeddings: body.withEmbeddings === true
+            withEmbeddings: body.withEmbeddings === true,
+            forceLinearScan: body.forceLinearScan === true,
+            noThread: body.noThread === true
         }
     }
 }
@@ -92,9 +98,25 @@ export function buildVsimCommand(request: VsimRequest): string[][] {
     // Add count
     baseCommand.push("COUNT", String(request.count))
 
-    // Add expansion factor if provided
-    if (request.expansionFactor && request.expansionFactor > 0) {
-        baseCommand.push("EF", String(request.expansionFactor))
+    // Add searchExplorationFactor if provided
+    if (request.searchExplorationFactor && request.searchExplorationFactor > 0) {
+        baseCommand.push("EF", String(request.searchExplorationFactor))
+    }
+    
+    // Add filterExplorationFactor if provided
+    if (request.filterExplorationFactor && request.filterExplorationFactor > 0) {
+        console.log("FILTER-EF", String(request.filterExplorationFactor))
+        baseCommand.push("FILTER-EF", String(request.filterExplorationFactor))
+    }
+
+    // Add forceLinearScan if provided
+    if (request.forceLinearScan) {
+        baseCommand.push("TRUTH")
+    }
+
+    // Add noThread if provided
+    if (request.noThread) {
+        baseCommand.push("NOTHREAD")
     }
 
     return [baseCommand]

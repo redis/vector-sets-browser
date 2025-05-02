@@ -13,12 +13,12 @@ import SearchBox from "@/app/components/SearchBox"
 import SearchTimeIndicator from "@/app/components/SearchTimeIndicator"
 import StatusMessage from "@/app/components/StatusMessage"
 import {
-    useVectorSearch,
-    VectorSetSearchState,
+    useVectorSearch
 } from "@/app/hooks/useVectorSearch"
 import VectorViz3D from "./VectorViz3D"
 import HNSWVizPure from "./vizualizer/HNSW2dViz"
-import { VectorSetMetadata } from "@/app/types/vectorSetMetaData"
+import { VectorSetMetadata, VectorSetSearchOptions } from "@/app/types/vectorSetMetaData"
+import { userSettings } from "@/app/utils/userSettings"
 
 interface VectorSetVisualizationProps {
     vectorSetName: string
@@ -35,14 +35,19 @@ export default function VectorSetVisualization({
     const [fileOperationStatus, setFileOperationStatus] = useState("")
     const [results, setResults] = useState<VectorTuple[]>([])
     const [isVectorSetChanging, setIsVectorSetChanging] = useState(false)
-    const [searchState, setSearchState] = useState<VectorSetSearchState>({
+    
+    // Initialize with basic search state - advanced options will be loaded from userSettings by useVectorSearch
+    const [searchState, setSearchState] = useState<VectorSetSearchOptions>({
         searchType: "Vector" as const,
         searchQuery: "",
         searchCount: "10",
         searchFilter: "",
         resultsTitle: "Search Results",
         searchTime: undefined as string | undefined,
-        expansionFactor: undefined,
+        searchExplorationFactor: undefined,
+        filterExplorationFactor: undefined,
+        forceLinearScan: false,
+        noThread: false,
     })
 
     // Track vector set changes
@@ -62,8 +67,8 @@ export default function VectorSetVisualization({
     }, [results, isVectorSetChanging])
 
     const handleSearchStateChange = useCallback(
-        (newState: Partial<VectorSetSearchState>) => {
-            setSearchState((prevState) => ({
+        (newState: Partial<VectorSetSearchOptions>) => {
+            setSearchState((prevState: VectorSetSearchOptions) => ({
                 ...prevState,
                 ...newState,
             }))
@@ -156,10 +161,26 @@ export default function VectorSetVisualization({
                 searchCount={searchCount}
                 setSearchCount={setSearchCount}
                 error={fileOperationStatus}
-                expansionFactor={searchState.expansionFactor}
-                setExpansionFactor={(factor) =>
-                    setSearchState({ ...searchState, expansionFactor: factor })
-                }
+                searchExplorationFactor={searchState.searchExplorationFactor}
+                setSearchExplorationFactor={(factor) => {
+                    if (factor === searchState.searchExplorationFactor) return;
+                    setSearchState({ ...searchState, searchExplorationFactor: factor });
+                }}
+                filterExplorationFactor={searchState.filterExplorationFactor}
+                setFilterExplorationFactor={(factor) => {
+                    if (factor === searchState.filterExplorationFactor) return;
+                    setSearchState({ ...searchState, filterExplorationFactor: factor });
+                }}
+                forceLinearScan={searchState.forceLinearScan}
+                setForceLinearScan={(value) => {
+                    if (value === searchState.forceLinearScan) return;
+                    setSearchState({ ...searchState, forceLinearScan: value });
+                }}
+                noThread={searchState.noThread}
+                setNoThread={(value) => {
+                    if (value === searchState.noThread) return;
+                    setSearchState({ ...searchState, noThread: value });
+                }}
             />
             <div className="bg-[white] rounded shadow-md h-[calc(100vh-300px)]">
                 <div className="p-4 rounded shadow-md flex-1 flex flex-col">

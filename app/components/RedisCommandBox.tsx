@@ -19,10 +19,6 @@ export default function RedisCommandBox({
     searchFilter,
     showRedisCommand,
 }: RedisCommandBoxProps) {
-    // Add a useEffect to log when the executedCommand changes
-    useEffect(() => {
-        //console.log("Executed command updated:", executedCommand);
-    }, [executedCommand]);
 
     // Helper function to get and format the Redis command
     const getRedisCommand = (includeFullEmbedding: boolean = false) => {
@@ -105,7 +101,7 @@ export default function RedisCommandBox({
         // Default fallback for initial state
         return {
             type: 'simple',
-            text: `V? ${vectorSetName} VALUES ${dim} 0.0, 0.0, ...`
+            text: ``
         };
     }
 

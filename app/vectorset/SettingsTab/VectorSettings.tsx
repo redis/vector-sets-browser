@@ -276,7 +276,7 @@ export default function VectorSettings({
                         <div className="grow">
                             <div className="grid grid-cols-2 gap-2 text-sm">
                                 <div className="text-gray-600">
-                                    Quantization:
+                                    Vector Quantization <span className="text-xs text-gray-400">(NOQUANT, Q8, BIN options)</span>:
                                 </div>
                                 <div>
                                     {metadata?.redisConfig?.quantization || (
@@ -290,7 +290,7 @@ export default function VectorSettings({
                                 </div>
 
                                 <div className="text-gray-600">
-                                    Reduced Dimensions:
+                                    Reduced Dimensions <span className="text-xs text-gray-400">(REDUCE option)</span>:
                                 </div>
                                 <div>
                                     {metadata?.redisConfig
@@ -305,7 +305,7 @@ export default function VectorSettings({
                                 </div>
 
                                 <div className="text-gray-600">
-                                    Default CAS:
+                                    Default Check-and-Set <span className="text-xs text-gray-400">(CAS option)</span>:
                                 </div>
                                 <div>
                                     {metadata?.redisConfig?.defaultCAS !==
@@ -326,7 +326,7 @@ export default function VectorSettings({
                                 </div>
 
                                 <div className="text-gray-600">
-                                    Build Exploration Factor:
+                                    Build Exploration Factor <span className="text-xs text-gray-400">(EF option)</span>:
                                 </div>
                                 <div>
                                     {metadata?.redisConfig
@@ -338,7 +338,53 @@ export default function VectorSettings({
                                             </span>
                                         </span>
                                     )}
+                                </div>  
+
+                                <div className="text-gray-600">
+                                    Maximum Connections <span className="text-xs text-gray-400">(M option)</span>:
                                 </div>
+                                <div>
+                                    {metadata?.redisConfig
+                                        ?.maxConnections || (
+                                        <span>
+                                            Default:{" "}
+                                            <span className="font-bold">
+                                                16
+                                            </span>
+                                        </span>
+                                    )}
+                                </div>
+                                {/* <div className="text-gray-600">
+                                    Force Linear Scan <span className="text-xs text-gray-400">(TRUTH option)</span>:
+                                </div>
+                                <div>
+                                    {metadata?.redisConfig
+                                        ?.forceLinearScan ? (
+                                        "Enabled"
+                                    ) : (
+                                        <span>
+                                            Default:{" "}
+                                            <span className="font-bold">
+                                                False
+                                            </span>
+                                        </span>
+                                    )}
+                                </div>
+                                <div className="text-gray-600">
+                                    No Thread <span className="text-xs text-gray-400">(NOTHREAD option)</span>:
+                                </div>
+                                <div>
+                                    {metadata?.redisConfig?.noThread ? (
+                                        "Enabled"
+                                    ) : (
+                                        <span>
+                                            Default:{" "}
+                                            <span className="font-bold">
+                                                False
+                                            </span>
+                                        </span>
+                                    )}
+                                </div> */}
                             </div>
                         </div>
                     </div>

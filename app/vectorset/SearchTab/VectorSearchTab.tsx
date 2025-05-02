@@ -2,11 +2,10 @@
 
 import SearchBox from "@/app/components/SearchBox"
 import {
-    useVectorSearch,
-    VectorSetSearchState,
+    useVectorSearch
 } from "@/app/hooks/useVectorSearch"
 import { VectorTuple, vlinks } from "@/app/redis-server/api"
-import { VectorSetMetadata } from "@/app/types/vectorSetMetaData"
+import { VectorSetMetadata, VectorSetSearchOptions } from "@/app/types/vectorSetMetaData"
 import { userSettings } from "@/app/utils/userSettings"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useCallback, useState } from "react"
@@ -42,19 +41,21 @@ export default function VectorSearchTab({
     setResults,
     changeTab,
 }: VectorSearchTabProps) {
-    // Load persisted expansion factor settings
-    const useCustomEF = userSettings.get("useCustomEF") ?? false
-    const efValue = userSettings.get("efValue")
+    // Initialize search options from userSettings
     const [activeResultsTab, setActiveResultsTab] = useState("table")
 
-    const [searchState, setSearchState] = useState<VectorSetSearchState>({
+    // Initialize with basic search state - advanced options will be loaded from userSettings by useVectorSearch
+    const [searchState, setSearchState] = useState<VectorSetSearchOptions>({
         searchType: "Vector" as const,
         searchQuery: "",
         searchCount: "10",
         searchFilter: "",
         resultsTitle: "Search Results",
         searchTime: undefined as string | undefined,
-        expansionFactor: useCustomEF ? efValue : undefined,
+        searchExplorationFactor: undefined,
+        filterExplorationFactor: undefined,
+        forceLinearScan: false,
+        noThread: false,
     })
 
     const handleSearchResults = useCallback(
@@ -67,8 +68,8 @@ export default function VectorSearchTab({
     const handleStatusChange = useCallback(() => { }, [])
 
     const handleSearchStateChange = useCallback(
-        (newState: Partial<VectorSetSearchState>) => {
-            setSearchState((prevState) => ({
+        (newState: Partial<VectorSetSearchOptions>) => {
+            setSearchState((prevState: VectorSetSearchOptions) => ({
                 ...prevState,
                 ...newState,
             }))
@@ -95,8 +96,14 @@ export default function VectorSearchTab({
         setSearchFilter,
         error,
         clearError: hookClearError,
-        expansionFactor,
-        setExpansionFactor,
+        searchExplorationFactor,
+        setSearchExplorationFactor,
+        filterExplorationFactor,
+        setFilterExplorationFactor,
+        forceLinearScan,
+        setForceLinearScan,
+        noThread,
+        setNoThread,
         executedCommand,
     } = useVectorSearch({
         vectorSetName,
@@ -198,8 +205,14 @@ export default function VectorSearchTab({
                 dim={dim}
                 metadata={metadata}
                 error={error}
-                expansionFactor={expansionFactor}
-                setExpansionFactor={setExpansionFactor}
+                searchExplorationFactor={searchExplorationFactor}
+                setSearchExplorationFactor={setSearchExplorationFactor}
+                filterExplorationFactor={filterExplorationFactor}
+                setFilterExplorationFactor={setFilterExplorationFactor}
+                forceLinearScan={forceLinearScan}
+                setForceLinearScan={setForceLinearScan}
+                noThread={noThread}
+                setNoThread={setNoThread}
                 executedCommand={executedCommand}
                 results={results}
             />

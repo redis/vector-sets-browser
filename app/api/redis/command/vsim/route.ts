@@ -29,6 +29,7 @@ export async function POST(request: Request) {
         }
 
         const command = buildVsimCommand(validationResult.value)
+
         if (validationResult.value.returnCommandOnly) {
             return NextResponse.json({ command })
         }

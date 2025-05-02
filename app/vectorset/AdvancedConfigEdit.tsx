@@ -23,6 +23,7 @@ export default function AdvancedConfigEdit({
         reduceDimensions:
             redisConfig.redisConfig?.reduceDimensions?.toString() || "",
         defaultCAS: redisConfig.redisConfig?.defaultCAS || false,
+        maxConnections: redisConfig.redisConfig?.maxConnections?.toString() || "",
         buildExplorationFactor:
             redisConfig.redisConfig?.buildExplorationFactor?.toString() || "",
     })
@@ -60,6 +61,13 @@ export default function AdvancedConfigEdit({
             } else {
                 updatedRedisConfig.redisConfig.defaultCAS = value as boolean
             }
+        } else if (key === "maxConnections") {
+            const numValue = typeof value === "string" ? parseInt(value) : null
+            if (value === "" || numValue === null) {
+                delete updatedRedisConfig.redisConfig.maxConnections
+            } else {
+                updatedRedisConfig.redisConfig.maxConnections = numValue
+            }
         } else if (key === "buildExplorationFactor") {
             const numValue = typeof value === "string" ? parseInt(value) : null
             if (value === "" || numValue === null) {
@@ -88,14 +96,14 @@ export default function AdvancedConfigEdit({
             </div>
 
             <div className="form-body space-y-6">
-                {/* Runtime configurable options */}
+                {/* Immutable options */}
                 <div className="space-y-2">
                     <div className="w-full flex items-center">
-                        <h4 className="text-sm font-semibold grow">
-                            Runtime Options
+                        <h4 className="text-sm grow font-semibold">
+                            VADD Parameters
                         </h4>
-                        <div className="text-gray-500 text-xs">
-                            (You can change these settings later.)
+                        <div className="text-xs text-gray-500">
+                            (Cannot be changed after the first vector is added)
                         </div>
                     </div>
                     <div className="form-section border-none">
@@ -110,7 +118,8 @@ export default function AdvancedConfigEdit({
                                             High performance multi-threading
                                         </span>
                                         <p className="text-xs text-gray-500">
-                                            This controls the CAS option used
+                                            This controls the{" "}
+                                            <strong>CAS</strong> parameter used
                                             with VADD command. When set, the CAS
                                             option will be used for all VADD
                                             calls
@@ -144,32 +153,20 @@ export default function AdvancedConfigEdit({
                                 <div>
                                     <label
                                         className="text-sm font-medium"
-                                        htmlFor="exploration-factor-input"
+                                        htmlFor="build-exploration-factor-input"
                                     >
                                         Build Exploration Factor
                                     </label>
                                     <p className="text-xs text-gray-500">
-                                        Controls the EF option used with VSIM
-                                        command. When set, the EF option will be
-                                        used for all VSIM calls
-                                    </p>
-                                    <p className="text-xs text-gray-500">
-                                        Higher values improve recall, but
-                                        increase search time (default is 200,
-                                        values between 100 and 1000)
-                                        <a
-                                            href="/docs#exploration-factor"
-                                            className="pl-2 whitespace-nowrap text-xs text-blue-500 hover:underline"
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                        >
-                                            Learn more
-                                        </a>
+                                        Controls the <strong>EF</strong>{" "}
+                                        parameter used with VADD command. When
+                                        set, the EF parameter will be used for
+                                        all VADD calls
                                     </p>
                                 </div>
                                 <div className="grow"></div>
                                 <Input
-                                    id="exploration-factor-input"
+                                    id="build-exploration-factor-input"
                                     type="number"
                                     placeholder="200"
                                     className="text-right border-none w-48"
@@ -184,18 +181,7 @@ export default function AdvancedConfigEdit({
                             </div>
                         </div>
                     </div>
-                </div>
 
-                {/* Immutable options */}
-                <div className="space-y-2 pt-4">
-                    <div className="w-full flex items-center">
-                        <h4 className="text-sm grow font-semibold">
-                            Vector Options
-                        </h4>
-                        <div className="text-xs text-gray-500">
-                            (Cannot be changed after the first vector is added)
-                        </div>
-                    </div>
                     <div className="form-section border-none">
                         <div className="border-none">
                             <div className="flex w-full space-x-2 items-center">
@@ -208,7 +194,10 @@ export default function AdvancedConfigEdit({
                                     </label>
                                     <p className="text-xs text-gray-500">
                                         Reduce storage size at the expense of
-                                        precision
+                                        precision. Controls the{" "}
+                                        <strong>NOQUANT</strong>,{" "}
+                                        <strong>Q8</strong> and{" "}
+                                        <strong>BIN</strong> parameters
                                         <a
                                             href="/docs#vector-quantization"
                                             className="pl-2 whitespace-nowrap text-xs text-blue-500 hover:underline"
@@ -234,13 +223,13 @@ export default function AdvancedConfigEdit({
                                     </SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="NOQUANT">
-                                            None (full precision)
+                                            None - (NOQUANT){" "}
                                         </SelectItem>
                                         <SelectItem value="Q8">
-                                            8-bit quantization
+                                            8-bit (Q8) - Default
                                         </SelectItem>
                                         <SelectItem value="BIN">
-                                            Binary quantization
+                                            Binary (BIN)
                                         </SelectItem>
                                     </SelectContent>
                                 </Select>
@@ -259,7 +248,8 @@ export default function AdvancedConfigEdit({
                                     </label>
                                     <p className="text-xs text-gray-500">
                                         Reduce dimensions for faster search,
-                                        lower precision
+                                        lower precision. Controls the{" "}
+                                        <strong>REDUCE</strong> parameter
                                         <a
                                             href="/docs#dimension-reduction"
                                             className="text-xs whitespace-nowrap pl-2 text-blue-500 hover:underline"
@@ -280,6 +270,47 @@ export default function AdvancedConfigEdit({
                                     onChange={(e) =>
                                         handleChange(
                                             "reduceDimensions",
+                                            e.target.value
+                                        )
+                                    }
+                                />
+                            </div>
+                        </div>
+                    </div>
+                    <div className="form-section border-none">
+                        <div className="border-none">
+                            <div className="flex w-full space-x-2 items-center">
+                                <div>
+                                    <label
+                                        className="text-sm font-medium"
+                                        htmlFor="max-connections-input"
+                                    >
+                                        Maximum Connections
+                                    </label>
+                                    <p className="text-xs text-gray-500">
+                                        Maximum number of connections per node
+                                        (default: 16). Controls the{" "}
+                                        <strong>M</strong> parameter
+                                        <a
+                                            href="/docs#maximum-connections"
+                                            className="text-xs whitespace-nowrap pl-2 text-blue-500 hover:underline"
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                        >
+                                            Learn more
+                                        </a>
+                                    </p>
+                                </div>
+                                <div className="grow"></div>
+                                <Input
+                                    id="max-connections-input"
+                                    type="number"
+                                    placeholder="Enter max connections"
+                                    className="text-right border-none w-48"
+                                    value={config.maxConnections}
+                                    onChange={(e) =>
+                                        handleChange(
+                                            "maxConnections",
                                             e.target.value
                                         )
                                     }

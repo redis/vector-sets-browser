@@ -6,6 +6,7 @@ export interface VaddOptions {
     ef?: number
     quantization?: string
     attributes?: string
+    maxConnections?: number
 }
 
 export interface VaddRequest {
@@ -46,6 +47,9 @@ export function validateVaddRequest(body: any): { isValid: boolean; error?: stri
     }
     if (typeof body.attributes === 'string') {
         options.attributes = body.attributes
+    }
+    if (typeof body.maxConnections === 'number') {
+        options.maxConnections = body.maxConnections
     }
 
     return {
@@ -88,6 +92,10 @@ export function buildVaddCommand(request: VaddRequest): string[] {
 
     if (request.options?.ef) {
         command.push('EF', request.options.ef.toString())
+    }
+
+    if (request.options?.maxConnections) {
+        command.push('M', request.options.maxConnections.toString())
     }
 
     return command
