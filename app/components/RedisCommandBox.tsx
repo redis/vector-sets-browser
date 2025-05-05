@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button"
 import { Copy } from "lucide-react"
-import { useEffect, useState } from "react"
+import { useState } from "react"
 
 interface RedisCommandBoxProps {
     vectorSetName: string
@@ -110,7 +110,7 @@ export default function RedisCommandBox({
 
     return (
         <div className="flex gap-2 items-center w-full bg-gray-100 rounded-md">
-            <div className="text-grey-400 p-2 font-mono overflow-x-scroll text-sm grow">
+            <div className="text-muted-foreground p-1 font-mono overflow-x-scroll text-sm grow">
                 {(() => {
                     const commandData = getRedisCommand(false);
                     if (!commandData) {
@@ -127,7 +127,7 @@ export default function RedisCommandBox({
 
                     // Render structured command
                     return (
-                        <div className="text-gray-500 font-mono text-xs">
+                        <div className="text-muted-foreground font-mono text-xs">
                             {commandData.prefix}
                             {showFullVector ? (
                                 <span 
