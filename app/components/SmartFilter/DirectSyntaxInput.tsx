@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { X } from "lucide-react"
+import { Trash } from "lucide-react"
 import React, { useEffect, useRef } from "react"
 import {
     Tooltip,
@@ -160,7 +160,7 @@ export default function DirectSyntaxInput({
                                         className="h-6 w-6"
                                         onClick={clearFilter}
                                     >
-                                        <X className="h-3.5 w-3.5 text-muted-foreground" />
+                                        <Trash className="h-3.5 w-3.5 text-muted-foreground" />
                                         <span className="sr-only">
                                             Clear filter
                                         </span>

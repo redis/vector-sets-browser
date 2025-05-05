@@ -122,7 +122,7 @@ export default function NaturalLanguageInput({
                                 <Button
                                 variant="ghost"
                                     size="icon"
-                                    className="hover:text-foreground text-muted-foreground"
+                                    className="text-red-500"
                                     onClick={clearFilter}
                                 >
                                     <Trash className="h-3 w-3" />

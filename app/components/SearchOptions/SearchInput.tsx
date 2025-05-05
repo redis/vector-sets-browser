@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Shuffle } from "lucide-react"
 import { useMemo } from "react"
-import ImageUploader from "../ImageUploader"
+import ImageUploader from "../ImageUploader/ImageUploader"
 
 interface SearchInputProps {
     searchType: "Vector" | "Element" | "Image"
