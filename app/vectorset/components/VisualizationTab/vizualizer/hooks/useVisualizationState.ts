@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from "react"
-import { userSettings } from "@/app/utils/userSettings"
+import { userSettings } from "@/lib/storage/userSettings"
 
 export function useVisualizationState() {
     const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {

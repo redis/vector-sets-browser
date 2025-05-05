@@ -1,5 +1,5 @@
 import { ImportJobConfig, jobs } from "@/app/api/jobs"
-import { VectorSetMetadata } from "@/app/types/vectorSetMetaData"
+import { VectorSetMetadata } from "@/lib/types/vectors"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import {
@@ -12,10 +12,10 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { FileJson, Loader2, X } from "lucide-react"
 import React, { useState } from "react"
-import eventBus, { AppEvents } from "@/app/utils/eventEmitter"
+import eventBus, { AppEvents } from "@/lib/client/events/eventEmitter"
 import ImportCard from "../ImportCard"
 import { CodeBlock } from "@/components/ui/code-block"
-import { vcard, vrem, vsim } from "@/app/redis-server/api"
+import { vcard, vrem, vsim } from "@/lib/redis-server/api"
 
 interface ImportJSONFlowProps {
     metadata: VectorSetMetadata | null

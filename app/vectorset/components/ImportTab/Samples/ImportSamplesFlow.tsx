@@ -1,5 +1,5 @@
 import { vectorSets } from "@/app/api/vector-sets"
-import { VectorSetMetadata } from "@/app/types/vectorSetMetaData"
+import { VectorSetMetadata } from "@/lib/types/vectors"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { Database } from "lucide-react"
 import { useState } from "react"

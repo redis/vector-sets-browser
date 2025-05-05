@@ -8,17 +8,17 @@ import {
     SelectValue,
 } from "@/components/ui/select"
 import { useCallback, useEffect, useState } from "react"
-import { VectorTuple, vlinks } from "@/app/redis-server/api"
-import SearchBox from "@/app/components/SearchBox"
-import SearchTimeIndicator from "@/app/components/SearchTimeIndicator"
-import StatusMessage from "@/app/components/StatusMessage"
+import { VectorTuple, vlinks } from "@/lib/redis-server/api"
+import SearchBox from "@/components/SearchBox"
+import SearchTimeIndicator from "@/components/SearchTimeIndicator"
+import StatusMessage from "@/components/StatusMessage"
 import {
     useVectorSearch
-} from "@/app/hooks/useVectorSearch"
+} from "@/app/vectorset/hooks/useVectorSearch"
 import VectorViz3D from "./VectorViz3D"
 import HNSWVizPure from "./vizualizer/HNSW2dViz"
-import { VectorSetMetadata, VectorSetSearchOptions } from "@/app/types/vectorSetMetaData"
-import { userSettings } from "@/app/utils/userSettings"
+import { VectorSetMetadata, VectorSetSearchOptions } from "@/lib/types/vectors"
+import { userSettings } from "@/lib/storage/userSettings"
 
 interface VectorSetVisualizationProps {
     vectorSetName: string

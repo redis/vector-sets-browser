@@ -1,4 +1,4 @@
-import { userSettings } from "@/app/utils/userSettings";
+import { userSettings } from "@/lib/storage/userSettings";
 import { z } from "zod";
 
 export const EmbeddingTemplateResponseObject = z.object({

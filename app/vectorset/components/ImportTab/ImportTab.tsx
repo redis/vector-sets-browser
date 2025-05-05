@@ -4,11 +4,11 @@ import {
     type ImportLogEntry,
     type Job,
 } from "@/app/api/jobs"
-import { getModelName } from "@/app/embeddings/types/embeddingModels"
-import { VectorSetMetadata } from "@/app/types/vectorSetMetaData"
-import eventBus, { AppEvents } from "@/app/utils/eventEmitter"
+import { getModelName } from "@/lib/embeddings/types/embeddingModels"
+import { VectorSetMetadata } from "@/lib/types/vectors"
+import eventBus, { AppEvents } from "@/lib/client/events/eventEmitter"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { subscribe } from "@/lib/sse"
+import { subscribe } from "@/lib/client/sse/sse"
 import { useCallback, useEffect, useRef, useState } from "react"
 import ImportFromCSVFlow from "./CSV/ImportFromCSVFlow"
 import ImportHistory from "./ImportHistory"

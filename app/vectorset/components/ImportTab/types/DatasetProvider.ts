@@ -1,4 +1,4 @@
-import { EmbeddingConfig } from "@/app/embeddings/types/embeddingModels"
+import { EmbeddingConfig } from "@/lib/embeddings/types/embeddingModels"
 import { ImportJobConfig } from "@/app/api/jobs"
 import { ComponentType, FC } from "react"
 

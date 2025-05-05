@@ -1,9 +1,9 @@
 "use client"
 
-import { HeroSection } from "@/app/HeroSection"
-import { MainContentSection } from "@/app/MainContentSection"
-import { FeatureCardSection } from "@/app/FeatureCardSection"
-import { CallToAction } from "@/app/CallToAction"
+import { HeroSection } from "@/components/landing/HeroSection"
+import { MainContentSection } from "@/components/landing/MainContentSection"
+import { FeatureCardSection } from "@/components/landing/FeatureCardSection"
+import { CallToAction } from "@/components/landing/CallToAction"
 
 export default function Home() {
     return (

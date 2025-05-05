@@ -1,6 +1,6 @@
 import "./globals.css"
 import type { Metadata, Viewport } from 'next'
-import ClientLayout from './ClientLayout'
+import ClientLayout from '../components/landing/ClientLayout'
 
 export const metadata: Metadata = {
   title: 'Vector Sets Browser',

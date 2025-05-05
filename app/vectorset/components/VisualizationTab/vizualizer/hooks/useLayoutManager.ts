@@ -1,4 +1,4 @@
-import { userSettings } from "@/app/utils/userSettings"
+import { userSettings } from "@/lib/storage/userSettings"
 import { PCA } from "ml-pca"
 import { useCallback, useEffect, useRef, useState } from "react"
 import { toast } from "sonner"

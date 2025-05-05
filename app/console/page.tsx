@@ -4,11 +4,11 @@ import { Card } from "@/components/ui/card"
 import { useRouter } from "next/navigation"
 import { useEffect, useRef, useState } from "react"
 import { toast } from "sonner"
-import { useRedisConnection } from "../hooks/useRedisConnection"
+import { useRedisConnection } from "../../hooks/useRedisConnection"
 import {
     cleanupOldConnections,
     storeConnection,
-} from "../redis-server/connectionManager"
+} from "@/lib/redis-server/connectionManager"
 import RedisConnectionList from "./RedisConnectionList"
 
 export default function ConsolePage() {

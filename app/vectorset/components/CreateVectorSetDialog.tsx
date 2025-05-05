@@ -5,22 +5,22 @@ import {
     getExpectedDimensions,
     getModelName,
     getProviderInfo
-} from "@/app/embeddings/types/embeddingModels"
+} from "@/lib/embeddings/types/embeddingModels"
 import {
     createVectorSetMetadata,
     VectorSetMetadata,
-} from "@/app/types/vectorSetMetaData"
+} from "@/lib/types/vectors"
 
-import EditEmbeddingConfigModal from "@/app/components/EmbeddingConfig/EditEmbeddingConfigDialog"
+import EditEmbeddingConfigModal from "@/components/EmbeddingConfig/EditEmbeddingConfigDialog"
 import {
     getEmbeddingIcon
-} from "@/app/components/EmbeddingConfig/EmbeddingIcons"
-import RedisCommandBox from "@/app/components/RedisCommandBox"
-import { vadd } from "@/app/redis-server/api"
-import { getDefaultTextEmbeddingConfig } from "@/app/utils/embeddingUtils"
-import { userSettings } from "@/app/utils/userSettings"
+} from "@/components/EmbeddingConfig/EmbeddingIcons"
+import RedisCommandBox from "@/components/RedisCommandBox"
+import { vadd } from "@/lib/redis-server/api"
+import { getDefaultTextEmbeddingConfig } from "@/lib/embeddings/utils"
+import { userSettings } from "@/lib/storage/userSettings"
 import AdvancedConfigEdit from "@/app/vectorset/components/AdvancedConfigEdit"
-import { DEFAULT_EMBEDDING } from "@/app/vectorset/constants"
+import { DEFAULT_EMBEDDING } from "@/app/vectorset/utils/constants"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ArrowLeft, ChevronRight, MessageSquareText } from "lucide-react"

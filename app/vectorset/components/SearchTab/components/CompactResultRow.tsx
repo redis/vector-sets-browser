@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button"
 import { TableCell, TableRow } from "@/components/ui/table"
-import { ColumnConfig } from "@/app/hooks/useVectorResultsSettings"
-import { VectorTuple } from "@/app/redis-server/api"
+import { ColumnConfig } from "@/app/vectorset/hooks/useVectorResultsSettings"
+import { VectorTuple } from "@/lib/redis-server/api"
 
 interface CompactResultRowProps {
     row: VectorTuple

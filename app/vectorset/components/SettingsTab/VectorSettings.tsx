@@ -1,21 +1,21 @@
 import { vectorSets } from "@/app/api/vector-sets"
-import EditEmbeddingConfigModal from "@/app/components/EmbeddingConfig/EditEmbeddingConfigDialog"
-import { getEmbeddingIcon } from "@/app/components/EmbeddingConfig/EmbeddingIcons"
+import EditEmbeddingConfigModal from "@/components/EmbeddingConfig/EditEmbeddingConfigDialog"
+import { getEmbeddingIcon } from "@/components/EmbeddingConfig/EmbeddingIcons"
 import {
     EmbeddingConfig,
     getEmbeddingDataFormat,
     getExpectedDimensions,
     getModelName,
     getProviderInfo,
-} from "@/app/embeddings/types/embeddingModels"
-import { vadd, vcard, vdim, vrem, vsim } from "@/app/redis-server/api"
-import { VectorSetMetadata } from "@/app/types/vectorSetMetaData"
-import eventBus, { AppEvents } from "@/app/utils/eventEmitter"
+} from "@/lib/embeddings/types/embeddingModels"
+import { vadd, vcard, vdim, vrem, vsim } from "@/lib/redis-server/api"
+import { VectorSetMetadata } from "@/lib/types/vectors"
+import eventBus, { AppEvents } from "@/lib/client/events/eventEmitter"
 import AdvancedConfigEdit from "@/app/vectorset/components/AdvancedConfigEdit"
 import {
     DEFAULT_EMBEDDING,
     DEFAULT_EMBEDDING_CONFIG,
-} from "@/app/vectorset/constants"
+} from "@/app/vectorset/utils/constants"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"

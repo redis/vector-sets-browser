@@ -1,4 +1,4 @@
-import { userSettings } from "@/app/utils/userSettings"
+import { userSettings } from "@/lib/storage/userSettings"
 import { Button } from "@/components/ui/button"
 import {
     Dialog,

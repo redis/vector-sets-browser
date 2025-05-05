@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { RedisConnection, getRedisUrl } from "@/app/redis-server/RedisConnection";
+import { RedisConnection, getRedisUrl } from "@/lib/redis-server/RedisConnection";
 
 // GET /api/importlog - Get import logs
 export async function GET(req: NextRequest) {

@@ -1,4 +1,4 @@
-import SearchTimeIndicator from "@/app/components/SearchTimeIndicator"
+import SearchTimeIndicator from "@/components/SearchTimeIndicator"
 
 interface NoResultsProps {
     keyName: string

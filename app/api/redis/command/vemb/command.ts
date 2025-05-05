@@ -1,5 +1,5 @@
-import { validateKeyName } from "@/app/redis-server/utils"
-import { VembRequestBody } from "@/app/redis-server/api"
+import { validateKeyName } from "@/lib/redis-server/utils"
+import { VembRequestBody } from "@/lib/redis-server/api"
 
 export function validateVembRequest(body: any): {
     isValid: boolean

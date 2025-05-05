@@ -1,6 +1,6 @@
 import { ApiError } from "@/app/api/client"
 import { ImportJobConfig, jobs } from "@/app/api/jobs"
-import { VectorSetMetadata } from "@/app/types/vectorSetMetaData"
+import { VectorSetMetadata } from "@/lib/types/vectors"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import {

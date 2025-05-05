@@ -1,7 +1,7 @@
-import { RedisConnection, getRedisUrl } from "@/app/redis-server/RedisConnection"
+import { RedisConnection, getRedisUrl } from "@/lib/redis-server/RedisConnection"
 import { NextResponse } from "next/server"
-import { EmbeddingConfig } from "@/app/embeddings/types/embeddingModels"
-import { DEFAULT_EMBEDDING_CONFIG } from "@/app/vectorset/constants"
+import { EmbeddingConfig } from "@/lib/embeddings/types/embeddingModels"
+import { DEFAULT_EMBEDDING_CONFIG } from "@/app/vectorset/utils/constants"
 
 // Redis key for storing cache configuration
 const CONFIG_KEY = "vector-set-browser:config"

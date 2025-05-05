@@ -1,5 +1,5 @@
-import { CSVJobMetadata } from "@/app/types/job-queue"
-import { VectorSetMetadata } from "@/app/types/vectorSetMetaData"
+import { CSVJobMetadata } from "@/lib/types/jobs"
+import { VectorSetMetadata } from "@/lib/types/vectors"
 
 import { apiClient } from "./client"
 

@@ -1,4 +1,4 @@
-import SearchTimeIndicator from "@/app/components/SearchTimeIndicator"
+import SearchTimeIndicator from "@/components/SearchTimeIndicator"
 import { Button } from "@/components/ui/button"
 import {
     DropdownMenu,
@@ -10,7 +10,7 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { CheckSquare, Settings } from "lucide-react"
-import { ColumnConfig } from "@/app/hooks/useVectorResultsSettings"
+import { ColumnConfig } from "@/app/vectorset/hooks/useVectorResultsSettings"
 
 interface ResultsHeaderProps {
     results: any[]

@@ -1,5 +1,5 @@
 import { ApiError } from "@/app/api/client"
-import { EmbeddingConfig } from "@/app/embeddings/types/embeddingModels"
+import { EmbeddingConfig } from "@/lib/embeddings/types/embeddingModels"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import {
@@ -14,7 +14,7 @@ import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { AlertTriangle, Info, Loader2, PowerOff } from "lucide-react"
 import { useEffect, useState } from "react"
-import { DEFAULT_EMBEDDING_CONFIG } from "../vectorset/constants"
+import { DEFAULT_EMBEDDING_CONFIG } from "../vectorset/utils/constants"
 
 interface CacheInfo {
     size: number

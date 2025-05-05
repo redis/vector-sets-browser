@@ -1,12 +1,12 @@
 "use client"
 
-import SearchBox from "@/app/components/SearchBox"
+import SearchBox from "@/components/SearchBox"
 import {
     useVectorSearch
-} from "@/app/hooks/useVectorSearch"
-import { VectorTuple, vlinks } from "@/app/redis-server/api"
-import { VectorSetMetadata, VectorSetSearchOptions } from "@/app/types/vectorSetMetaData"
-import { userSettings } from "@/app/utils/userSettings"
+} from "@/app/vectorset/hooks/useVectorSearch"
+import { VectorTuple, vlinks } from "@/lib/redis-server/api"
+import { VectorSetMetadata, VectorSetSearchOptions } from "@/lib/types/vectors"
+import { userSettings } from "@/lib/storage/userSettings"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useCallback, useState } from "react"
 import { toast } from "sonner"

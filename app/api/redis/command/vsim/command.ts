@@ -1,5 +1,5 @@
-import { validateKeyName } from '@/app/redis-server/utils'
-import { VsimRequestBody } from '@/app/redis-server/api'
+import { validateKeyName } from '@/lib/redis-server/utils'
+import { VsimRequestBody } from '@/lib/redis-server/api'
 
 export function validateVsimRequest(body: any): { isValid: boolean; error?: string; value?: VsimRequestBody } {
     if (!validateKeyName(body.keyName)) {

@@ -2,7 +2,7 @@ import { SetMetadataRequestBody } from "@/app/api/vector-sets"
 import {
     RedisConnection,
     getRedisUrl,
-} from "@/app/redis-server/RedisConnection"
+} from "@/lib/redis-server/RedisConnection"
 import { NextRequest, NextResponse } from "next/server"
 
 // type Params = { params: { setname: string } }

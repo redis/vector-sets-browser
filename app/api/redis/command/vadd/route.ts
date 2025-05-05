@@ -1,5 +1,5 @@
-import { RedisConnection, getRedisUrl } from '@/app/redis-server/RedisConnection'
-import { validateRequest, formatResponse, handleError } from '@/app/redis-server/utils'
+import { RedisConnection, getRedisUrl } from '@/lib/redis-server/RedisConnection'
+import { validateRequest, formatResponse, handleError } from '@/lib/redis-server/utils'
 import { validateVaddRequest, buildVaddCommand } from './command'
 import { NextResponse } from 'next/server'
 

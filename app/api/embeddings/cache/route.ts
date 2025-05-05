@@ -1,6 +1,6 @@
-import { RedisConnection, getRedisUrl } from "@/app/redis-server/RedisConnection"
+import { RedisConnection, getRedisUrl } from "@/lib/redis-server/RedisConnection"
 import { NextResponse } from "next/server"
-import { EMBEDDING_CACHE_KEY, EMBEDDING_CACHE_LOG_KEY } from "@/app/embeddings/cache/redis-cache"
+import { EMBEDDING_CACHE_KEY, EMBEDDING_CACHE_LOG_KEY } from "@/lib/embeddings/cache/redis-cache"
 
 export async function GET() {
     try {

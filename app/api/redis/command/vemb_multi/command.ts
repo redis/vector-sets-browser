@@ -1,6 +1,6 @@
-import { validateKeyName, validateElement } from '@/app/redis-server/utils'
-import { VembMultiRequestBody } from '@/app/redis-server/api'
-import { RedisConnection, RedisOperationResult } from "@/app/redis-server/RedisConnection"
+import { validateKeyName, validateElement } from '@/lib/redis-server/utils'
+import { VembMultiRequestBody } from '@/lib/redis-server/api'
+import { RedisConnection, RedisOperationResult } from "@/lib/redis-server/RedisConnection"
 
 export function validateVembMultiRequest(body: any): { isValid: boolean; error?: string; value?: VembMultiRequestBody } {
     if (!validateKeyName(body.keyName)) {

@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/dialog"
 import { SampleDataSelect } from "./SampleDataSelect"
 import { SampleDataImporter } from "./SampleDataImporter"
-import { VectorSetMetadata } from "@/app/types/vectorSetMetaData"
+import { VectorSetMetadata } from "@/lib/types/vectors"
 import { Dataset } from "../types/DatasetProvider"
 
 interface SampleDataDialogProps {

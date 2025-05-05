@@ -1,5 +1,5 @@
 import { ImportJobConfig } from "@/app/api/jobs"
-import { EmbeddingConfig, isTextEmbedding } from "@/app/embeddings/types/embeddingModels"
+import { EmbeddingConfig, isTextEmbedding } from "@/lib/embeddings/types/embeddingModels"
 import { Dataset, DatasetMetadata, DatasetProvider } from "../../types/DatasetProvider"
 
 export interface TextDatasetConfig extends DatasetMetadata {

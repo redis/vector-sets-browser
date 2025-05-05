@@ -1,14 +1,14 @@
 import { ApiError } from "@/app/api/client"
 import { vectorSets } from "@/app/api/vector-sets"
-import EditEmbeddingConfigModal from "@/app/components/EmbeddingConfig/EditEmbeddingConfigDialog"
-import { vinfo_multi } from "@/app/redis-server/api"
-import { VectorSetMetadata } from "@/app/types/vectorSetMetaData"
-import eventBus, { AppEvents } from "@/app/utils/eventEmitter"
-import { sanitizeRedisUrl } from "@/app/utils/redisUrl"
+import EditEmbeddingConfigModal from "@/components/EmbeddingConfig/EditEmbeddingConfigDialog"
+import { vinfo_multi } from "@/lib/redis-server/api"
+import { VectorSetMetadata } from "@/lib/types/vectors"
+import eventBus, { AppEvents } from "@/lib/client/events/eventEmitter"
+import { sanitizeRedisUrl } from "@/lib/server/redis/url"
 import {
     estimateVectorSetMemoryUsage,
     formatBytes,
-} from "@/app/utils/vectorSetMemory"
+} from "@/lib/storage/vectorSetMemory"
 import CreateVectorSetModal from "@/app/vectorset/components/CreateVectorSetDialog"
 import DeleteVectorSetDialog from "@/app/vectorset/components/DeleteVectorSetDialog"
 import { Button } from "@/components/ui/button"

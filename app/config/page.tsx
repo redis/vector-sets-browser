@@ -1,6 +1,6 @@
 "use client"
 
-import OpenAIKeyManager from "../components/OpenAIKeyManager"
+import OpenAIKeyManager from "../../components/OpenAIKeyManager"
 import CacheManager from "./CacheManager"
 
 export default function ConfigPage() {

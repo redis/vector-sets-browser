@@ -1,4 +1,4 @@
-import { VectorSetMetadata } from "@/app/types/vectorSetMetaData"
+import { VectorSetMetadata } from "@/lib/types/vectors"
 import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
 import {

@@ -2,9 +2,9 @@ import { NextResponse } from "next/server"
 import {
     RedisConnection,
     getRedisUrl,
-} from "@/app/redis-server/RedisConnection"
+} from "@/lib/redis-server/RedisConnection"
 import { buildVlinksCommand, validateVlinksRequest } from "./command"
-import { validateRequest } from "@/app/redis-server/utils"
+import { validateRequest } from "@/lib/redis-server/utils"
 import { fetchEmbeddingsBatch } from "@/app/api/redis/command/vemb_multi/command"
 
 // Define the types for our links

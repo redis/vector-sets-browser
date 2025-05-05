@@ -1,5 +1,5 @@
-import { validateKeyName, validateElement } from '@/app/redis-server/utils'
-import { VgetAttrMultiRequestBody } from '@/app/redis-server/api'
+import { validateKeyName, validateElement } from '@/lib/redis-server/utils'
+import { VgetAttrMultiRequestBody } from '@/lib/redis-server/api'
 
 export function validateVgetattrMultiRequest(body: any): { isValid: boolean; error?: string; value?: VgetAttrMultiRequestBody } {
     if (!validateKeyName(body.keyName)) {

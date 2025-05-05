@@ -18,7 +18,7 @@ import {
     useVisualizationState,
 } from "./hooks"
 import type { HNSWVizPureProps } from "./types"
-import { vemb } from "@/app/redis-server/api"
+import { vemb } from "@/lib/redis-server/api"
 import { COLORS_REDIS_DARK, COLORS_REDIS_LIGHT, NODE_SIZE } from "./constants"
 
 // Add error message display

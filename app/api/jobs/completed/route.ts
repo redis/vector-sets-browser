@@ -1,4 +1,4 @@
-import { cleanupOldJobs, CompletedJob, recentlyCompletedJobs } from "@/app/lib/completedJobs";
+import { cleanupOldJobs, CompletedJob, recentlyCompletedJobs } from "@/lib/jobs/completedJobs";
 import { NextRequest, NextResponse } from "next/server"
 
 

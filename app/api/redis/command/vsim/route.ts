@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
-import { RedisConnection, getRedisUrl } from '@/app/redis-server/RedisConnection'
+import { RedisConnection, getRedisUrl } from '@/lib/redis-server/RedisConnection'
 import { validateVsimRequest, buildVsimCommand } from './command'
-import { formatResponse } from '@/app/redis-server/utils'
+import { formatResponse } from '@/lib/redis-server/utils'
 import { fetchEmbeddingsBatch } from '@/app/api/redis/command/vemb_multi/command'
 
 type SimPair = [string, number];

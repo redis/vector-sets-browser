@@ -1,4 +1,4 @@
-import { VectorTuple } from "@/app/redis-server/api"
+import { VectorTuple } from "@/lib/redis-server/api"
 import ExpandedResultRow from "./ExpandedResultRow"
 
 interface ExpandedResultsListProps {

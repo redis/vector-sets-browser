@@ -1,5 +1,5 @@
-import { VectorTuple } from "@/app/redis-server/api"
-import { ColumnConfig } from "@/app/hooks/useVectorResultsSettings"
+import { VectorTuple } from "@/lib/redis-server/api"
+import { ColumnConfig } from "@/app/vectorset/hooks/useVectorResultsSettings"
 
 export type SortColumn = "element" | "score" | "none"
 export type SortDirection = "asc" | "desc"

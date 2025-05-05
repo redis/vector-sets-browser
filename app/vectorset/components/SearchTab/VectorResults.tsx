@@ -1,10 +1,10 @@
-import SearchTimeIndicator from "@/app/components/SearchTimeIndicator"
+import SearchTimeIndicator from "@/components/SearchTimeIndicator"
 import {
     ColumnConfig,
     useVectorResultsSettings,
-} from "@/app/hooks/useVectorResultsSettings"
-import { VectorTuple, vgetattr_multi } from "@/app/redis-server/api"
-import { parseFieldFilters } from "@/app/utils/filterParser"
+} from "@/app/vectorset/hooks/useVectorResultsSettings"
+import { VectorTuple, vgetattr_multi } from "@/lib/redis-server/api"
+import { parseFieldFilters } from "@/lib/data/filter"
 import { Button } from "@/components/ui/button"
 import {
     Dialog,

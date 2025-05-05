@@ -1,9 +1,9 @@
-import { VectorSetMetadata } from "@/app/types/vectorSetMetaData"
+import { VectorSetMetadata } from "@/lib/types/vectors"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { AlertCircle } from "lucide-react"
 import { useRef, useState } from "react"
-import { convertToNumericIfPossible } from "@/app/utils/numberUtils"
+import { convertToNumericIfPossible } from "@/lib/data/numbers"
 
 export interface CSVPreviewData {
     totalRecords: number

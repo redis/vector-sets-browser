@@ -1,5 +1,5 @@
-import { validateElement, validateKeyName, validateVector } from '@/app/redis-server/utils'
-import { VaddRequestBody } from '@/app/redis-server/api'
+import { validateElement, validateKeyName, validateVector } from '@/lib/redis-server/utils'
+import { VaddRequestBody } from '@/lib/redis-server/api'
 
 export function validateVaddRequest(body: any): { isValid: boolean; error?: string; value?: VaddRequestBody } {
     if (!validateKeyName(body.keyName)) {

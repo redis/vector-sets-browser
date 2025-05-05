@@ -1,5 +1,5 @@
-import { validateKeyName } from '@/app/redis-server/utils'
-import { VinfoRequestBody } from '@/app/redis-server/api'
+import { validateKeyName } from '@/lib/redis-server/utils'
+import { VinfoRequestBody } from '@/lib/redis-server/api'
 
 export function validateVinfoRequest(body: any): { isValid: boolean; error?: string; value?: VinfoRequestBody } {
     if (!validateKeyName(body.keyName)) {

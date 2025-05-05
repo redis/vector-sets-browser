@@ -1,6 +1,6 @@
 import { Table, TableBody } from "@/components/ui/table"
-import { VectorTuple } from "@/app/redis-server/api"
-import { ColumnConfig } from "@/app/hooks/useVectorResultsSettings"
+import { VectorTuple } from "@/lib/redis-server/api"
+import { ColumnConfig } from "@/app/vectorset/hooks/useVectorResultsSettings"
 import { FilterField, SortColumn, SortDirection } from "../types"
 import ResultsTableHeader from "./ResultsTableHeader"
 import CompactResultRow from "./CompactResultRow"
