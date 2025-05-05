@@ -13,11 +13,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import { Shuffle } from "lucide-react"
 import { useEffect, useMemo, useState } from "react"
-import ImageUploader from "../components/ImageUploader/ImageUploader"
-import RedisCommandBox from "../components/RedisCommandBox"
+import ImageUploader from "@/app/components/ImageUploader/ImageUploader"
+import RedisCommandBox from "@/app/components/RedisCommandBox"
 
 // Import ImageFileInfo type 
-import type { ImageFileInfo } from "../components/ImageUploader/types"
+import type { ImageFileInfo } from "@/app/components/ImageUploader/types"
 
 interface AddVectorModalProps {
     isOpen: boolean

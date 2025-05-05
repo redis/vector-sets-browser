@@ -1,20 +1,20 @@
 import { ApiError } from "@/app/api/client"
 import { vectorSets } from "@/app/api/vector-sets"
-import { vinfo_multi, vcard } from "@/app/redis-server/api"
+import EditEmbeddingConfigModal from "@/app/components/EmbeddingConfig/EditEmbeddingConfigDialog"
+import { vinfo_multi } from "@/app/redis-server/api"
 import { VectorSetMetadata } from "@/app/types/vectorSetMetaData"
 import eventBus, { AppEvents } from "@/app/utils/eventEmitter"
+import { sanitizeRedisUrl } from "@/app/utils/redisUrl"
 import {
     estimateVectorSetMemoryUsage,
     formatBytes,
 } from "@/app/utils/vectorSetMemory"
-import { sanitizeRedisUrl } from "@/app/utils/redisUrl"
+import CreateVectorSetModal from "@/app/vectorset/components/CreateVectorSetDialog"
+import DeleteVectorSetDialog from "@/app/vectorset/components/DeleteVectorSetDialog"
 import { Button } from "@/components/ui/button"
 import { Sidebar, SidebarContent, SidebarHeader } from "@/components/ui/sidebar"
 import { debounce } from "lodash"
 import { useCallback, useEffect, useRef, useState } from "react"
-import EditEmbeddingConfigModal from "../components/EmbeddingConfig/EditEmbeddingConfigDialog"
-import CreateVectorSetModal from "./CreateVectorSetDialog"
-import DeleteVectorSetDialog from "./DeleteVectorSetDialog"
 import { toast } from "sonner"
 
 interface VectorSetNavProps {

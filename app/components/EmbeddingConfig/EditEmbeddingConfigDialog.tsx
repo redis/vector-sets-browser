@@ -1,13 +1,15 @@
 import {
     EmbeddingConfig,
-    EmbeddingProvider,
-    getProviderInfo,
-    getDefaultModelForProvider,
-    getModelData,
     EmbeddingDataFormat,
-    getProvidersByDataFormat,
-    getEmbeddingDataFormat
+    EmbeddingProvider,
+    getDefaultModelForProvider,
+    getEmbeddingDataFormat,
+    getModelData,
+    getProviderInfo,
+    getProvidersByDataFormat
 } from "@/app/embeddings/types/embeddingModels"
+import { defaultOllamaUrl } from "@/app/utils/embeddingUtils"
+import { userSettings } from "@/app/utils/userSettings"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import {
@@ -19,21 +21,14 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { userSettings } from "@/app/utils/userSettings"
 import { useEffect, useState } from "react"
-import { defaultOllamaUrl } from "@/app/utils/embeddingUtils"
-import ProviderSelector from "./ProviderSelector"
-import ModelSelector from "./ModelSelector"
-import { 
-    RadioGroup, 
-    RadioGroupItem 
-} from "@/components/ui/radio-group"
-import { 
-    ImageEmbeddingIcon, 
-    MultiModalEmbeddingIcon, 
-    TextEmbeddingIcon 
+import {
+    ImageEmbeddingIcon,
+    MultiModalEmbeddingIcon,
+    TextEmbeddingIcon
 } from "./EmbeddingIcons"
-import { Card } from "@/components/ui/card"
+import ModelSelector from "./ModelSelector"
+import ProviderSelector from "./ProviderSelector"
 
 const DEFAULT_CONFIG: EmbeddingConfig = {
     provider: "openai",

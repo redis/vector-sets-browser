@@ -1,33 +1,30 @@
+import { ApiError } from "@/app/api/client"
 import {
     EmbeddingConfig,
-    getExpectedDimensions,
     getEmbeddingDataFormat,
+    getExpectedDimensions,
     getModelName,
     getProviderInfo
 } from "@/app/embeddings/types/embeddingModels"
 import {
-    VectorSetMetadata,
     createVectorSetMetadata,
+    VectorSetMetadata,
 } from "@/app/types/vectorSetMetaData"
-import { ApiError } from "@/app/api/client"
 
+import EditEmbeddingConfigModal from "@/app/components/EmbeddingConfig/EditEmbeddingConfigDialog"
+import {
+    getEmbeddingIcon
+} from "@/app/components/EmbeddingConfig/EmbeddingIcons"
+import RedisCommandBox from "@/app/components/RedisCommandBox"
 import { vadd } from "@/app/redis-server/api"
 import { getDefaultTextEmbeddingConfig } from "@/app/utils/embeddingUtils"
 import { userSettings } from "@/app/utils/userSettings"
+import AdvancedConfigEdit from "@/app/vectorset/components/AdvancedConfigEdit"
+import { DEFAULT_EMBEDDING } from "@/app/vectorset/constants"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ArrowLeft, ChevronRight, MessageSquareText } from "lucide-react"
 import { useEffect, useRef, useState } from "react"
-import EditEmbeddingConfigModal from "../components/EmbeddingConfig/EditEmbeddingConfigDialog"
-import RedisCommandBox from "../components/RedisCommandBox"
-import AdvancedConfigEdit from "./AdvancedConfigEdit"
-import { DEFAULT_EMBEDDING } from "./constants"
-import { 
-    getEmbeddingIcon, 
-    ImageEmbeddingIcon, 
-    MultiModalEmbeddingIcon, 
-    TextEmbeddingIcon 
-} from "@/app/components/EmbeddingConfig/EmbeddingIcons"
 
 interface CreateVectorSetModalProps {
     isOpen: boolean

@@ -1,15 +1,22 @@
 import { vectorSets } from "@/app/api/vector-sets"
 import EditEmbeddingConfigModal from "@/app/components/EmbeddingConfig/EditEmbeddingConfigDialog"
+import { getEmbeddingIcon } from "@/app/components/EmbeddingConfig/EmbeddingIcons"
 import {
     EmbeddingConfig,
     getEmbeddingDataFormat,
     getExpectedDimensions,
     getModelName,
-    getProviderInfo
+    getProviderInfo,
 } from "@/app/embeddings/types/embeddingModels"
 import { vadd, vcard, vdim, vrem, vsim } from "@/app/redis-server/api"
 import { VectorSetMetadata } from "@/app/types/vectorSetMetaData"
 import eventBus, { AppEvents } from "@/app/utils/eventEmitter"
+import AdvancedConfigEdit from "@/app/vectorset/components/AdvancedConfigEdit"
+import {
+    DEFAULT_EMBEDDING,
+    DEFAULT_EMBEDDING_CONFIG,
+} from "@/app/vectorset/constants"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
@@ -20,19 +27,10 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@/components/ui/dialog"
-import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
-import { useState, useEffect } from "react"
-import AdvancedConfigEdit from "../AdvancedConfigEdit"
-import { DEFAULT_EMBEDDING, DEFAULT_EMBEDDING_CONFIG } from "../constants"
-import { 
-    getEmbeddingIcon, 
-    ImageEmbeddingIcon, 
-    MultiModalEmbeddingIcon, 
-    TextEmbeddingIcon 
-} from "@/app/components/EmbeddingConfig/EmbeddingIcons"
-import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert"
+import { Switch } from "@/components/ui/switch"
 import { AlertTriangle } from "lucide-react"
+import { useEffect, useState } from "react"
 
 interface VectorSettingsProps {
     vectorSetName: string
@@ -54,33 +52,45 @@ export default function VectorSettings({
     const [isSuccessDialogOpen, setIsSuccessDialogOpen] = useState(false)
     const [pendingEmbeddingConfig, setPendingEmbeddingConfig] =
         useState<EmbeddingConfig | null>(null)
-    const [successInfo, setSuccessInfo] = useState<{oldModel: string, newModel: string, dimensions: number} | null>(null)
+    const [successInfo, setSuccessInfo] = useState<{
+        oldModel: string
+        newModel: string
+        dimensions: number
+    } | null>(null)
     const [actualVectorDim, setActualVectorDim] = useState<number | null>(null)
     const [dimensionMismatch, setDimensionMismatch] = useState(false)
 
     // Fetch actual vector dimensions from Redis
     useEffect(() => {
         const fetchVectorDimensions = async () => {
-            if (!vectorSetName) return;
-            
+            if (!vectorSetName) return
+
             try {
-                const dimResponse = await vdim({ keyName: vectorSetName });
+                const dimResponse = await vdim({ keyName: vectorSetName })
                 if (dimResponse.success && dimResponse.result !== undefined) {
-                    setActualVectorDim(dimResponse.result);
-                    
+                    setActualVectorDim(dimResponse.result)
+
                     // Check for dimension mismatch
                     if (metadata?.embedding) {
-                        const expectedDimensions = getExpectedDimensions(metadata.embedding);
-                        setDimensionMismatch(expectedDimensions > 0 && dimResponse.result !== expectedDimensions);
+                        const expectedDimensions = getExpectedDimensions(
+                            metadata.embedding
+                        )
+                        setDimensionMismatch(
+                            expectedDimensions > 0 &&
+                                dimResponse.result !== expectedDimensions
+                        )
                     }
                 }
             } catch (error) {
-                console.error("[VectorSettings] Error fetching vector dimensions:", error);
+                console.error(
+                    "[VectorSettings] Error fetching vector dimensions:",
+                    error
+                )
             }
-        };
-        
-        fetchVectorDimensions();
-    }, [vectorSetName, metadata]);
+        }
+
+        fetchVectorDimensions()
+    }, [vectorSetName, metadata])
 
     const handleEditConfig = async (newConfig: EmbeddingConfig) => {
         try {
@@ -148,7 +158,7 @@ export default function VectorSettings({
                             setSuccessInfo({
                                 oldModel: getModelName(metadata.embedding),
                                 newModel: getModelName(newConfig),
-                                dimensions
+                                dimensions,
                             })
 
                             // Proceed with the update
@@ -205,11 +215,13 @@ export default function VectorSettings({
         setIsWarningDialogOpen(false)
         setIsSuccessDialogOpen(false)
         setPendingEmbeddingConfig(null)
-        
+
         // Check for dimension mismatch after updating config
         if (actualVectorDim !== null) {
-            const expectedDimensions = getExpectedDimensions(newConfig);
-            setDimensionMismatch(expectedDimensions > 0 && actualVectorDim !== expectedDimensions);
+            const expectedDimensions = getExpectedDimensions(newConfig)
+            setDimensionMismatch(
+                expectedDimensions > 0 && actualVectorDim !== expectedDimensions
+            )
         }
     }
 
@@ -276,7 +288,11 @@ export default function VectorSettings({
                         <div className="grow">
                             <div className="grid grid-cols-2 gap-2 text-sm">
                                 <div className="text-gray-600">
-                                    Vector Quantization <span className="text-xs text-gray-400">(NOQUANT, Q8, BIN options)</span>:
+                                    Vector Quantization{" "}
+                                    <span className="text-xs text-gray-400">
+                                        (NOQUANT, Q8, BIN options)
+                                    </span>
+                                    :
                                 </div>
                                 <div>
                                     {metadata?.redisConfig?.quantization || (
@@ -290,7 +306,11 @@ export default function VectorSettings({
                                 </div>
 
                                 <div className="text-gray-600">
-                                    Reduced Dimensions <span className="text-xs text-gray-400">(REDUCE option)</span>:
+                                    Reduced Dimensions{" "}
+                                    <span className="text-xs text-gray-400">
+                                        (REDUCE option)
+                                    </span>
+                                    :
                                 </div>
                                 <div>
                                     {metadata?.redisConfig
@@ -305,7 +325,11 @@ export default function VectorSettings({
                                 </div>
 
                                 <div className="text-gray-600">
-                                    Default Check-and-Set <span className="text-xs text-gray-400">(CAS option)</span>:
+                                    Default Check-and-Set{" "}
+                                    <span className="text-xs text-gray-400">
+                                        (CAS option)
+                                    </span>
+                                    :
                                 </div>
                                 <div>
                                     {metadata?.redisConfig?.defaultCAS !==
@@ -326,7 +350,11 @@ export default function VectorSettings({
                                 </div>
 
                                 <div className="text-gray-600">
-                                    Build Exploration Factor <span className="text-xs text-gray-400">(EF option)</span>:
+                                    Build Exploration Factor{" "}
+                                    <span className="text-xs text-gray-400">
+                                        (EF option)
+                                    </span>
+                                    :
                                 </div>
                                 <div>
                                     {metadata?.redisConfig
@@ -338,14 +366,17 @@ export default function VectorSettings({
                                             </span>
                                         </span>
                                     )}
-                                </div>  
+                                </div>
 
                                 <div className="text-gray-600">
-                                    Maximum Connections <span className="text-xs text-gray-400">(M option)</span>:
+                                    Maximum Connections{" "}
+                                    <span className="text-xs text-gray-400">
+                                        (M option)
+                                    </span>
+                                    :
                                 </div>
                                 <div>
-                                    {metadata?.redisConfig
-                                        ?.maxConnections || (
+                                    {metadata?.redisConfig?.maxConnections || (
                                         <span>
                                             Default:{" "}
                                             <span className="font-bold">
@@ -458,17 +489,23 @@ export default function VectorSettings({
                     </p>
 
                     {/* Dimension mismatch warning */}
-                    {dimensionMismatch && metadata?.embedding && metadata.embedding.provider !== "none" && (
-                        <Alert variant="destructive" className="mt-4 mb-2">
-                            <AlertTriangle className="h-4 w-4" />
-                            <AlertTitle>Dimension Mismatch</AlertTitle>
-                            <AlertDescription>
-                                The selected embedding model produces vectors with {getExpectedDimensions(metadata.embedding)} dimensions, 
-                                but the VectorSet contains vectors with {actualVectorDim} dimensions. 
-                                This will cause compatibility issues when adding new items.
-                            </AlertDescription>
-                        </Alert>
-                    )}
+                    {dimensionMismatch &&
+                        metadata?.embedding &&
+                        metadata.embedding.provider !== "none" && (
+                            <Alert variant="destructive" className="mt-4 mb-2">
+                                <AlertTriangle className="h-4 w-4" />
+                                <AlertTitle>Dimension Mismatch</AlertTitle>
+                                <AlertDescription>
+                                    The selected embedding model produces
+                                    vectors with{" "}
+                                    {getExpectedDimensions(metadata.embedding)}{" "}
+                                    dimensions, but the VectorSet contains
+                                    vectors with {actualVectorDim} dimensions.
+                                    This will cause compatibility issues when
+                                    adding new items.
+                                </AlertDescription>
+                            </Alert>
+                        )}
 
                     {/* Toggle for using embedding model or not */}
                     <div className="flex items-center justify-between bg-slate-50 p-4 rounded-lg mt-4 mb-2">
@@ -481,21 +518,35 @@ export default function VectorSettings({
                             </span>
                         </div>
                         <div className="flex items-center space-x-2">
-                            <Label htmlFor="embedding-toggle" className="text-sm text-gray-600">
-                                {metadata?.embedding && metadata.embedding.provider === "none" ? "Disabled" : "Enabled"}
+                            <Label
+                                htmlFor="embedding-toggle"
+                                className="text-sm text-gray-600"
+                            >
+                                {metadata?.embedding &&
+                                metadata.embedding.provider === "none"
+                                    ? "Disabled"
+                                    : "Enabled"}
                             </Label>
                             <Switch
                                 id="embedding-toggle"
-                                checked={metadata?.embedding && metadata.embedding.provider !== "none"}
+                                checked={
+                                    metadata?.embedding &&
+                                    metadata.embedding.provider !== "none"
+                                }
                                 onCheckedChange={(checked) => {
                                     if (checked) {
                                         // Toggle to use an embedding model
                                         setIsEditConfigModalOpen(true)
-                                    } else if (metadata?.embedding && metadata.embedding.provider !== "none") {
+                                    } else if (
+                                        metadata?.embedding &&
+                                        metadata.embedding.provider !== "none"
+                                    ) {
                                         // Set to none provider
-                                        const dimensions = metadata.embedding 
-                                            ? getExpectedDimensions(metadata.embedding) || DEFAULT_EMBEDDING.DIMENSIONS
-                                            : DEFAULT_EMBEDDING.DIMENSIONS;
+                                        const dimensions = metadata.embedding
+                                            ? getExpectedDimensions(
+                                                  metadata.embedding
+                                              ) || DEFAULT_EMBEDDING.DIMENSIONS
+                                            : DEFAULT_EMBEDDING.DIMENSIONS
 
                                         handleEditConfig({
                                             provider: "none",
@@ -545,9 +596,11 @@ export default function VectorSettings({
                                         Provider:
                                     </div>
                                     <div className="font-bold">
-                                        {metadata?.embedding?.provider ? 
-                                            getProviderInfo(metadata.embedding.provider).displayName :
-                                            "None"}
+                                        {metadata?.embedding?.provider
+                                            ? getProviderInfo(
+                                                  metadata.embedding.provider
+                                              ).displayName
+                                            : "None"}
                                     </div>
                                 </div>
                                 <div className="flex items-center space-x-2">
@@ -561,10 +614,19 @@ export default function VectorSettings({
                                         <div className="text-gray-600">
                                             Vector Dimensions:
                                         </div>
-                                        <div className={`font-bold ${dimensionMismatch ? "text-red-600" : ""}`}>
-                                            {getExpectedDimensions(metadata.embedding)} 
-                                            {dimensionMismatch && actualVectorDim !== null && 
-                                             ` (VectorSet has ${actualVectorDim})`}
+                                        <div
+                                            className={`font-bold ${
+                                                dimensionMismatch
+                                                    ? "text-red-600"
+                                                    : ""
+                                            }`}
+                                        >
+                                            {getExpectedDimensions(
+                                                metadata.embedding
+                                            )}
+                                            {dimensionMismatch &&
+                                                actualVectorDim !== null &&
+                                                ` (VectorSet has ${actualVectorDim})`}
                                         </div>
                                     </div>
                                 )}
@@ -578,8 +640,8 @@ export default function VectorSettings({
                         </div>
                     ) : (
                         <div className="p-4 border rounded-md text-gray-600">
-                            {metadata?.embedding && 
-                             metadata.embedding.provider === "none" ? (
+                            {metadata?.embedding &&
+                            metadata.embedding.provider === "none" ? (
                                 <div className="flex flex-col">
                                     <p className="mb-2">
                                         <span className="font-medium">
@@ -591,11 +653,11 @@ export default function VectorSettings({
                                         <span className="font-medium">
                                             Vector dimensions:
                                         </span>{" "}
-                                        {metadata.embedding.none
-                                            ?.dimensions ||
+                                        {metadata.embedding.none?.dimensions ||
                                             DEFAULT_EMBEDDING.DIMENSIONS}
-                                        {dimensionMismatch && actualVectorDim !== null && 
-                                         ` (VectorSet has ${actualVectorDim} - mismatch)`}
+                                        {dimensionMismatch &&
+                                            actualVectorDim !== null &&
+                                            ` (VectorSet has ${actualVectorDim} - mismatch)`}
                                     </p>
                                 </div>
                             ) : (
@@ -656,15 +718,15 @@ export default function VectorSettings({
                     config={
                         metadata?.embedding &&
                         metadata.embedding.provider !== "none"
-                            ? metadata.embedding 
+                            ? metadata.embedding
                             : {
-                                // Default to a reasonable embedding config like OpenAI
-                                provider: "openai",
-                                openai: {
-                                    model: "text-embedding-3-small",
-                                    batchSize: 100,
-                                },
-                            }
+                                  // Default to a reasonable embedding config like OpenAI
+                                  provider: "openai",
+                                  openai: {
+                                      model: "text-embedding-3-small",
+                                      batchSize: 100,
+                                  },
+                              }
                     }
                     onSave={handleEditConfig}
                 />
