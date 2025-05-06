@@ -49,6 +49,7 @@ import NoResults from "./components/NoResults"
 import ResultsHeader from "./components/ResultsHeader"
 import AttributeColumnsDialog from "./components/AttributeColumnsDialog"
 import CompactResultsTable from "./components/CompactResultsTable"
+import DropzoneResultsTable from "./components/DropzoneResultsTable"
 import ExpandedResultsList from "./components/ExpandedResultsList"
 
 export default function VectorResults({
@@ -67,6 +68,8 @@ export default function VectorResults({
     isLoading,
     searchType,
     changeTab,
+    handleAddVectorWithImage,
+    metadata
 }: VectorResultsProps) {
     const [isCompact, setIsCompact] = useState(true)
     const {
@@ -481,6 +484,9 @@ export default function VectorResults({
             <EmptyVectorSet
                 onAddVector={onAddVector || (() => {})}
                 onChangeTab={changeTab || (() => {})}
+                handleAddVector={handleAddVectorWithImage}
+                vectorSetName={keyName}
+                metadata={metadata}
             />
         )
     }
@@ -546,7 +552,7 @@ export default function VectorResults({
             />
 
             {isCompact ? (
-                <CompactResultsTable 
+                <DropzoneResultsTable 
                     filteredAndSortedResults={filteredAndSortedResults}
                     availableColumns={availableColumns}
                     filterFields={filterFields}
@@ -563,6 +569,9 @@ export default function VectorResults({
                     onShowVectorClick={onShowVectorClick}
                     setEditingAttributes={setEditingAttributes}
                     onDeleteClick={onDeleteClick}
+                    vectorSetName={keyName}
+                    handleAddVector={handleAddVectorWithImage}
+                    metadata={metadata}
                 />
             ) : (
                 <ExpandedResultsList 

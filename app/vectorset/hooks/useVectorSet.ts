@@ -322,21 +322,24 @@ const useVectorSet = (): UseVectorSetReturn => {
             // special case for default vector.  IF the vector set contains only one vector
             // and the record we are deleting is NOT the default vector, then we should add a default vector
             // before deleting the record. This way the placeholder is maintained and the vector set stays valid 
+            let placeholderAdded = false;
             if (element !== "Placeholder (Vector)") {
                 const vectorCountResponse = await vcard({ keyName: vectorSetName })
                 
                 if (vectorCountResponse.success && vectorCountResponse.result === 1) {
                     const dimResponse = await vdim({ keyName: vectorSetName })
                     if (dimResponse.success && dimResponse.result) {
+                        const placeholderVector = Array(dimResponse.result).fill(0);
                         await vadd({
                             keyName: vectorSetName,
                             element: "Placeholder (Vector)",
-                            vector: Array(dimResponse.result).fill(0),
+                            vector: placeholderVector,
                             attributes: "",
                             useCAS: metadata?.redisConfig?.defaultCAS,
                             reduceDimensions: metadata?.redisConfig?.reduceDimensions,
                             ef: metadata?.redisConfig?.buildExplorationFactor,
-                        })
+                        });
+                        placeholderAdded = true;
                     }
                 }
             }
@@ -371,10 +374,18 @@ const useVectorSet = (): UseVectorSetReturn => {
 
             setStatusMessage("Vector deleted successfully")
 
-            // Remove the vector from the results list
-            setResults((prevResults) =>
-                prevResults.filter(([id]) => id !== element)
-            )
+            // Update the results properly
+            if (placeholderAdded) {
+                // If we added a placeholder, update results to show only the placeholder
+                // This will trigger the EmptyVectorSet component to be displayed
+                const placeholderVector = Array(dim).fill(0);
+                setResults([["Placeholder (Vector)", 1.0, placeholderVector, ""] as VectorTuple]);
+            } else {
+                // Otherwise, just remove the deleted vector from results
+                setResults((prevResults) =>
+                    prevResults.filter(([id]) => id !== element)
+                );
+            }
         } catch (error) {
             console.error("Error deleting vector:", error)
             setStatusMessage(
@@ -392,8 +403,41 @@ const useVectorSet = (): UseVectorSetReturn => {
         }
         try {
             setStatusMessage(`Deleting elements "${elements}"...`)
+            
+            // Check if deleting these elements would leave the vector set empty
+            const vectorCountResponse = await vcard({ keyName: vectorSetName })
+            let placeholderAdded = false;
+            
+            // If we're going to delete all vectors (or all but the placeholder)
+            if (vectorCountResponse.success) {
+                const currentCount = vectorCountResponse.result;
+                const deletingCount = elements.length;
+                const hasPlaceholder = elements.includes("Placeholder (Vector)");
+                
+                // If we're going to delete all vectors or all but the placeholder
+                if (currentCount !== undefined && 
+                    ((currentCount <= deletingCount) || 
+                    (!hasPlaceholder && currentCount - deletingCount <= 0))) {
+                    
+                    // Add a placeholder vector to keep the vector set valid
+                    const dimResponse = await vdim({ keyName: vectorSetName })
+                    if (dimResponse.success && dimResponse.result) {
+                        const placeholderVector = Array(dimResponse.result).fill(0);
+                        await vadd({
+                            keyName: vectorSetName,
+                            element: "Placeholder (Vector)",
+                            vector: placeholderVector,
+                            attributes: "",
+                            useCAS: metadata?.redisConfig?.defaultCAS,
+                            reduceDimensions: metadata?.redisConfig?.reduceDimensions,
+                            ef: metadata?.redisConfig?.buildExplorationFactor,
+                        });
+                        placeholderAdded = true;
+                    }
+                }
+            }
+            
             // Delete the vectors
-
             await vrem({
                 keyName: vectorSetName,
                 elements,
@@ -424,10 +468,18 @@ const useVectorSet = (): UseVectorSetReturn => {
 
             setStatusMessage("Vectors deleted successfully")
 
-            // Remove the vectors from the results list
-            setResults((prevResults) =>
-                prevResults.filter(([id]) => !elements.includes(id))
-            )
+            // Update the results properly
+            if (placeholderAdded) {
+                // If we added a placeholder, update results to show only the placeholder
+                // This will trigger the EmptyVectorSet component to be displayed
+                const placeholderVector = Array(dim).fill(0);
+                setResults([["Placeholder (Vector)", 1.0, placeholderVector, ""] as VectorTuple]);
+            } else {
+                // Otherwise, just remove the deleted vectors from results
+                setResults((prevResults) =>
+                    prevResults.filter(([id]) => !elements.includes(id))
+                );
+            }
         } catch (error) {
             console.error("Error deleting vectors:", error)
             setStatusMessage(

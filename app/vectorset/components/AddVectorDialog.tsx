@@ -709,6 +709,7 @@ export default function AddVectorModal({
                                             onImagesChange={handleImagesChange}
                                             config={metadata?.embedding || { provider: "image", image: { model: "mobilenet" } }}
                                             allowMultiple={true}
+                                            context="add"
                                         />
                                         {/* {imageEmbedding && uploadImages.length <= 1 && (
                                             <div className="mt-2 text-sm text-green-600">

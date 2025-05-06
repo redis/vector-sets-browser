@@ -68,6 +68,7 @@ export default function SearchInput({
                     config={metadata?.embedding}
                     className="w-full"
                     allowMultiple={false}
+                    context="search"
                 />
             ) : (
                 // Show regular search input for other types

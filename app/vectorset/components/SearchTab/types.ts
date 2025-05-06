@@ -1,5 +1,6 @@
 import { VectorTuple } from "@/lib/redis-server/api"
 import { ColumnConfig } from "@/app/vectorset/hooks/useVectorResultsSettings"
+import { VectorSetMetadata } from "@/lib/types/vectors"
 
 export type SortColumn = "element" | "score" | "none"
 export type SortDirection = "asc" | "desc"
@@ -32,6 +33,8 @@ export interface VectorResultsProps {
     isLoading?: boolean
     searchType?: "Vector" | "Element" | "Image"
     changeTab?: (tab: string, options?: { openSampleData?: boolean }) => void
+    handleAddVectorWithImage?: (element: string, embedding: number[]) => Promise<void>
+    metadata?: VectorSetMetadata | null
 }
 
 export interface AttributeColumnsDialogProps {

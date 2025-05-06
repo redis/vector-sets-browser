@@ -13,6 +13,7 @@ import { toast } from "sonner"
 import VectorResults from "./VectorResults"
 // import VectorViz3D from "../VisualizationTab/VectorViz3D"
 import HNSW2dViz from "../VisualizationTab/vizualizer/HNSW2dViz"
+import { DeleteVectorDialog } from "./DeleteVectorDialog"
 
 interface VectorSearchTabProps {
     vectorSetName: string
@@ -22,6 +23,7 @@ interface VectorSearchTabProps {
     onShowVector: (element: string) => Promise<number[] | null>
     onDeleteVector: (element: string) => Promise<void>
     onDeleteVector_multi: (elements: string[]) => Promise<void>
+    handleAddVector?: (element: string, embedding: number[], useCAS?: boolean) => Promise<void>
     isLoading: boolean
     results: VectorTuple[]
     setResults: (results: VectorTuple[]) => void
@@ -36,6 +38,7 @@ export default function VectorSearchTab({
     onShowVector,
     onDeleteVector,
     onDeleteVector_multi,
+    handleAddVector,
     isLoading,
     results,
     setResults,
@@ -43,6 +46,10 @@ export default function VectorSearchTab({
 }: VectorSearchTabProps) {
     // Initialize search options from userSettings
     const [activeResultsTab, setActiveResultsTab] = useState("table")
+    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+    const [vectorToDelete, setVectorToDelete] = useState<string | null>(null)
+    const [vectorsToDelete, setVectorsToDelete] = useState<string[]>([])
+    const [isBulkDelete, setIsBulkDelete] = useState(false)
 
     // Initialize with basic search state - advanced options will be loaded from userSettings by useVectorSearch
     const [searchState, setSearchState] = useState<VectorSetSearchOptions>({
@@ -131,15 +138,23 @@ export default function VectorSearchTab({
         setSearchQuery(element)
     }
     const handleBulkDeleteClick = (elements: string[]) => {
-        if (confirm("Are you sure you want to delete these vectors?")) {
-            console.log("Deleting vectors:", elements)
-            onDeleteVector_multi(elements)
-        }
+        setVectorsToDelete(elements)
+        setIsBulkDelete(true)
+        setDeleteDialogOpen(true)
     }
     const handleDeleteClick = (e: React.MouseEvent, element: string) => {
         e.stopPropagation()
-        if (confirm("Are you sure you want to delete this vector?")) {
-            onDeleteVector(element)
+        setVectorToDelete(element)
+        setIsBulkDelete(false)
+        setDeleteDialogOpen(true)
+    }
+
+    const handleConfirmDelete = () => {
+        if (isBulkDelete) {
+            console.log("Deleting vectors:", vectorsToDelete)
+            onDeleteVector_multi(vectorsToDelete)
+        } else if (vectorToDelete) {
+            onDeleteVector(vectorToDelete)
         }
     }
 
@@ -192,6 +207,14 @@ export default function VectorSearchTab({
 
     return (
         <section>
+            <DeleteVectorDialog 
+                isOpen={deleteDialogOpen}
+                onOpenChange={setDeleteDialogOpen}
+                onConfirm={handleConfirmDelete}
+                vectorName={vectorToDelete || ""}
+                isMultiDelete={isBulkDelete}
+                vectorCount={vectorsToDelete.length}
+            />
             <SearchBox
                 vectorSetName={vectorSetName}
                 searchType={searchType}
@@ -248,6 +271,8 @@ export default function VectorSearchTab({
                             isLoading={isLoading}
                             onBulkDeleteClick={handleBulkDeleteClick}
                             changeTab={changeTab}
+                            handleAddVectorWithImage={handleAddVector}
+                            metadata={metadata}
                         />
                     </TabsContent>
 

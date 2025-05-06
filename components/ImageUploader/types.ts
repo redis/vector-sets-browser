@@ -18,4 +18,5 @@ export interface ImageUploaderProps {
     config?: EmbeddingConfig
     className?: string
     allowMultiple?: boolean
+    context?: 'search' | 'add' | 'default'
 } 

@@ -5,7 +5,7 @@ import { FilterField, SortColumn, SortDirection } from "../types"
 import ResultsTableHeader from "./ResultsTableHeader"
 import CompactResultRow from "./CompactResultRow"
 
-interface CompactResultsTableProps {
+export interface CompactResultsTableProps {
     filteredAndSortedResults: VectorTuple[]
     availableColumns: ColumnConfig[]
     filterFields: FilterField[]

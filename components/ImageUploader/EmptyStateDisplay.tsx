@@ -2,23 +2,39 @@ interface EmptyStateDisplayProps {
     isLoading: boolean
     isProcessingEmbedding: boolean
     allowMultiple: boolean
+    context?: 'search' | 'add' | 'default'
 }
 
 export default function EmptyStateDisplay({
     isLoading,
     isProcessingEmbedding,
-    allowMultiple
+    allowMultiple,
+    context = 'default'
 }: EmptyStateDisplayProps) {
     if (isLoading || isProcessingEmbedding) {
         return null
     }
     
+    const getMessage = () => {
+        if (context === 'search') {
+            return allowMultiple
+                ? "Search for images: Drag one or more images here, or click to select"
+                : "Search for an image: Drag an image here, or click to select"
+        } else if (context === 'add') {
+            return allowMultiple
+                ? "Add images: Drag one or more images here, or click to select"
+                : "Add an image: Drag an image here, or click to select"
+        } else {
+            return allowMultiple
+                ? "Drag and drop one or more images here, or click to select"
+                : "Drag and drop an image here, or click to select"
+        }
+    }
+    
     return (
         <>
             <div className="text-gray-500 mb-2 text-sm">
-                {allowMultiple
-                    ? "Drag and drop one or more images here, or click to select"
-                    : "Drag and drop an image here, or click to select"}
+                {getMessage()}
             </div>
             <svg
                 xmlns="http://www.w3.org/2000/svg"

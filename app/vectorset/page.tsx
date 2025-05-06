@@ -217,6 +217,7 @@ function VectorSetPageContent() {
                 onShowVector={handleShowVector}
                 onDeleteVector={handleDeleteVector}
                 onDeleteVector_multi={handleDeleteVector_multi}
+                handleAddVector={handleAddVector}
                 isLoading={isVectorSetChanging}
                 results={results}
                 setResults={setResults}
@@ -231,6 +232,7 @@ function VectorSetPageContent() {
         handleShowVector,
         handleDeleteVector,
         handleDeleteVector_multi,
+        handleAddVector,
         results,
         setResults,
         changeTab

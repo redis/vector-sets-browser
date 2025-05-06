@@ -163,7 +163,7 @@ export default function ResultsHeader({
                 {/* Selection mode controls */}
                 {selectMode ? (
                     <div className="flex items-center space-x-2">
-                        <span className="text-sm font-medium">
+                        <span className="text-xs text-muted-foreground whitespace-nowrap">
                             {selectedElements.size} selected
                         </span>
                         <Button

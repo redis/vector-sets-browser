@@ -1,12 +1,24 @@
 import { Button } from "@/components/ui/button"
 import { Database, FileSpreadsheet, Plus } from "lucide-react"
+import DropZone from "./components/DropZone"
+import { VectorSetMetadata } from "@/lib/types/vectors"
+import { isTextEmbedding, isImageEmbedding, isMultiModalEmbedding } from "@/lib/embeddings/types/embeddingModels"
 
 interface EmptyVectorSetProps {
     onAddVector: () => void
     onChangeTab: (tab: string, options?: { openSampleData?: boolean, openCSV?: boolean }) => void
+    handleAddVector?: (element: string, embedding: number[], useCAS?: boolean) => Promise<void>
+    vectorSetName?: string | null
+    metadata?: VectorSetMetadata | null
 }
 
-export default function EmptyVectorSet({ onAddVector, onChangeTab }: EmptyVectorSetProps) {
+export default function EmptyVectorSet({ 
+    onAddVector, 
+    onChangeTab, 
+    handleAddVector,
+    vectorSetName,
+    metadata
+}: EmptyVectorSetProps) {
     // Handler to change to import tab and automatically open sample data dialog
     const handleImportSamples = () => {
         onChangeTab("import", { openSampleData: true });
@@ -17,16 +29,39 @@ export default function EmptyVectorSet({ onAddVector, onChangeTab }: EmptyVector
         onChangeTab("import", { openCSV: true });
     };
 
+    // Determine the placeholder text based on embedding type
+    const getEmptyStateText = () => {
+        if (!metadata?.embedding) {
+            return "Drag and drop files here to get started"
+        }
+
+        if (isMultiModalEmbedding(metadata.embedding)) {
+            return "Drag and drop images or text files here to get started"
+        } else if (isImageEmbedding(metadata.embedding)) {
+            return "Drag and drop images here to get started"
+        } else if (isTextEmbedding(metadata.embedding)) {
+            return "Drag and drop text files here to get started"
+        }
+
+        return "Drag and drop files here to get started"
+    }
+
     return (
-        <div className="flex flex-col items-center justify-center py-12 space-y-8 bg-[white] rounded-lg border border-dashed border-gray-300 p-8">
-            <div className="text-center space-y-2">
-                <h2 className="text-xl font-semibold text-gray-800">
-                    Vector Set is Empty
-                </h2>
-                <p className="text-sm text-gray-500 max-w-md">
-                    This vector set doesn{`'`}t contain any vectors yet. You can
-                    add vectors in several ways:
-                </p>
+        <div className="flex flex-col items-center justify-center py-4 space-y-4 bg-[white] rounded-lg border border-dashed border-gray-300 p-8">
+            {/* Dropzone Area */}
+            <DropZone 
+                onAddVector={handleAddVector}
+                metadata={metadata}
+                containerStyle="empty"
+            >
+                <div className="flex flex-col items-center justify-center p-6">
+                    <h3 className="text-lg font-medium text-gray-700 mb-2">This vector set is empty</h3>
+                    <p className="text-sm text-gray-500 mb-6 text-center">{getEmptyStateText()}</p>
+                </div>
+            </DropZone>
+
+            <div className="text-center">
+                <p className="text-sm text-gray-500">Or choose one of these options:</p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-4xl">

@@ -20,6 +20,7 @@ export default function ImageUploader({
     },
     className = "",
     allowMultiple = false,
+    context = 'default',
 }: ImageUploaderProps) {
     const [previewUrl, setPreviewUrl] = useState<string | null>(null)
     const [isLoading, setIsLoading] = useState(false)
@@ -257,10 +258,11 @@ export default function ImageUploader({
                     isLoading={isLoading}
                     isProcessingEmbedding={isProcessingEmbedding}
                     allowMultiple={allowMultiple}
+                    context={context}
                 />
             )
         }
-    }, [allowMultiple, clearPreviewImage, imageFiles, isLoading, isProcessingEmbedding, previewUrl, removeImage])
+    }, [allowMultiple, clearPreviewImage, imageFiles, isLoading, isProcessingEmbedding, previewUrl, removeImage, context])
 
     return (
         <div className={`flex items-center gap-2 w-full ${className}`}>
