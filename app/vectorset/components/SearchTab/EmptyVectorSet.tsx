@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button"
-import { Database, FileSpreadsheet, Plus } from "lucide-react"
+import { Database, FileSpreadsheet, Plus, UploadCloud } from "lucide-react"
 import DropZone from "./components/DropZone"
 import { VectorSetMetadata } from "@/lib/types/vectors"
 import { isTextEmbedding, isImageEmbedding, isMultiModalEmbedding } from "@/lib/embeddings/types/embeddingModels"
@@ -54,14 +54,15 @@ export default function EmptyVectorSet({
                 metadata={metadata}
                 containerStyle="empty"
             >
-                <div className="flex flex-col items-center justify-center p-6">
+                <div className="flex flex-col items-center justify-center p-4">
+                    <UploadCloud className="h-8 w-8 mb-2 text-muted-foreground" />
                     <h3 className="text-lg font-medium text-gray-700 mb-2">This vector set is empty</h3>
-                    <p className="text-sm text-gray-500 mb-6 text-center">{getEmptyStateText()}</p>
+                    <p className="text-sm text-muted-foreground text-center">{getEmptyStateText()}</p>
                 </div>
             </DropZone>
 
             <div className="text-center">
-                <p className="text-sm text-gray-500">Or choose one of these options:</p>
+                <p className="text-sm text-muted-foreground">Or choose one of these options:</p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-4xl">
@@ -73,7 +74,7 @@ export default function EmptyVectorSet({
                         <Plus className="h-8 w-8 text-blue-500" />
                     </div>
                     <h3 className="font-medium">Add Individual Vector</h3>
-                    <p className="text-sm text-gray-500">
+                    <p className="text-sm text-muted-foreground">
                         Add a single vector by providing text or a raw vector
                         array.
                     </p>
@@ -94,7 +95,7 @@ export default function EmptyVectorSet({
                         <Database className="h-8 w-8 text-green-500" />
                     </div>
                     <h3 className="font-medium">Import Sample Data</h3>
-                    <p className="text-sm text-gray-500">
+                    <p className="text-sm text-muted-foreground">
                         Use pre-configured datasets like books, movies, or
                         images.
                     </p>
@@ -115,7 +116,7 @@ export default function EmptyVectorSet({
                         <FileSpreadsheet className="h-8 w-8 text-amber-500" />
                     </div>
                     <h3 className="font-medium">Import Your Data</h3>
-                    <p className="text-sm text-gray-500">
+                    <p className="text-sm text-muted-foreground">
                         Upload a CSV file with your own data or use the API.
                     </p>
                     <Button
