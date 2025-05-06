@@ -4,8 +4,8 @@ import ImageDropZone from "./ImageDropZone"
 import ImagePreview from "./ImagePreview"
 import MultipleImagesGrid from "./MultipleImagesGrid"
 import EmptyStateDisplay from "./EmptyStateDisplay"
-import { fileToBase64 } from "./ImageProcessingService"
-import { generateImageEmbedding } from "./EmbeddingService"
+import { clientEmbeddingService } from "@/lib/embeddings/client/embeddingService"
+import { fileToBase64 } from "@/lib/embeddings/client/imageProcessingService"
 
 export default function ImageUploader({
     onImageSelect,
@@ -69,7 +69,7 @@ export default function ImageUploader({
                 setIsProcessingEmbedding(true)
 
                 try {
-                    const embedding = await generateImageEmbedding(base64Data, config)
+                    const embedding = await clientEmbeddingService.getEmbedding(base64Data, config, true)
                     onEmbeddingGenerated(embedding)
 
                     // Update the image info with embedding if in multiple mode
@@ -124,7 +124,7 @@ export default function ImageUploader({
                     setIsProcessingEmbedding(true)
 
                     try {
-                        const embedding = await generateImageEmbedding(base64Data, config)
+                        const embedding = await clientEmbeddingService.getEmbedding(base64Data, config, true)
                         // Update the image info with embedding
                         imageInfo.embedding = embedding
                     } catch (error) {

@@ -2,6 +2,7 @@ import { apiClient, ApiResponse } from "@/app/api/client"
 import { EmbeddingConfig } from "@/lib/embeddings/types/embeddingModels"
 import { EmbeddingRequestBody } from "@/lib/embeddings/types/response"
 import { userSettings } from "@/lib/storage/userSettings"
+import { clientEmbeddingService } from "./client/embeddingService"
 
 export const embeddings = {
     async getEmbedding(
@@ -10,31 +11,26 @@ export const embeddings = {
         imageData?: string
     ): Promise<ApiResponse<number[]>> {
         try {
-            // Get user-provided API key if available
-            const userApiKey = userSettings.get<string>("openai_api_key");
-            
-            // Prepare headers
-            const headers: Record<string, string> = {};
-            if (userApiKey) {
-                headers["X-OpenAI-Key"] = userApiKey;
+            if (!text && !imageData) {
+                return {
+                    success: false,
+                    error: "Either text or imageData must be provided"
+                };
             }
 
-            const response = await apiClient.post<ApiResponse<number[]>, EmbeddingRequestBody>(
-                "/api/embeddings",
-                {
-                    text,
-                    imageData,
-                    config,
-                },
-                headers
+            // Use client-side embedding service
+            const isImage = !!imageData;
+            const inputData = isImage ? imageData as string : text as string;
+            
+            const embedding = await clientEmbeddingService.getEmbedding(
+                inputData,
+                config,
+                isImage
             );
 
-            // Manually construct the ApiResponse object
-            console.log("[getEmbedding] Response:", response)
             return {
                 success: true,
-                result: response.result as any,
-                executionTimeMs: response.executionTimeMs || undefined
+                result: embedding
             };
         } catch (error) {
             if (error instanceof Error) {
