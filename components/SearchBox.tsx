@@ -6,7 +6,7 @@ import {
 import { type VectorSetMetadata } from "@/lib/types/vectors"
 import { Button } from "@/components/ui/button"
 import { Filter, X } from "lucide-react"
-import { useEffect, useRef } from "react"
+import { useCallback, useEffect, useRef } from "react"
 
 import { VectorTuple } from "@/lib/redis-server/api"
 import RedisCommandBox from "./RedisCommandBox"
@@ -138,16 +138,16 @@ export default function SearchBox({
         }
     }, [metadata, setSearchType])
 
-    // Handle image embedding generation
-    const handleImageSelect = (base64Data: string) => {
+    // Handle image embedding generation - memoized to prevent unnecessary recreations
+    const handleImageSelect = useCallback((base64Data: string) => {
         setSearchType("Image") // Set search type to Image when an image is selected
         setSearchQuery(base64Data)
-    }
+    }, [setSearchQuery, setSearchType])
 
-    const handleImageEmbeddingGenerated = (embedding: number[]) => {
+    const handleImageEmbeddingGenerated = useCallback((embedding: number[]) => {
         // Set search query to a vector representation (needed for the search)
         setSearchQuery(embedding.join(", "))
-    }
+    }, [setSearchQuery])
 
     return (
         <section className="mb-2">
@@ -233,8 +233,6 @@ export default function SearchBox({
                                 />
                             </div>
                         )}
-
-                        {/* Display search error - moved to FilterSection */}
                     </div>
                 </div>
                 {/* Redis Command Box */}

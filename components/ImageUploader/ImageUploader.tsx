@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { ImageUploaderProps, ImageFileInfo } from "./types"
 import ImageDropZone from "./ImageDropZone"
 import ImagePreview from "./ImagePreview"
@@ -34,21 +34,69 @@ export default function ImageUploader({
         }
     }, [imageFiles, onImagesChange, allowMultiple])
 
-    const handleFileSelect = async (files: File[]) => {
-        if (files.length === 0) return
+    // Memoize processFile to avoid recreating this function on every render
+    const processFile = useCallback(async (file: File) => {
+        try {
+            setIsLoading(true)
 
-        // Filter out non-image files
-        const imageFiles = files.filter((file) => file.type.startsWith("image/"))
-        if (imageFiles.length === 0) return
+            // Create preview URL
+            const objectUrl = URL.createObjectURL(file)
+            setPreviewUrl(objectUrl)
 
-        if (allowMultiple) {
-            processMultipleFiles(imageFiles)
-        } else {
-            processFile(imageFiles[0])
+            // Convert to base64
+            const base64Data = await fileToBase64(file)
+            setImageData(base64Data)
+            onImageSelect(base64Data)
+
+            // Create a single-image collection for consistency
+            if (allowMultiple) {
+                const imageInfo: ImageFileInfo = {
+                    id: `img_${Date.now()}`,
+                    fileName: file.name,
+                    previewUrl: objectUrl,
+                    base64Data: base64Data,
+                }
+                setImageFiles([imageInfo])
+            }
+
+            // Provide the file name if the callback exists
+            if (onFileNameSelect) {
+                onFileNameSelect(file.name)
+            }
+
+            // Generate embedding if handler is provided
+            if (onEmbeddingGenerated) {
+                setIsProcessingEmbedding(true)
+
+                try {
+                    const embedding = await generateImageEmbedding(base64Data, config)
+                    onEmbeddingGenerated(embedding)
+
+                    // Update the image info with embedding if in multiple mode
+                    if (allowMultiple) {
+                        setImageFiles((prev) =>
+                            prev.map((img) =>
+                                img.id === `img_${Date.now()}`
+                                    ? { ...img, embedding }
+                                    : img
+                            )
+                        )
+                    }
+                } catch (error) {
+                    console.error("Error generating embedding:", error)
+                } finally {
+                    setIsProcessingEmbedding(false)
+                }
+            }
+        } catch (error) {
+            console.error(`Error processing image ${file.name}:`, error)
+        } finally {
+            setIsLoading(false)
         }
-    }
+    }, [allowMultiple, config, onEmbeddingGenerated, onFileNameSelect, onImageSelect])
 
-    const processMultipleFiles = async (files: File[]) => {
+    // Memoize processMultipleFiles to avoid recreating this function on every render
+    const processMultipleFiles = useCallback(async (files: File[]) => {
         const newImages: ImageFileInfo[] = []
 
         for (let i = 0; i < files.length; i++) {
@@ -108,70 +156,25 @@ export default function ImageUploader({
                 onEmbeddingGenerated(lastImage.embedding)
             }
         }
-    }
+    }, [config, onEmbeddingGenerated, onFileNameSelect, onImageSelect])
 
-    const processFile = async (file: File) => {
-        try {
-            setIsLoading(true)
+    // Memoize handleFileSelect to avoid recreating this function on every render
+    const handleFileSelect = useCallback(async (files: File[]) => {
+        if (files.length === 0) return
 
-            // Create preview URL
-            const objectUrl = URL.createObjectURL(file)
-            setPreviewUrl(objectUrl)
+        // Filter out non-image files
+        const imageFiles = files.filter((file) => file.type.startsWith("image/"))
+        if (imageFiles.length === 0) return
 
-            // Convert to base64
-            const base64Data = await fileToBase64(file)
-            setImageData(base64Data)
-            onImageSelect(base64Data)
-
-            // Create a single-image collection for consistency
-            if (allowMultiple) {
-                const imageInfo: ImageFileInfo = {
-                    id: `img_${Date.now()}`,
-                    fileName: file.name,
-                    previewUrl: objectUrl,
-                    base64Data: base64Data,
-                }
-                setImageFiles([imageInfo])
-            }
-
-            // Provide the file name if the callback exists
-            if (onFileNameSelect) {
-                onFileNameSelect(file.name)
-            }
-
-            // Generate embedding if handler is provided
-            if (onEmbeddingGenerated) {
-                setIsProcessingEmbedding(true)
-
-                try {
-                    const embedding = await generateImageEmbedding(base64Data, config)
-                    onEmbeddingGenerated(embedding)
-
-                    // Update the image info with embedding if in multiple mode
-                    if (allowMultiple) {
-                        setImageFiles((prev) =>
-                            prev.map((img) =>
-                                img.id === `img_${Date.now()}`
-                                    ? { ...img, embedding }
-                                    : img
-                            )
-                        )
-                    }
-                } catch (error) {
-                    console.error("Error generating embedding:", error)
-                } finally {
-                    setIsProcessingEmbedding(false)
-                }
-            }
-        } catch (error) {
-            console.error(`Error processing image ${file.name}:`, error)
-        } finally {
-            setIsLoading(false)
+        if (allowMultiple) {
+            processMultipleFiles(imageFiles)
+        } else {
+            processFile(imageFiles[0])
         }
-    }
+    }, [allowMultiple, processFile, processMultipleFiles])
 
     // Remove an image from the list
-    const removeImage = (id: string) => {
+    const removeImage = useCallback((id: string) => {
         setImageFiles((prev) => {
             const filtered = prev.filter((img) => img.id !== id)
 
@@ -199,10 +202,10 @@ export default function ImageUploader({
 
             return filtered
         })
-    }
+    }, [onEmbeddingGenerated, onFileNameSelect, onImageSelect])
 
     // Clear the single image in the preview
-    const clearPreviewImage = () => {
+    const clearPreviewImage = useCallback(() => {
         // Revoke object URL to prevent memory leaks
         if (previewUrl) {
             URL.revokeObjectURL(previewUrl)
@@ -229,10 +232,10 @@ export default function ImageUploader({
         if (allowMultiple) {
             setImageFiles([])
         }
-    }
+    }, [allowMultiple, onEmbeddingGenerated, onFileNameSelect, onImageSelect, previewUrl])
 
     // Render appropriate content based on state
-    const renderContent = () => {
+    const renderContent = useCallback(() => {
         if (allowMultiple && imageFiles.length > 0) {
             return (
                 <MultipleImagesGrid
@@ -257,7 +260,7 @@ export default function ImageUploader({
                 />
             )
         }
-    }
+    }, [allowMultiple, clearPreviewImage, imageFiles, isLoading, isProcessingEmbedding, previewUrl, removeImage])
 
     return (
         <div className={`flex items-center gap-2 w-full ${className}`}>

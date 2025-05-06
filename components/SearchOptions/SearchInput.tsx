@@ -3,7 +3,7 @@ import { type VectorSetMetadata } from "@/lib/types/vectors"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Shuffle } from "lucide-react"
-import { useMemo } from "react"
+import { useCallback, useMemo } from "react"
 import ImageUploader from "../ImageUploader/ImageUploader"
 
 interface SearchInputProps {
@@ -46,6 +46,18 @@ export default function SearchInput({
         }
     }, [searchType, supportsEmbeddings, metadata?.embedding])
 
+    // Memoize the random vector generation function
+    const generateRandomVector = useCallback(() => {
+        if (!dim) return;
+        
+        const randomVector = Array.from(
+            { length: dim },
+            () => Math.random()
+        ).map((n) => n.toFixed(4));
+        
+        setSearchQuery(randomVector.join(", "));
+    }, [dim, setSearchQuery]);
+
     return (
         <>
             {searchType === "Image" ? (
@@ -72,15 +84,7 @@ export default function SearchInput({
                             variant="ghost"
                             size="icon"
                             className="absolute right-0 top-0 h-full"
-                            onClick={() => {
-                                if (dim) {
-                                    const randomVector = Array.from(
-                                        { length: dim },
-                                        () => Math.random()
-                                    ).map((n) => n.toFixed(4))
-                                    setSearchQuery(randomVector.join(", "))
-                                }
-                            }}
+                            onClick={generateRandomVector}
                         >
                             <Shuffle className="h-4 w-4" />
                         </Button>

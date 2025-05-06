@@ -6,6 +6,23 @@ const modelCache: Record<string, any> = {}
 let mobilenetModule: any = null
 let isModelLoading = false
 
+// Embedding cache to avoid regenerating the same embeddings
+interface EmbeddingCacheEntry {
+    embedding: number[];
+    timestamp: number;
+}
+const embeddingCache: Map<string, EmbeddingCacheEntry> = new Map();
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes in milliseconds
+
+// Calculate a cache key based on image data and config
+const getCacheKey = (imageData: string, config: EmbeddingConfig): string => {
+    const configStr = JSON.stringify(config);
+    // Use just first 50 chars + length of image data for the cache key to avoid 
+    // memory issues with very large image data strings
+    const dataKey = `${imageData.substring(0, 50)}_${imageData.length}`;
+    return `${dataKey}_${configStr}`;
+};
+
 /**
  * Generate an embedding from image data using either TensorFlow or CLIP
  */
@@ -17,14 +34,43 @@ export const generateImageEmbedding = async (
         throw new Error("No image data provided")
     }
 
+    // Check cache first
+    const cacheKey = getCacheKey(imageData, config);
+    const now = Date.now();
+    const cached = embeddingCache.get(cacheKey);
+    
+    if (cached && now - cached.timestamp < CACHE_TTL) {
+        console.log("Using cached embedding");
+        return cached.embedding;
+    }
+
+    // Generate new embedding
+    let embedding: number[];
+
     // Check if we're using CLIP
     if (config.provider === "clip") {
-        return generateClipEmbedding(imageData, config)
+        embedding = await generateClipEmbedding(imageData, config)
     } else if (config.provider === "image") {
-        return generateTensorFlowEmbedding(imageData)
+        embedding = await generateTensorFlowEmbedding(imageData)
     } else {
         throw new Error(`Unsupported provider for image embedding: ${config.provider}`)
     }
+
+    // Cache the result
+    embeddingCache.set(cacheKey, { embedding, timestamp: now });
+    
+    // Cleanup old cache entries if cache gets too large
+    if (embeddingCache.size > 100) {
+        const oldEntries = [...embeddingCache.entries()]
+            .filter(([_, entry]) => now - entry.timestamp > CACHE_TTL)
+            .slice(0, 20); // Remove oldest 20 entries that are expired
+            
+        for (const [key] of oldEntries) {
+            embeddingCache.delete(key);
+        }
+    }
+    
+    return embedding;
 }
 
 /**
