@@ -154,6 +154,7 @@ export default function VectorResults({
         if (onBulkDeleteClick && selectedElements.size > 0) {
             onBulkDeleteClick(Array.from(selectedElements))
             setSelectedElements(new Set())
+            setSelectMode(false)
         }
     }
 
