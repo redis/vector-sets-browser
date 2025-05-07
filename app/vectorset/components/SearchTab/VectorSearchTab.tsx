@@ -1,19 +1,16 @@
 "use client"
 
+import { useVectorSearch } from "@/app/vectorset/hooks/useVectorSearch"
 import SearchBox from "@/components/SearchBox"
-import {
-    useVectorSearch
-} from "@/app/vectorset/hooks/useVectorSearch"
-import { VectorTuple, vlinks } from "@/lib/redis-server/api"
-import { VectorSetMetadata, VectorSetSearchOptions } from "@/lib/types/vectors"
-import { userSettings } from "@/lib/storage/userSettings"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { useCallback, useState } from "react"
+import { VectorTuple, vlinks, vsim } from "@/lib/redis-server/api"
+import { VectorSetMetadata, VectorSetSearchOptions } from "@/lib/types/vectors"
+import { useCallback, useEffect, useState } from "react"
 import { toast } from "sonner"
-import VectorResults from "./VectorResults"
-// import VectorViz3D from "../VisualizationTab/VectorViz3D"
+import VectorViz3D from "../VisualizationTab/VectorViz3D"
 import HNSW2dViz from "../VisualizationTab/vizualizer/HNSW2dViz"
 import { DeleteVectorDialog } from "./DeleteVectorDialog"
+import VectorResults from "./VectorResults"
 
 interface VectorSearchTabProps {
     vectorSetName: string
@@ -23,7 +20,11 @@ interface VectorSearchTabProps {
     onShowVector: (element: string) => Promise<number[] | null>
     onDeleteVector: (element: string) => Promise<void>
     onDeleteVector_multi: (elements: string[]) => Promise<void>
-    handleAddVector?: (element: string, embedding: number[], useCAS?: boolean) => Promise<void>
+    handleAddVector?: (
+        element: string,
+        embedding: number[],
+        useCAS?: boolean
+    ) => Promise<void>
     isLoading: boolean
     results: VectorTuple[]
     setResults: (results: VectorTuple[]) => void
@@ -50,6 +51,7 @@ export default function VectorSearchTab({
     const [vectorToDelete, setVectorToDelete] = useState<string | null>(null)
     const [vectorsToDelete, setVectorsToDelete] = useState<string[]>([])
     const [isBulkDelete, setIsBulkDelete] = useState(false)
+    const [resultsWithVectors, setResultsWithVectors] = useState<VectorTuple[]>([])
 
     // Initialize with basic search state - advanced options will be loaded from userSettings by useVectorSearch
     const [searchState, setSearchState] = useState<VectorSetSearchOptions>({
@@ -65,14 +67,64 @@ export default function VectorSearchTab({
         noThread: false,
     })
 
+    // Effect to fetch vectors when tab changes to 3D view
+    useEffect(() => {
+        const fetchVectorsFor3D = async () => {
+            if (activeResultsTab === "3d" && vectorSetName && results.length > 0) {
+                // Check if results already have vectors
+                const needsVectors = results.some(result => !result[2] || result[2].length === 0);
+                
+                if (needsVectors) {
+                    try {
+                        // Re-fetch search results with embeddings
+                        const elements = results.map(r => r[0]);
+                        const count = results.length;
+                        
+                        // Get the first element to use as search base
+                        const searchElement = elements[0];
+                        
+                        const response = await vsim({
+                            keyName: vectorSetName,
+                            searchElement,
+                            count,
+                            withEmbeddings: true, // Always get embeddings for 3D viz
+                        });
+                        
+                        if (response.success && response.result) {
+                            // Update results with the vector data
+                            setResultsWithVectors(response.result);
+                        }
+                    } catch (error) {
+                        console.error("Error fetching vectors for 3D visualization:", error);
+                    }
+                } else {
+                    // If vectors already present, just use the existing results
+                    setResultsWithVectors(results);
+                }
+            }
+        };
+        
+        fetchVectorsFor3D();
+    }, [activeResultsTab, vectorSetName, results]);
+
     const handleSearchResults = useCallback(
         (newResults: VectorTuple[]) => {
             setResults(newResults)
+            
+            // Check if results already have vectors
+            const hasVectors = newResults.some(result => 
+                Array.isArray(result[2]) && result[2].length > 0
+            );
+            
+            // Update resultsWithVectors if vectors are present
+            if (hasVectors) {
+                setResultsWithVectors(newResults);
+            }
         },
-        [setResults]
+        [setResults, setResultsWithVectors]
     )
 
-    const handleStatusChange = useCallback(() => { }, [])
+    const handleStatusChange = useCallback(() => {}, [])
 
     const handleSearchStateChange = useCallback(
         (newState: Partial<VectorSetSearchOptions>) => {
@@ -125,9 +177,9 @@ export default function VectorSearchTab({
 
     const clearError = useCallback(() => {
         if (error && hookClearError) {
-            hookClearError();
+            hookClearError()
         }
-    }, [error, hookClearError]);
+    }, [error, hookClearError])
 
     const handleSearchQueryChange = (query: string) => {
         setSearchQuery(query)
@@ -180,7 +232,7 @@ export default function VectorSearchTab({
 
     const getNeighbors = async (
         element: string,
-        count: number,
+        count: number
     ): Promise<{ element: string; similarity: number; vector: number[] }[]> => {
         try {
             const response = await vlinks({
@@ -207,7 +259,7 @@ export default function VectorSearchTab({
 
     return (
         <section>
-            <DeleteVectorDialog 
+            <DeleteVectorDialog
                 isOpen={deleteDialogOpen}
                 onOpenChange={setDeleteDialogOpen}
                 onConfirm={handleConfirmDelete}
@@ -252,7 +304,9 @@ export default function VectorSearchTab({
                         <TabsTrigger value="2d" className="w-full">
                             2D Visualization
                         </TabsTrigger>
-                        {/* <TabsTrigger value="3d" className="w-full">3D Visualization</TabsTrigger> */}
+                        <TabsTrigger value="3d" className="w-full">
+                            3D Visualization
+                        </TabsTrigger>
                     </TabsList>
 
                     <TabsContent value="table">
@@ -300,19 +354,34 @@ export default function VectorSearchTab({
                         </div>
                     </TabsContent>
 
-                    {/* <TabsContent value="3d">
-                        <div style={{ height: "calc(100vh - 400px)", minHeight: "400px" }}>
-                            {results.length > 0 && (
+                    <TabsContent value="3d">
+                        <div
+                            style={{
+                                height: "calc(100vh - 400px)",
+                                minHeight: "400px",
+                            }}
+                        >
+                            {resultsWithVectors.length > 0 && (
                                 <VectorViz3D
-                                    data={results.map((result) => ({
-                                        label: `${result[0]} (${result[1].toFixed(3)})`,
-                                        vector: result[2] || [],
-                                    }))}
+                                    data={resultsWithVectors.map((result) => {
+                                        // Create an array with 3 zeros as fallback
+                                        const fallbackVector = new Array(3).fill(0);
+                                        
+                                        // Ensure vector exists and has data
+                                        const vector = Array.isArray(result[2]) && result[2].length > 0 
+                                            ? result[2] 
+                                            : fallbackVector;
+                                        
+                                        return {
+                                            label: `${result[0]} (${result[1].toFixed(3)})`,
+                                            vector: vector,
+                                        };
+                                    })}
                                     onVectorSelect={handleRowClick}
                                 />
                             )}
                         </div>
-                    </TabsContent> */}
+                    </TabsContent>
                 </Tabs>
             </div>
         </section>

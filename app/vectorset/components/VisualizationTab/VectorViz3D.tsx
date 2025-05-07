@@ -95,17 +95,15 @@ function reduceToThreeD(vectors: number[][]): number[][] {
 
 // Calculate a color based on vector properties
 function getVectorColor(vector: number[]): string {
-    // Define a pleasing color palette
+    // Define color palette with specified colors
     const palette = [
-        "#2176AE",
-        "#57B8FF",
-        "#6FA6C3",
-        "#879386",
-        "#b66d0d",
-        "#00ACC1",
-        "#fbb13c",
-        "#fd8d42",
-        "#fe6847",
+        "#B20000", // Deep red
+        "#F04229", // Bright red/orange
+        "#0A2A53", // Navy blue
+        "#0011F6", // Bright blue
+        "#B20000", // Deep red (repeated)
+        "#FFFFFF", // White (repeated)
+        "#F04229"  // Bright red/orange (repeated)
     ]
 
     // Use a hash of the vector to pick a color

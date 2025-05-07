@@ -1,5 +1,9 @@
 "use client"
 
+import { useVectorSearch } from "@/app/vectorset/hooks/useVectorSearch"
+import SearchBox from "@/components/SearchBox"
+import SearchTimeIndicator from "@/components/SearchTimeIndicator"
+import StatusMessage from "@/components/StatusMessage"
 import {
     Select,
     SelectContent,
@@ -7,18 +11,11 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select"
-import { useCallback, useEffect, useState } from "react"
 import { VectorTuple, vlinks } from "@/lib/redis-server/api"
-import SearchBox from "@/components/SearchBox"
-import SearchTimeIndicator from "@/components/SearchTimeIndicator"
-import StatusMessage from "@/components/StatusMessage"
-import {
-    useVectorSearch
-} from "@/app/vectorset/hooks/useVectorSearch"
+import { VectorSetMetadata, VectorSetSearchOptions } from "@/lib/types/vectors"
+import { useCallback, useEffect, useState } from "react"
 import VectorViz3D from "./VectorViz3D"
 import HNSWVizPure from "./vizualizer/HNSW2dViz"
-import { VectorSetMetadata, VectorSetSearchOptions } from "@/lib/types/vectors"
-import { userSettings } from "@/lib/storage/userSettings"
 
 interface VectorSetVisualizationProps {
     vectorSetName: string
@@ -35,7 +32,7 @@ export default function VectorSetVisualization({
     const [fileOperationStatus, setFileOperationStatus] = useState("")
     const [results, setResults] = useState<VectorTuple[]>([])
     const [isVectorSetChanging, setIsVectorSetChanging] = useState(false)
-    
+
     // Initialize with basic search state - advanced options will be loaded from userSettings by useVectorSearch
     const [searchState, setSearchState] = useState<VectorSetSearchOptions>({
         searchType: "Vector" as const,
@@ -163,23 +160,29 @@ export default function VectorSetVisualization({
                 error={fileOperationStatus}
                 searchExplorationFactor={searchState.searchExplorationFactor}
                 setSearchExplorationFactor={(factor) => {
-                    if (factor === searchState.searchExplorationFactor) return;
-                    setSearchState({ ...searchState, searchExplorationFactor: factor });
+                    if (factor === searchState.searchExplorationFactor) return
+                    setSearchState({
+                        ...searchState,
+                        searchExplorationFactor: factor,
+                    })
                 }}
                 filterExplorationFactor={searchState.filterExplorationFactor}
                 setFilterExplorationFactor={(factor) => {
-                    if (factor === searchState.filterExplorationFactor) return;
-                    setSearchState({ ...searchState, filterExplorationFactor: factor });
+                    if (factor === searchState.filterExplorationFactor) return
+                    setSearchState({
+                        ...searchState,
+                        filterExplorationFactor: factor,
+                    })
                 }}
                 forceLinearScan={searchState.forceLinearScan}
                 setForceLinearScan={(value) => {
-                    if (value === searchState.forceLinearScan) return;
-                    setSearchState({ ...searchState, forceLinearScan: value });
+                    if (value === searchState.forceLinearScan) return
+                    setSearchState({ ...searchState, forceLinearScan: value })
                 }}
                 noThread={searchState.noThread}
                 setNoThread={(value) => {
-                    if (value === searchState.noThread) return;
-                    setSearchState({ ...searchState, noThread: value });
+                    if (value === searchState.noThread) return
+                    setSearchState({ ...searchState, noThread: value })
                 }}
             />
             <div className="bg-[white] rounded shadow-md h-[calc(100vh-300px)]">

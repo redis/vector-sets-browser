@@ -1,56 +1,24 @@
-import SearchTimeIndicator from "@/components/SearchTimeIndicator"
 import {
     ColumnConfig,
     useVectorResultsSettings,
 } from "@/app/vectorset/hooks/useVectorResultsSettings"
-import { VectorTuple, vgetattr_multi } from "@/lib/redis-server/api"
-import { parseFieldFilters } from "@/lib/data/filter"
-import { Button } from "@/components/ui/button"
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogHeader,
-    DialogTitle,
-} from "@/components/ui/dialog"
-import {
-    DropdownMenu,
-    DropdownMenuCheckboxItem,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuLabel,
-    DropdownMenuSeparator,
-    DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { Label } from "@/components/ui/label"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { Switch } from "@/components/ui/switch"
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from "@/components/ui/table"
-import {
-    ArrowDownUp,
-    ArrowDownWideNarrow,
-    ArrowUpNarrowWide,
-    CheckSquare,
-    Settings,
-} from "lucide-react"
+import { vgetattr_multi } from "@/lib/redis-server/api"
 import { useEffect, useMemo, useRef, useState } from "react"
-import EditAttributesDialog from "./EditAttributesDialog"
-import EmptyVectorSet from "./EmptyVectorSet"
-import { VectorResultsProps, AttributeCache, ParsedAttributes, SortColumn, SortDirection, FilterField } from "./types"
-import { extractFilterFields, isEmptyVectorSet, sortResults } from "./utils"
-import NoResults from "./components/NoResults"
-import ResultsHeader from "./components/ResultsHeader"
 import AttributeColumnsDialog from "./components/AttributeColumnsDialog"
-import CompactResultsTable from "./components/CompactResultsTable"
 import DropzoneResultsTable from "./components/DropzoneResultsTable"
 import ExpandedResultsList from "./components/ExpandedResultsList"
+import NoResults from "./components/NoResults"
+import ResultsHeader from "./components/ResultsHeader"
+import EditAttributesDialog from "./EditAttributesDialog"
+import EmptyVectorSet from "./EmptyVectorSet"
+import {
+    AttributeCache,
+    ParsedAttributes,
+    SortColumn,
+    SortDirection,
+    VectorResultsProps,
+} from "./types"
+import { extractFilterFields, isEmptyVectorSet, sortResults } from "./utils"
 
 export default function VectorResults({
     results,
@@ -69,7 +37,7 @@ export default function VectorResults({
     searchType,
     changeTab,
     handleAddVectorWithImage,
-    metadata
+    metadata,
 }: VectorResultsProps) {
     const [isCompact, setIsCompact] = useState(true)
     const {
@@ -93,24 +61,34 @@ export default function VectorResults({
     const [filterText, setFilterText] = useState("")
     const [sortColumn, setSortColumn] = useState<SortColumn>("none")
     const [sortDirection, setSortDirection] = useState<SortDirection>("asc")
-    const [editingAttributes, setEditingAttributes] = useState<string | null>(null)
+    const [editingAttributes, setEditingAttributes] = useState<string | null>(
+        null
+    )
     const [attributeCache, setAttributeCache] = useState<AttributeCache>({})
     const [isLoadingAttributes, setIsLoadingAttributes] = useState(false)
-    const [filteredFieldValues, setFilteredFieldValues] = useState<Record<string, Record<string, string>>>({})
-    const [parsedAttributeCache, setParsedAttributeCache] = useState<Record<string, ParsedAttributes>>({})
+    const [filteredFieldValues, setFilteredFieldValues] = useState<
+        Record<string, Record<string, string>>
+    >({})
+    const [parsedAttributeCache, setParsedAttributeCache] = useState<
+        Record<string, ParsedAttributes>
+    >({})
     const [availableColumns, setAvailableColumns] = useState<ColumnConfig[]>([
         { name: "element", visible: true, type: "system" },
         { name: "score", visible: true, type: "system" },
     ])
-    const [isAttributeColumnsDialogOpen, setIsAttributeColumnsDialogOpen] = useState(false)
+    const [isAttributeColumnsDialogOpen, setIsAttributeColumnsDialogOpen] =
+        useState(false)
 
     // Add state variables for selection mode
     const [selectMode, setSelectMode] = useState(false)
-    const [selectedElements, setSelectedElements] = useState<Set<string>>(new Set())
+    const [selectedElements, setSelectedElements] = useState<Set<string>>(
+        new Set()
+    )
 
     // Filter fields state
-    const filterFields = useMemo(() => 
-        extractFilterFields(searchFilter), [searchFilter]
+    const filterFields = useMemo(
+        () => extractFilterFields(searchFilter),
+        [searchFilter]
     )
 
     // Clear selections when the keyName (vector set) changes
@@ -442,7 +420,7 @@ export default function VectorResults({
     // Modify the Add Vector button click handler
     const handleAddVector = async () => {
         if (onAddVector) {
-            await onAddVector()
+            onAddVector()
             // The parent component should handle refreshing the results
         }
     }
@@ -459,14 +437,12 @@ export default function VectorResults({
     }
 
     // Check if the vectorset is empty (only has placeholder)
-    const vectorSetIsEmpty = useMemo(() => 
-        isEmptyVectorSet(results), [results]
-    )
+    const vectorSetIsEmpty = useMemo(() => isEmptyVectorSet(results), [results])
 
     // Early returns for different states
     if (!isLoaded || isLoading || isSearching) {
         return (
-            <NoResults 
+            <NoResults
                 keyName={keyName}
                 isLoaded={isLoaded}
                 isLoading={isLoading}
@@ -494,7 +470,7 @@ export default function VectorResults({
 
     if (results.length === 0) {
         return (
-            <NoResults 
+            <NoResults
                 keyName={keyName}
                 isLoaded={isLoaded}
                 isLoading={isLoading}
@@ -523,7 +499,7 @@ export default function VectorResults({
                 onToggleColumn={handleToggleColumn}
             />
 
-            <ResultsHeader 
+            <ResultsHeader
                 results={results}
                 searchTime={searchTime}
                 isSearching={isSearching}
@@ -542,18 +518,22 @@ export default function VectorResults({
                 setIsCompact={setIsCompact}
                 setShowAttributes={setShowAttributes}
                 setShowOnlyFilteredAttributes={setShowOnlyFilteredAttributes}
-                setIsAttributeColumnsDialogOpen={setIsAttributeColumnsDialogOpen}
+                setIsAttributeColumnsDialogOpen={
+                    setIsAttributeColumnsDialogOpen
+                }
                 setSelectMode={setSelectMode}
                 handleSelectAll={handleSelectAll}
                 handleDeselectAll={handleDeselectAll}
                 handleBulkDelete={handleBulkDelete}
                 handleExitSelectMode={handleExitSelectMode}
                 handleAddVector={handleAddVector}
-                updateAttributeColumnVisibility={updateAttributeColumnVisibility}
+                updateAttributeColumnVisibility={
+                    updateAttributeColumnVisibility
+                }
             />
 
             {isCompact ? (
-                <DropzoneResultsTable 
+                <DropzoneResultsTable
                     filteredAndSortedResults={filteredAndSortedResults}
                     availableColumns={availableColumns}
                     filterFields={filterFields}
@@ -575,7 +555,7 @@ export default function VectorResults({
                     metadata={metadata}
                 />
             ) : (
-                <ExpandedResultsList 
+                <ExpandedResultsList
                     filteredAndSortedResults={filteredAndSortedResults}
                     selectMode={selectMode}
                     selectedElements={selectedElements}

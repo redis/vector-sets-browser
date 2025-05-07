@@ -235,6 +235,7 @@ const useVectorSet = (): UseVectorSetReturn => {
                 attributes: "",
                 useCAS: useCAS || metadata?.redisConfig?.defaultCAS,
                 reduceDimensions: metadata?.redisConfig?.reduceDimensions,
+                quantization: metadata?.redisConfig?.quantization,
                 ef: metadata?.redisConfig?.buildExplorationFactor,
             })
 
@@ -246,13 +247,23 @@ const useVectorSet = (): UseVectorSetReturn => {
             // and it is the default vector, then we should delete the Placeholder (Vector)
             // after adding the new vector.
             if (vectorCount === 1) {
-                await vrem({
-                    keyName: vectorSetName,
-                    element: "Placeholder (Vector)",
-                })
-                console.log("attempted to remove defaultVector")
-                // Also remove the default vector from the results array
-                setResults((prevResults) => prevResults.filter(result => result[0] !== "Placeholder (Vector)"))
+                // First check if "Placeholder (Vector)" exists before attempting to remove it
+                const placeholderExists = results.some(result => result[0] === "Placeholder (Vector)")
+                
+                if (placeholderExists) {
+                    try {
+                        await vrem({
+                            keyName: vectorSetName,
+                            element: "Placeholder (Vector)",
+                        })
+                        console.log("Removed defaultVector placeholder")
+                        // Also remove the default vector from the results array
+                        setResults((prevResults) => prevResults.filter(result => result[0] !== "Placeholder (Vector)"))
+                    } catch (error) {
+                        console.warn("Failed to remove placeholder vector, it might not exist:", error)
+                        // Continue execution since this is not critical
+                    }
+                }
             }
 
             // Get the new record count
