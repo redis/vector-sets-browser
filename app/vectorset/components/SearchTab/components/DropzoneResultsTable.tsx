@@ -39,9 +39,7 @@ export default function DropzoneResultsTable({
   }
 
   // Create a custom overlay that fits within the table container
-  const customDropOverlay = (dragState: boolean) => {
-    setIsDragging(dragState);
-    return (
+  const customDropOverlay = () => (
     <div className="absolute inset-0 bg-blue-50 bg-opacity-90 z-10 transition-all duration-200 flex items-center justify-center">
       <div className="flex flex-col items-center px-4 py-6 text-center">
         <UploadCloud className="h-16 w-16 mb-4 text-blue-500" />
@@ -53,7 +51,7 @@ export default function DropzoneResultsTable({
         </div>
       </div>
     </div>
-  )};
+  );
 
   // Custom wrapper for the onAddVector callback that also resets the isDragging state
   const handleAddVectorWrapper = async (element: string, embedding: number[]) => {
@@ -71,6 +69,8 @@ export default function DropzoneResultsTable({
       metadata={metadata}
       className="w-full"
       renderDropOverlay={customDropOverlay}
+      onDragStateChange={setIsDragging}
+      data-dropzone-id="results-table-dropzone"
     >
       <div className="flex flex-col">
         <CompactResultsTable {...compactResultsTableProps} />

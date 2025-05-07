@@ -1,4 +1,4 @@
-import { ReactNode } from "react"
+import { ReactNode, useEffect } from "react"
 import { VectorSetMetadata } from "@/lib/types/vectors"
 import { ProgressBar } from "./ProgressBar"
 import { DragOverlay } from "./DragOverlay"
@@ -14,6 +14,8 @@ export interface DropZoneProps {
     className?: string
     showProgressBar?: boolean
     containerStyle?: "empty" | "overlay"
+    onDragStateChange?: (isDragging: boolean) => void
+    "data-dropzone-id"?: string
 }
 
 // Re-export for backward compatibility
@@ -27,6 +29,8 @@ export default function DropZone({
     className = "",
     showProgressBar = true,
     containerStyle = "overlay",
+    onDragStateChange,
+    "data-dropzone-id": dropzoneId,
 }: DropZoneProps) {
     const {
         isDragging,
@@ -39,6 +43,13 @@ export default function DropZone({
         handleDrop
     } = useDropZone({ onAddVector, metadata })
 
+    // Use useEffect to call onDragStateChange when isDragging changes
+    useEffect(() => {
+        if (onDragStateChange) {
+            onDragStateChange(isDragging);
+        }
+    }, [isDragging, onDragStateChange]);
+
     // If using the empty container style
     if (containerStyle === "empty") {
         return (
@@ -50,6 +61,7 @@ export default function DropZone({
                 onDragEnter={handleDragEnter}
                 onDragLeave={handleDragLeave}
                 onDrop={handleDrop}
+                data-dropzone-id={dropzoneId}
             >
                 {children || <EmptyDropZoneContent isDragging={isDragging} />}
 
@@ -71,6 +83,7 @@ export default function DropZone({
             onDragEnter={handleDragEnter}
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
+            data-dropzone-id={dropzoneId}
         >
             <DragOverlay 
                 isDragging={isDragging} 

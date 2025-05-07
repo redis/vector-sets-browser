@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 
 interface DragOverlayProps {
     isDragging: boolean;
@@ -9,7 +9,7 @@ export function DragOverlay({ isDragging, renderCustomOverlay }: DragOverlayProp
     if (!isDragging) return null;
 
     if (renderCustomOverlay) {
-        return <>{renderCustomOverlay(isDragging)}</>;
+        return <>{renderCustomOverlay(true)}</>;
     }
 
     return (
