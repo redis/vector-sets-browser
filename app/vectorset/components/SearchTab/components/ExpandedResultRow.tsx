@@ -1,5 +1,10 @@
 import { Button } from "@/components/ui/button"
 import { VectorTuple } from "@/lib/redis-server/api"
+import { 
+    TextEmbeddingIcon, 
+    ImageEmbeddingIcon, 
+    MultiModalEmbeddingIcon 
+} from "@/components/EmbeddingConfig/EmbeddingIcons"
 
 interface ExpandedResultRowProps {
     row: VectorTuple
@@ -46,6 +51,30 @@ export default function ExpandedResultRow({
         return String(value)
     }
 
+    // Helper to determine the vector type icon
+    const getVectorTypeIcon = (element: string) => {
+        const attributes = parsedAttributeCache[element]
+        
+        // Check for content_type or type attribute that indicates image
+        if (attributes?.content_type?.includes('image') || 
+            attributes?.type === 'image' || 
+            attributes?.vector_type === 'image' ||
+            (typeof attributes?.filename === 'string' && /\.(jpe?g|png|gif|webp|bmp)$/i.test(attributes.filename))) {
+            return <ImageEmbeddingIcon />
+        }
+        
+        // Check for multi-modal content
+        if (attributes?.content_type?.includes('multimodal') || 
+            attributes?.type === 'text-and-image' || 
+            attributes?.vector_type === 'text-and-image' ||
+            attributes?.has_image === true) {
+            return <MultiModalEmbeddingIcon />
+        }
+        
+        // Default to text
+        return <TextEmbeddingIcon />
+    }
+
     return (
         <div
             className={`bg-[white] rounded-lg border p-4 hover:shadow-md group ${
@@ -85,7 +114,10 @@ export default function ExpandedResultRow({
                             <div className="text-sm text-gray-500 uppercase">
                                 Element
                             </div>
-                            <div className="font-medium">
+                            <div className="font-medium flex items-center gap-2">
+                                <span className="flex-shrink-0">
+                                    {getVectorTypeIcon(row[0])}
+                                </span>
                                 {row[0]}
                             </div>
                         </div>

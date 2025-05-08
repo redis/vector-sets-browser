@@ -1,12 +1,7 @@
-import {
-    isImageEmbedding,
-    isMultiModalEmbedding,
-    isTextEmbedding,
-} from "@/lib/embeddings/types/embeddingModels"
-import { type VectorSetMetadata } from "@/lib/types/vectors"
 import { Button } from "@/components/ui/button"
+import { type VectorSetMetadata } from "@/lib/types/vectors"
 import { Filter, X } from "lucide-react"
-import { useCallback, useEffect, useRef } from "react"
+import { useCallback } from "react"
 
 import { VectorTuple } from "@/lib/redis-server/api"
 import RedisCommandBox from "./RedisCommandBox"
@@ -106,36 +101,6 @@ export default function SearchBox({
         filterExplorationFactor,
         setFilterExplorationFactor,
     })
-
-    // Add a ref to track if we've initialized the search type
-    const initialSearchTypeSetRef = useRef(false)
-
-    // set default searchType only when metadata changes
-    useEffect(() => {
-        if (!metadata) return // Don't set defaults if no metadata
-
-        const supportsEmbeddings =
-            metadata?.embedding.provider &&
-            metadata?.embedding.provider !== "none"
-
-        // Only set default on first metadata load
-        if (supportsEmbeddings && !initialSearchTypeSetRef.current) {
-            // Choose appropriate default search type based on embedding format
-            let newSearchType: "Vector" | "Element" | "Image"
-
-            // Always default to Image for any vector set that supports images
-            if (isImageEmbedding(metadata.embedding) || isMultiModalEmbedding(metadata.embedding)) {
-                newSearchType = "Image"
-            } else if (isTextEmbedding(metadata.embedding)) {
-                newSearchType = "Vector"
-            } else {
-                newSearchType = "Element"
-            }
-
-            setSearchType(newSearchType)
-            initialSearchTypeSetRef.current = true
-        }
-    }, [metadata, setSearchType])
 
     // Handle image embedding generation - memoized to prevent unnecessary recreations
     const handleImageSelect = useCallback((base64Data: string) => {

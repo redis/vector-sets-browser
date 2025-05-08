@@ -4,6 +4,7 @@ import { ColumnConfig } from "@/app/vectorset/hooks/useVectorResultsSettings"
 import { FilterField, SortColumn, SortDirection } from "../types"
 import ResultsTableHeader from "./ResultsTableHeader"
 import CompactResultRow from "./CompactResultRow"
+import { VectorSetMetadata } from "@/lib/types/vectors"
 
 export interface CompactResultsTableProps {
     filteredAndSortedResults: VectorTuple[]
@@ -22,6 +23,7 @@ export interface CompactResultsTableProps {
     onShowVectorClick: (e: React.MouseEvent, element: string) => void
     setEditingAttributes: (element: string) => void
     onDeleteClick: (e: React.MouseEvent, element: string) => void
+    metadata?: VectorSetMetadata | null
 }
 
 export default function CompactResultsTable({
@@ -40,7 +42,8 @@ export default function CompactResultsTable({
     handleSearchSimilar,
     onShowVectorClick,
     setEditingAttributes,
-    onDeleteClick
+    onDeleteClick,
+    metadata
 }: CompactResultsTableProps) {
     return (
         <Table>
@@ -71,6 +74,7 @@ export default function CompactResultsTable({
                         onShowVectorClick={onShowVectorClick}
                         setEditingAttributes={setEditingAttributes}
                         onDeleteClick={onDeleteClick}
+                        metadata={metadata}
                     />
                 ))}
             </TableBody>

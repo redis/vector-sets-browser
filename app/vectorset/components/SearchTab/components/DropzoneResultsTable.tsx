@@ -78,7 +78,7 @@ export default function DropzoneResultsTable({
             data-dropzone-id="results-table-dropzone"
         >
             <div className="flex flex-col">
-                <CompactResultsTable {...compactResultsTableProps} />
+                <CompactResultsTable {...compactResultsTableProps} metadata={metadata} />
                 <DropzoneFooter isDragging={isDragging} metadata={metadata} />
             </div>
         </DropZone>

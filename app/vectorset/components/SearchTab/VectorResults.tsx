@@ -19,6 +19,7 @@ import {
     VectorResultsProps,
 } from "./types"
 import { extractFilterFields, isEmptyVectorSet, sortResults } from "./utils"
+import { getProviderInfo, getProvidersByDataFormat } from "@/lib/embeddings/types/embeddingModels"
 
 export default function VectorResults({
     results,
@@ -461,7 +462,7 @@ export default function VectorResults({
             <EmptyVectorSet
                 onAddVector={onAddVector || (() => {})}
                 onChangeTab={changeTab || (() => {})}
-                handleAddVector={handleAddVectorWithImage}
+                handleAddVector={handleAddVectorWithImage || (async () => {})}
                 vectorSetName={keyName}
                 metadata={metadata}
             />
@@ -533,27 +534,31 @@ export default function VectorResults({
             />
 
             {isCompact ? (
-                <DropzoneResultsTable
-                    filteredAndSortedResults={filteredAndSortedResults}
-                    availableColumns={availableColumns}
-                    filterFields={filterFields}
-                    parsedAttributeCache={parsedAttributeCache}
-                    sortColumn={sortColumn}
-                    sortDirection={sortDirection}
-                    handleSort={handleSort}
-                    selectMode={selectMode}
-                    selectedElements={selectedElements}
-                    handleSelectToggle={handleSelectToggle}
-                    handleSelectAll={handleSelectAll}
-                    handleDeselectAll={handleDeselectAll}
-                    handleSearchSimilar={handleSearchSimilar}
-                    onShowVectorClick={onShowVectorClick}
-                    setEditingAttributes={setEditingAttributes}
-                    onDeleteClick={onDeleteClick}
-                    vectorSetName={keyName}
-                    handleAddVector={handleAddVectorWithImage}
-                    metadata={metadata}
-                />
+                <>
+                    <DropzoneResultsTable
+                        filteredAndSortedResults={filteredAndSortedResults}
+                        availableColumns={availableColumns}
+                        filterFields={filterFields}
+                        parsedAttributeCache={parsedAttributeCache}
+                        sortColumn={sortColumn}
+                        sortDirection={sortDirection}
+                        handleSort={handleSort}
+                        selectMode={selectMode}
+                        selectedElements={selectedElements}
+                        handleSelectToggle={handleSelectToggle}
+                        handleSelectAll={handleSelectAll}
+                        handleDeselectAll={handleDeselectAll}
+                        handleSearchSimilar={handleSearchSimilar}
+                        onShowVectorClick={onShowVectorClick}
+                        setEditingAttributes={setEditingAttributes}
+                        onDeleteClick={onDeleteClick}
+                        vectorSetName={keyName}
+                        handleAddVector={
+                            handleAddVectorWithImage || (async () => {})
+                        }
+                        metadata={metadata}
+                    />
+                </>
             ) : (
                 <ExpandedResultsList
                     filteredAndSortedResults={filteredAndSortedResults}

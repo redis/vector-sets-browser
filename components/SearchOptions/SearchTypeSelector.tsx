@@ -61,7 +61,6 @@ export default function SearchTypeSelector({
                 Search by
             </label>
             <Select
-                defaultValue={searchType}
                 value={searchType}
                 onValueChange={(value) => {
                     // Clear search query when switching between search types

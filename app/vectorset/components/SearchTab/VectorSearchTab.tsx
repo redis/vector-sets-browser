@@ -3,9 +3,10 @@
 import { useVectorSearch } from "@/app/vectorset/hooks/useVectorSearch"
 import SearchBox from "@/components/SearchBox"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { isImageEmbedding, isMultiModalEmbedding, isTextEmbedding } from "@/lib/embeddings/types/embeddingModels"
 import { VectorTuple, vlinks, vsim } from "@/lib/redis-server/api"
 import { VectorSetMetadata, VectorSetSearchOptions } from "@/lib/types/vectors"
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { toast } from "sonner"
 import VectorViz3D from "../VisualizationTab/VectorViz3D"
 import HNSW2dViz from "../VisualizationTab/vizualizer/HNSW2dViz"
@@ -66,6 +67,11 @@ export default function VectorSearchTab({
         forceLinearScan: false,
         noThread: false,
     })
+
+    // Ref to track the last vector set name we processed
+    const lastVectorSetRef = useRef<string | null>(null);
+    // Ref to track if we've already set the default search type
+    const searchTypeSetRef = useRef<boolean>(false);
 
     // Effect to fetch vectors when tab changes to 3D view
     useEffect(() => {
@@ -174,6 +180,39 @@ export default function VectorSearchTab({
         onSearchStateChange: handleSearchStateChange,
         fetchEmbeddings: false, // Always fetch embeddings for visualization
     })
+
+    // Effect to set default search type only when vector set changes
+    useEffect(() => {
+        // Skip if there's no metadata or if we're dealing with the same vector set
+        if (!metadata || vectorSetName === lastVectorSetRef.current) return;
+        
+        // Update last vector set ref
+        lastVectorSetRef.current = vectorSetName;
+        
+        // Use setTimeout to defer the search type update until after render
+        setTimeout(() => {
+            // Reset the search type only if we have a new vector set
+            if (metadata.embedding.provider && metadata.embedding.provider !== "none") {
+                let newSearchType: "Vector" | "Element" | "Image";
+                
+                // Always default to Image for any vector set that supports images
+                if (isImageEmbedding(metadata.embedding) || isMultiModalEmbedding(metadata.embedding)) {
+                    newSearchType = "Image";
+                } else if (isTextEmbedding(metadata.embedding)) {
+                    newSearchType = "Vector";
+                } else {
+                    newSearchType = "Element";
+                }
+                
+                // Only update search type if it's different
+                if (searchType !== newSearchType) {
+                    setSearchType(newSearchType);
+                }
+                
+                searchTypeSetRef.current = true;
+            }
+        }, 0);
+    }, [vectorSetName, metadata]); // Don't include searchType or setSearchType in dependencies
 
     const clearError = useCallback(() => {
         if (error && hookClearError) {

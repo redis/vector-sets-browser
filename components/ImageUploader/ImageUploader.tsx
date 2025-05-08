@@ -38,11 +38,11 @@ export default function ImageUploader({
         }
         
         // Set a timer to activate compact mode
-        const timer = setTimeout(() => {
-            setIsCompact(true)
-        }, 2500)
+        // const timer = setTimeout(() => {
+        //     setIsCompact(true)
+        // }, 2500)
         
-        return () => clearTimeout(timer)
+        //return () => clearTimeout(timer)
     }, [context, previewUrl, imageFiles])
 
     // Notify parent when images change

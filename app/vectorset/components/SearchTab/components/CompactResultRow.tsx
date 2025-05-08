@@ -1,7 +1,13 @@
+import React from "react"
 import { Button } from "@/components/ui/button"
 import { TableCell, TableRow } from "@/components/ui/table"
 import { ColumnConfig } from "@/app/vectorset/hooks/useVectorResultsSettings"
 import { VectorTuple } from "@/lib/redis-server/api"
+import { 
+    getEmbeddingIcon
+} from "@/components/EmbeddingConfig/EmbeddingIcons"
+import { EmbeddingDataFormat, getEmbeddingDataFormat } from "@/lib/embeddings/types/embeddingModels"
+import { VectorSetMetadata } from "@/lib/types/vectors"
 
 interface CompactResultRowProps {
     row: VectorTuple
@@ -15,6 +21,7 @@ interface CompactResultRowProps {
     onShowVectorClick: (e: React.MouseEvent, element: string) => void
     setEditingAttributes: (element: string) => void
     onDeleteClick: (e: React.MouseEvent, element: string) => void
+    metadata?: VectorSetMetadata | null
 }
 
 export default function CompactResultRow({
@@ -28,7 +35,8 @@ export default function CompactResultRow({
     handleSearchSimilar,
     onShowVectorClick,
     setEditingAttributes,
-    onDeleteClick
+    onDeleteClick,
+    metadata
 }: CompactResultRowProps) {
     // Helper to format different attribute value types
     const formatAttributeValue = (value: any): string => {
@@ -75,7 +83,12 @@ export default function CompactResultRow({
                     >
                         {col.type === "system" ? (
                             col.name === "element" ? (
-                                <div className="line-clamp-2 break-words">
+                                <div className="line-clamp-2 break-words flex items-center gap-2">
+                                    <span className="flex-shrink-0">
+                                        {React.createElement(getEmbeddingIcon(getEmbeddingDataFormat(
+                                                            metadata?.embedding
+                                                        )))}
+                                    </span>
                                     {row[0]}
                                 </div>
                             ) : typeof row[1] === "number" ? (
