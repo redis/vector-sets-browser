@@ -27,6 +27,23 @@ export default function ImageUploader({
     const [isProcessingEmbedding, setIsProcessingEmbedding] = useState(false)
     const [imageData, setImageData] = useState<string | null>(null)
     const [imageFiles, setImageFiles] = useState<ImageFileInfo[]>([])
+    const [isCompact, setIsCompact] = useState(false)
+
+    // Animate to compact mode after 2.5 seconds when in search context
+    useEffect(() => {
+        // Reset compact mode immediately when preview is available
+        if (previewUrl || context !== 'search') {
+            setIsCompact(false)
+            return
+        }
+        
+        // Set a timer to activate compact mode
+        const timer = setTimeout(() => {
+            setIsCompact(true)
+        }, 2500)
+        
+        return () => clearTimeout(timer)
+    }, [context, previewUrl, imageFiles])
 
     // Notify parent when images change
     useEffect(() => {
@@ -259,10 +276,11 @@ export default function ImageUploader({
                     isProcessingEmbedding={isProcessingEmbedding}
                     allowMultiple={allowMultiple}
                     context={context}
+                    isCompact={isCompact}
                 />
             )
         }
-    }, [allowMultiple, clearPreviewImage, imageFiles, isLoading, isProcessingEmbedding, previewUrl, removeImage, context])
+    }, [allowMultiple, clearPreviewImage, imageFiles, isLoading, isProcessingEmbedding, previewUrl, removeImage, context, isCompact])
 
     return (
         <div className={`flex items-center gap-2 w-full ${className}`}>
@@ -272,6 +290,7 @@ export default function ImageUploader({
                 isProcessingEmbedding={isProcessingEmbedding}
                 previewUrl={previewUrl}
                 allowMultiple={allowMultiple}
+                isCompact={isCompact}
             >
                 {renderContent()}
             </ImageDropZone>
