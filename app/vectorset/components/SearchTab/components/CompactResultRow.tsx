@@ -89,10 +89,10 @@ export default function CompactResultRow({
                                                             metadata?.embedding
                                                         )))}
                                     </span>
-                                    {row[0]}
+                                    <span className="font-medium">{row[0]}</span>
                                 </div>
                             ) : typeof row[1] === "number" ? (
-                                row[1].toFixed(4)
+                                <span className="text-muted-foreground border border-muted-foreground rounded-full p-1 text-xs">{row[1].toFixed(4)}</span>
                             ) : (
                                 row[1]
                             )

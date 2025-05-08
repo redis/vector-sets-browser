@@ -49,9 +49,11 @@ const SearchTimeIndicator: React.FC<SearchTimeIndicatorProps> = ({
     const isMilliseconds = searchTime < 1
 
     // Format the time appropriately
-    const formattedTime = isMilliseconds
-        ? `${(searchTime * 1000).toFixed(2)} ms`
-        : `${searchTime.toFixed(2)} s`
+    const timeValue = isMilliseconds
+        ? (searchTime * 1000).toFixed(1)
+        : searchTime.toFixed(2)
+    
+    const timeUnit = isMilliseconds ? "ms" : "s"
 
     // Determine color based on performance
     let colorClass = "text-black bg-green-100" // Fast
@@ -69,24 +71,42 @@ const SearchTimeIndicator: React.FC<SearchTimeIndicatorProps> = ({
         }
     }
 
+    let borderColor = "border-green-300"
+    if (isMilliseconds) {
+        if (searchTime * 1000 > 1000) {
+            borderColor = "border-red-500" // Slow
+        } else if (searchTime * 1000 > 500) {
+            borderColor = "border-yellow-500" // Moderate
+        }
+    } else {
+        if (searchTime > 1) {
+            borderColor = "border-red-500" // Slow
+        } else if (searchTime > 0.5) {
+            borderColor = "border-yellow-500" // Moderate
+        }
+    }
     return (
-        <div className={`-ml-1 p-1 flex space-x-1 items-center rounded-lg text-xs ${colorClass}`}>
-            <svg 
-                xmlns="http://www.w3.org/2000/svg" 
-                width="12" 
-                height="12" 
-                viewBox="0 0 24 24" 
-                fill="none" 
-                stroke="currentColor" 
-                strokeWidth="2" 
-                strokeLinecap="round" 
-                strokeLinejoin="round" 
-                className="text-gray-500"
+        <div
+            className={`-ml-1 pr-1 flex space-x-1 items-center rounded-lg text-xs border ${borderColor}`}
+        >
+            <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className={`text-gray-500 ${colorClass} rounded-full`}
             >
                 <circle cx="12" cy="12" r="10" />
                 <polyline points="12 6 12 12 16 14" />
             </svg>
-            <div>{formattedTime}</div>
+            <div>
+                {timeValue} <span className="text-muted-foreground">{timeUnit}</span>
+            </div>
         </div>
     )
 }
