@@ -105,7 +105,7 @@ const SearchTimeIndicator: React.FC<SearchTimeIndicatorProps> = ({
                 <polyline points="12 6 12 12 16 14" />
             </svg>
             <div>
-                {timeValue} <span className="text-muted-foreground">{timeUnit}</span>
+                VSIM Latency: {timeValue} <span className="text-muted-foreground">{timeUnit}</span>
             </div>
         </div>
     )

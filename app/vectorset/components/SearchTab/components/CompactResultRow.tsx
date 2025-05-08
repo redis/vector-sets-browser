@@ -92,14 +92,16 @@ export default function CompactResultRow({
                                     <span className="font-medium">{row[0]}</span>
                                 </div>
                             ) : typeof row[1] === "number" ? (
-                                <span className="text-muted-foreground border border-muted-foreground rounded-full p-1 text-xs">{row[1].toFixed(4)}</span>
+                                <span className="text-muted-foreground border border-gray-200 rounded-full p-1 text-xs">{row[1].toFixed(4)}</span>
                             ) : (
                                 row[1]
                             )
                         ) : (
-                            formatAttributeValue(
-                                parsedAttributeCache[row[0]]?.[col.name]
-                            )
+                            <span className="text-xs">
+                                {formatAttributeValue(
+                                    parsedAttributeCache[row[0]]?.[col.name]
+                                )}
+                            </span>
                         )}
                     </TableCell>
                 ))}
