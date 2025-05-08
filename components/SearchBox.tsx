@@ -123,11 +123,10 @@ export default function SearchBox({
             // Choose appropriate default search type based on embedding format
             let newSearchType: "Vector" | "Element" | "Image"
 
-            if (isImageEmbedding(metadata.embedding)) {
+            // Always default to Image for any vector set that supports images
+            if (isImageEmbedding(metadata.embedding) || isMultiModalEmbedding(metadata.embedding)) {
                 newSearchType = "Image"
             } else if (isTextEmbedding(metadata.embedding)) {
-                newSearchType = "Vector"
-            } else if (isMultiModalEmbedding(metadata.embedding)) {
                 newSearchType = "Vector"
             } else {
                 newSearchType = "Element"
