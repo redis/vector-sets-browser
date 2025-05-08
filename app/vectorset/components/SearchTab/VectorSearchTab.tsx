@@ -12,7 +12,7 @@ import VectorViz3D from "../VisualizationTab/VectorViz3D"
 import HNSW2dViz from "../VisualizationTab/vizualizer/HNSW2dViz"
 import { DeleteVectorDialog } from "./DeleteVectorDialog"
 import VectorResults from "./VectorResults"
-
+    
 interface VectorSearchTabProps {
     vectorSetName: string
     dim: number | null
