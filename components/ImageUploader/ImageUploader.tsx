@@ -254,6 +254,11 @@ export default function ImageUploader({
 
     // Render appropriate content based on state
     const renderContent = useCallback(() => {
+        // Helper function to determine the correct context for ImagePreview
+        const getPreviewContext = (): 'embedded' | 'default' => {
+            return context === 'embedded' ? 'embedded' : 'default'
+        }
+
         if (allowMultiple && imageFiles.length > 0) {
             return (
                 <MultipleImagesGrid
@@ -267,6 +272,7 @@ export default function ImageUploader({
                     src={previewUrl}
                     alt="Preview"
                     onRemove={clearPreviewImage}
+                    context={getPreviewContext()}
                 />
             )
         } else {
@@ -291,6 +297,7 @@ export default function ImageUploader({
                 previewUrl={previewUrl}
                 allowMultiple={allowMultiple}
                 isCompact={isCompact}
+                context={context}
             >
                 {renderContent()}
             </ImageDropZone>

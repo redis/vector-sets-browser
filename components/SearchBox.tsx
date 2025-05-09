@@ -5,6 +5,7 @@ import { useCallback } from "react"
 
 import { VectorTuple } from "@/lib/redis-server/api"
 import RedisCommandBox from "./RedisCommandBox"
+import { isImageEmbedding, isMultiModalEmbedding } from "@/lib/embeddings/types/embeddingModels"
 
 // Import custom hook
 import useSearchOptions from "@/app/vectorset/hooks/useSearchOptions"
@@ -18,6 +19,7 @@ import {
     SearchSettingsDropdown,
     SearchTypeSelector,
 } from "./SearchOptions"
+import { SearchType } from "./SearchOptions/SearchTypeSelector"
 
 const searchTypes = [
     {
@@ -36,8 +38,8 @@ const searchTypes = [
 
 interface SearchBoxProps {
     vectorSetName: string
-    searchType: "Vector" | "Element" | "Image"
-    setSearchType: (type: "Vector" | "Element" | "Image") => void
+    searchType: SearchType
+    setSearchType: (type: SearchType) => void
     searchQuery: string
     setSearchQuery: (query: string) => void
     searchFilter: string
@@ -104,9 +106,21 @@ export default function SearchBox({
 
     // Handle image embedding generation - memoized to prevent unnecessary recreations
     const handleImageSelect = useCallback((base64Data: string) => {
-        setSearchType("Image") // Set search type to Image when an image is selected
-        setSearchQuery(base64Data)
-    }, [setSearchQuery, setSearchType])
+        // Only change search type if we have image data and aren't already in an image mode
+        if (base64Data && !["Image", "TextAndImage", "ImageOrVector"].includes(searchType)) {
+            // For multi-modal models, use TextAndImage search type
+            if (metadata?.embedding && isMultiModalEmbedding(metadata.embedding)) {
+                setSearchType("TextAndImage")
+            }
+            // For image-only models, use Image search type
+            else if (metadata?.embedding && isImageEmbedding(metadata.embedding)) {
+                setSearchType("Image")
+            }
+        }
+        
+        // Don't set the base64 image data as the search query
+        // The embedding will be handled by the handleImageEmbeddingGenerated function
+    }, [setSearchType, searchType, metadata])
 
     const handleImageEmbeddingGenerated = useCallback((embedding: number[]) => {
         // Set search query to a vector representation (needed for the search)

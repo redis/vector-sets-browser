@@ -12,6 +12,7 @@ import VectorViz3D from "../VisualizationTab/VectorViz3D"
 import HNSW2dViz from "../VisualizationTab/vizualizer/HNSW2dViz"
 import { DeleteVectorDialog } from "./DeleteVectorDialog"
 import VectorResults from "./VectorResults"
+import { SearchType } from "@/components/SearchOptions/SearchTypeSelector"
     
 interface VectorSearchTabProps {
     vectorSetName: string
@@ -56,7 +57,7 @@ export default function VectorSearchTab({
 
     // Initialize with basic search state - advanced options will be loaded from userSettings by useVectorSearch
     const [searchState, setSearchState] = useState<VectorSetSearchOptions>({
-        searchType: "Vector" as const,
+        searchType: "Vector" as SearchType,
         searchQuery: "",
         searchCount: "10",
         searchFilter: "",
@@ -193,14 +194,22 @@ export default function VectorSearchTab({
         setTimeout(() => {
             // Reset the search type only if we have a new vector set
             if (metadata.embedding.provider && metadata.embedding.provider !== "none") {
-                let newSearchType: "Vector" | "Element" | "Image";
+                let newSearchType: SearchType;
                 
-                // Always default to Image for any vector set that supports images
-                if (isImageEmbedding(metadata.embedding) || isMultiModalEmbedding(metadata.embedding)) {
-                    newSearchType = "Image";
-                } else if (isTextEmbedding(metadata.embedding)) {
+                // Check for multi-modal embedding model
+                if (isMultiModalEmbedding(metadata.embedding)) {
+                    newSearchType = "TextAndImage";
+                } 
+                // Check for image-only embedding model
+                else if (isImageEmbedding(metadata.embedding) && !isTextEmbedding(metadata.embedding)) {
+                    newSearchType = "ImageOrVector";
+                }
+                // Check for text-only embedding model
+                else if (isTextEmbedding(metadata.embedding) && !isImageEmbedding(metadata.embedding)) {
                     newSearchType = "Vector";
-                } else {
+                }
+                // Default to Element if no embedding type is supported
+                else {
                     newSearchType = "Element";
                 }
                 
@@ -212,7 +221,7 @@ export default function VectorSearchTab({
                 searchTypeSetRef.current = true;
             }
         }, 0);
-    }, [vectorSetName, metadata]); // Don't include searchType or setSearchType in dependencies
+    }, [vectorSetName, metadata, setSearchType]);
 
     const clearError = useCallback(() => {
         if (error && hookClearError) {

@@ -4,6 +4,7 @@ import { VectorTuple, vdim, vsim, VsimResult } from "@/lib/redis-server/api"
 import { useCallback, useEffect, useRef, useState } from "react"
 import { VectorSetMetadata, VectorSetSearchOptions } from "@/lib/types/vectors"
 import { userSettings } from "@/lib/storage/userSettings"
+import { SearchType } from "@/components/SearchOptions/SearchTypeSelector"
 
 // Helper to convert VsimResult to VectorTuple array
 const convertToVectorTuple = (results: VsimResult): VectorTuple[] => {
@@ -22,8 +23,8 @@ interface UseVectorSearchProps {
 }
 
 interface UseVectorSearchReturn {
-    searchType: "Vector" | "Element" | "Image"
-    setSearchType: (type: "Vector" | "Element" | "Image") => void
+    searchType: SearchType
+    setSearchType: (type: SearchType) => void
     searchQuery: string
     setSearchQuery: (query: string) => void
     searchFilter: string
@@ -722,13 +723,20 @@ export function useVectorSearch({
         try {
             // If we have no query but have a filter, use zero vector search
             if (
-                internalSearchState.searchType === "Vector" &&
+                (internalSearchState.searchType === "Vector" || 
+                 internalSearchState.searchType === "TextAndImage") &&
                 !internalSearchState.searchQuery.trim()
             ) {
                 await performZeroVectorSearch(count)
-            } else if (internalSearchState.searchType === "Vector") {
+            } else if (
+                internalSearchState.searchType === "Vector" || 
+                internalSearchState.searchType === "TextAndImage" ||
+                internalSearchState.searchType === "ImageOrVector"
+            ) {
                 await handleVectorSearch(count)
-            } else if (internalSearchState.searchType === "Image") {
+            } else if (
+                internalSearchState.searchType === "Image"
+            ) {
                 await handleImageSearch(count)
             } else {
                 await handleElementSearch(count)

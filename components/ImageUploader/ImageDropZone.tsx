@@ -1,6 +1,5 @@
 import { Input } from "@/components/ui/input"
 import { ChangeEvent, useRef } from "react"
-import { X } from "lucide-react"
 
 interface ImageDropZoneProps {
     onFileSelect: (files: File[]) => void
@@ -9,8 +8,8 @@ interface ImageDropZoneProps {
     previewUrl: string | null
     allowMultiple: boolean
     isCompact?: boolean
-    className?: string
-    children?: React.ReactNode
+    children: React.ReactNode
+    context?: 'search' | 'add' | 'default' | 'embedded'
 }
 
 export default function ImageDropZone({
@@ -20,11 +19,11 @@ export default function ImageDropZone({
     previewUrl,
     allowMultiple,
     isCompact = false,
-    className = "",
-    children
+    children,
+    context = 'default'
 }: ImageDropZoneProps) {
     const fileInputRef = useRef<HTMLInputElement>(null)
-
+    
     const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
         const files = e.target.files
         if (!files || files.length === 0) return
@@ -50,25 +49,43 @@ export default function ImageDropZone({
         }
     }
 
+    // Get dynamic styling based on context
+    const getDropzoneClasses = () => {
+        const baseClasses = "relative flex flex-col items-center justify-center cursor-pointer transition-all"
+        
+        if (context === 'embedded') {
+            return `${baseClasses} h-full w-full p-1 rounded hover:bg-gray-100`
+        }
+        
+        return `${baseClasses} min-h-[200px] rounded p-6 border-2 border-dashed ${
+            isCompact ? 'border-gray-200' : 'border-gray-300 hover:bg-gray-50'
+        }`
+    }
+
+    // Loading or processing state
+    if (isLoading || isProcessingEmbedding) {
+        return (
+            <div className={getDropzoneClasses()}>
+                <div className="flex items-center justify-center">
+                    <div className="h-5 w-5 border-t-2 border-blue-500 rounded-full animate-spin"></div>
+                    <span className="ml-2 text-sm text-gray-500">
+                        {isProcessingEmbedding
+                            ? "Processing image..."
+                            : "Loading..."}
+                    </span>
+                </div>
+            </div>
+        )
+    }
+
     return (
         <div
-            className={`w-full grow border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center cursor-pointer hover:bg-gray-50 transition-all duration-300 relative overflow-hidden ${isCompact ? 'h-16 py-1 px-2' : 'h-28 p-2'} ${className}`}
+            className={getDropzoneClasses()}
             onClick={handleButtonClick}
             onDragOver={handleDragOver}
             onDrop={handleDrop}
         >
             {children}
-
-            {/* Show loading overlay if needed */}
-            {(isLoading || isProcessingEmbedding) && (
-                <div className="absolute inset-0 bg-black bg-opacity-30 flex items-center justify-center">
-                    <div className="bg-[white] px-4 py-2 rounded-lg">
-                        {isProcessingEmbedding
-                            ? "Processing embedding..."
-                            : "Processing image..."}
-                    </div>
-                </div>
-            )}
             <Input
                 ref={fileInputRef}
                 type="file"

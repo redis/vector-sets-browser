@@ -1,4 +1,5 @@
 import { EmbeddingConfig, getModelData } from "@/lib/embeddings/types/embeddingModels";
+import { SearchType } from "@/components/SearchOptions/SearchTypeSelector";
 
 export interface VectorSetAdvancedConfig {
     reduceDimensions?: number // If set, reduces vector dimensions using random projection
@@ -20,7 +21,7 @@ export interface VectorSetMetadata {
 
 // New interface for search options that combines VectorSetAdvancedConfig parameters with search state
 export interface VectorSetSearchOptions {
-    searchType: "Vector" | "Element" | "Image"
+    searchType: SearchType
     searchQuery: string
     searchCount: string
     searchFilter: string

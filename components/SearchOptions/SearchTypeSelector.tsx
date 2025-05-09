@@ -1,4 +1,4 @@
-import { isImageEmbedding, isMultiModalEmbedding } from "@/lib/embeddings/types/embeddingModels"
+import { isImageEmbedding, isMultiModalEmbedding, isTextEmbedding } from "@/lib/embeddings/types/embeddingModels"
 import { type VectorSetMetadata } from "@/lib/types/vectors"
 import {
     Select,
@@ -13,19 +13,39 @@ import { Input } from "@/components/ui/input"
 export const searchTypes = [
     {
         value: "Vector",
-        label: "Text or Vector",
+        label: "Vector",
+        forEmbeddings: ["text"] as string[],
     },
     {
         value: "Image",
         label: "Image",
+        forEmbeddings: ["image"] as string[],
+    },
+    {
+        value: "TextAndImage",
+        label: "Vector",
+        forEmbeddings: ["text-and-image"] as string[],
+    },
+    {
+        value: "ImageOrVector",
+        label: "Vector",
+        forEmbeddings: ["image"] as string[],
     },
     {
         value: "Element",
         label: "Element",
+        forEmbeddings: ["text", "image", "text-and-image"] as string[],
     },
 ] as const
 
-type SearchType = "Vector" | "Element" | "Image"
+export type SearchType = "Vector" | "Element" | "Image" | "TextAndImage" | "ImageOrVector"
+
+// Define a runtime type for search options that allows mutable labels
+type RuntimeSearchOption = {
+    value: (typeof searchTypes)[number]['value'];
+    label: string;
+    forEmbeddings: readonly string[];
+}
 
 interface SearchTypeSelectorProps {
     searchType: SearchType
@@ -44,16 +64,45 @@ export default function SearchTypeSelector({
     searchCount,
     setSearchCount,
 }: SearchTypeSelectorProps) {
+    // Determine which embedding type we're using
+    const isTextEmbeddingType = isTextEmbedding(metadata?.embedding)
+    const isImageEmbeddingType = isImageEmbedding(metadata?.embedding)
+    const isMultiModal = isMultiModalEmbedding(metadata?.embedding)
+
     // Filter search types based on metadata
-    const filteredSearchTypes = searchTypes.filter((type) => {
-        if (isMultiModalEmbedding(metadata?.embedding)) {
+    let filteredSearchTypes: RuntimeSearchOption[] = searchTypes.filter((type) => {
+        if (isMultiModal && type.forEmbeddings.includes("text-and-image")) {
             return true
         }
-        if (type.value === "Image" && !isImageEmbedding(metadata?.embedding)) {
-            return false
+        if (isTextEmbeddingType && !isImageEmbeddingType && type.forEmbeddings.includes("text")) {
+            return true
         }
-        return true
+        if (isImageEmbeddingType && !isTextEmbeddingType && type.forEmbeddings.includes("image")) {
+            return true
+        }
+        return false
+    }).map(type => ({
+        value: type.value,
+        label: type.label,
+        forEmbeddings: type.forEmbeddings
+    }));
+
+    // Rename the options for clarity according to embedding type
+    filteredSearchTypes = filteredSearchTypes.map(type => {
+        if (type.value === "Vector" && isTextEmbeddingType) {
+            return { ...type, label: "Vector" }
+        }
+        if (type.value === "ImageOrVector" && isImageEmbeddingType) {
+            return { ...type, label: "Image or Vector" }
+        }
+        return type
     })
+    
+    // Check if current search type is valid for this embedding type
+    // If not, default to the first available option
+    if (!filteredSearchTypes.some(type => type.value === searchType) && filteredSearchTypes.length > 0) {
+        setSearchType(filteredSearchTypes[0].value as SearchType)
+    }
 
     return (
         <div className="flex gap-2 items-center">
