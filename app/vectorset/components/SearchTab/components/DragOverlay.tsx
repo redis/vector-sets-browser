@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 
 interface DragOverlayProps {
     isDragging: boolean;
@@ -6,7 +6,27 @@ interface DragOverlayProps {
 }
 
 export function DragOverlay({ isDragging, renderCustomOverlay }: DragOverlayProps) {
-    if (!isDragging) return null;
+    // Add local state to track visibility with a slight delay
+    const [isVisible, setIsVisible] = useState(isDragging);
+    
+    // Update visibility state when isDragging changes
+    useEffect(() => {
+        // If isDragging becomes true, show immediately
+        if (isDragging) {
+            setIsVisible(true);
+            return;
+        }
+        
+        // If isDragging becomes false, delay hiding slightly
+        const timeout = setTimeout(() => {
+            setIsVisible(false);
+        }, 50);
+        
+        return () => clearTimeout(timeout);
+    }, [isDragging]);
+
+    // Don't render anything if not visible
+    if (!isVisible) return null;
 
     if (renderCustomOverlay) {
         return <>{renderCustomOverlay(true)}</>;

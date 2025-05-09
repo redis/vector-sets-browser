@@ -44,11 +44,11 @@ export default function DropzoneResultsTable({
 
     // Create a custom overlay that fits within the table container
     const customDropOverlay = () => (
-        <div className="absolute inset-0 bg-blue-50 bg-opacity-90 z-10 transition-all duration-200 flex items-center justify-center">
+        <div className="absolute inset-0 bg-blue-50 bg-opacity-90 z-10 transition-all duration-200 flex items-center justify-center border-2 border-dashed border-blue-500 rounded-lg">
             <div className="flex flex-col items-center px-4 py-6 text-center">
                 <UploadCloud className="h-16 w-16 mb-4 text-blue-500" />
                 <div className="text-lg font-semibold text-blue-700 mb-1">
-                    Drop files to add to vectors
+                    Drop files to add vectors
                 </div>
                 <div className="text-sm text-blue-500">{getDropMessage()}</div>
             </div>

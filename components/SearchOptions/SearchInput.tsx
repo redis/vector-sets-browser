@@ -42,6 +42,9 @@ export default function SearchInput({
     // Keep the preview URL for the selected image
     const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null)
     
+    // Track hover state when dragging over the drop area
+    const [isDraggingOver, setIsDraggingOver] = useState<boolean>(false)
+    
     // Reset the image when text input changes
     const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
         if (e.target.value && activeSearchMode === "image") {
@@ -200,13 +203,28 @@ export default function SearchInput({
                 {/* Image button - simplified alternative to ImageUploader */}
                 {showImageUploader && (
                     <div 
-                        className={`flex-shrink-0 border-r flex flex-col justify-center items-center p-1 cursor-pointer ${hasImage ? 'bg-blue-50' : 'bg-gray-50 hover:bg-gray-100'}`}
+                        className={`flex-shrink-0 border-r flex flex-col justify-center items-center p-1 cursor-pointer ${hasImage ? 'bg-blue-50' : isDraggingOver ? 'bg-blue-100' : 'bg-gray-50 hover:bg-gray-100'}`}
                         style={{ width: "120px", minWidth: "120px", height: "80px" }}
                         onClick={!hasImage ? handleImageButtonClick : undefined}
-                        onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                        onDragOver={(e) => { 
+                            e.preventDefault(); 
+                            e.stopPropagation();
+                            setIsDraggingOver(true);
+                        }}
+                        onDragLeave={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setIsDraggingOver(false);
+                        }}
+                        onDragExit={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setIsDraggingOver(false);
+                        }}
                         onDrop={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
+                            setIsDraggingOver(false);
                             if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
                                 const file = e.dataTransfer.files[0];
                                 if (file.type.startsWith('image/')) {
@@ -236,10 +254,10 @@ export default function SearchInput({
                     >
                         {!hasImage ? (
                             // Empty state - show icon and text
-                            <div className="h-full w-full flex flex-col items-center justify-center text-muted-foreground text-xs border border-dashed border-gray-300 rounded-md p-2">
+                            <div className={`h-full w-full flex flex-col items-center justify-center text-muted-foreground text-xs border border-dashed ${isDraggingOver ? 'border-blue-400' : 'border-gray-300'} rounded-md p-2 transition-colors duration-150`}>
                                 <ImageIcon size={24} />
                                 <span className="text-xs mt-1 text-center">
-                                    Search by image (drop here)
+                                    Search by image {isDraggingOver ? "(drop now)" : "(drop here)"}
                                 </span>
                             </div>
                         ) : (

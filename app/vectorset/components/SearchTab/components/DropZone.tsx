@@ -1,4 +1,4 @@
-import { ReactNode, useEffect } from "react"
+import { ReactNode, useEffect, useRef, useCallback } from "react"
 import { VectorSetMetadata } from "@/lib/types/vectors"
 import { ProgressBar } from "./ProgressBar"
 import { DragOverlay } from "./DragOverlay"
@@ -40,8 +40,12 @@ export default function DropZone({
         handleDragOver,
         handleDragEnter,
         handleDragLeave,
-        handleDrop
+        handleDrop,
+        setIsDragging
     } = useDropZone({ onAddVector, metadata })
+
+    // Ref to track the dropzone element
+    const dropzoneRef = useRef<HTMLDivElement>(null);
 
     // Use useEffect to call onDragStateChange when isDragging changes
     useEffect(() => {
@@ -50,10 +54,33 @@ export default function DropZone({
         }
     }, [isDragging, onDragStateChange]);
 
+    // More reliable mouse leave detection
+    const handleMouseLeave = useCallback((e: React.MouseEvent) => {
+        if (isDragging) {
+            // Check if the mouse is truly leaving the element and not just entering a child
+            if (e.currentTarget === e.target) {
+                // Extra check to see if the mouse is actually leaving the element
+                const rect = dropzoneRef.current?.getBoundingClientRect();
+                if (rect) {
+                    const { clientX, clientY } = e;
+                    const isOutsideX = clientX < rect.left || clientX > rect.right;
+                    const isOutsideY = clientY < rect.top || clientY > rect.bottom;
+                    
+                    if (isOutsideX || isOutsideY) {
+                        setIsDragging(false);
+                    }
+                } else {
+                    setIsDragging(false);
+                }
+            }
+        }
+    }, [isDragging, setIsDragging]);
+
     // If using the empty container style
     if (containerStyle === "empty") {
         return (
             <div
+                ref={dropzoneRef}
                 className={`w-full max-w-4xl p-2 border-1 border-dashed rounded-lg flex flex-col items-center justify-center
                   ${isDragging ? "bg-blue-50 border-blue-300" : "border-gray-300 hover:bg-gray-50"} 
                   ${className}`}
@@ -61,6 +88,7 @@ export default function DropZone({
                 onDragEnter={handleDragEnter}
                 onDragLeave={handleDragLeave}
                 onDrop={handleDrop}
+                onMouseLeave={handleMouseLeave}
                 data-dropzone-id={dropzoneId}
             >
                 {children || <EmptyDropZoneContent isDragging={isDragging} />}
@@ -78,11 +106,13 @@ export default function DropZone({
     // Default overlay style
     return (
         <div
+            ref={dropzoneRef}
             className={`relative ${className}`}
             onDragOver={handleDragOver}
             onDragEnter={handleDragEnter}
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
+            onMouseLeave={handleMouseLeave}
             data-dropzone-id={dropzoneId}
         >
             <DragOverlay 

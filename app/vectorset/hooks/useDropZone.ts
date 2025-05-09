@@ -21,6 +21,7 @@ interface UseDropZoneResult {
     handleDragEnter: (e: React.DragEvent) => void;
     handleDragLeave: (e: React.DragEvent) => void;
     handleDrop: (e: React.DragEvent) => void;
+    setIsDragging: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
 export function useDropZone({
@@ -37,17 +38,48 @@ export function useDropZone({
 
     // Clean up the timeout on unmount
     useEffect(() => {
+        // Set up global drag end event listener
+        const handleGlobalDragEnd = () => {
+            setIsDragging(false);
+        };
+
+        // Handle when user presses escape key
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape' && isDragging) {
+                setIsDragging(false);
+            }
+        };
+
+        // Handle when window loses focus
+        const handleWindowBlur = () => {
+            if (isDragging) {
+                setIsDragging(false);
+            }
+        };
+
+        // Add global event listeners
+        document.addEventListener('dragend', handleGlobalDragEnd);
+        document.addEventListener('keydown', handleKeyDown);
+        window.addEventListener('blur', handleWindowBlur);
+
         return () => {
+            // Clean up event listeners
+            document.removeEventListener('dragend', handleGlobalDragEnd);
+            document.removeEventListener('keydown', handleKeyDown);
+            window.removeEventListener('blur', handleWindowBlur);
+
             if (dragLeaveTimeoutRef.current) {
                 clearTimeout(dragLeaveTimeoutRef.current);
             }
+            // Reset state on unmount
+            setIsDragging(false);
         };
-    }, []);
+    }, [isDragging]);
 
     const handleDragOver = useCallback((e: React.DragEvent) => {
         e.preventDefault();
         e.stopPropagation();
-
+        
         // Check if the dragged items contain valid items
         if (containsValidItems(e.dataTransfer.items)) {
             setIsDragging(true);
@@ -210,6 +242,7 @@ export function useDropZone({
         handleDragOver,
         handleDragEnter,
         handleDragLeave,
-        handleDrop
+        handleDrop,
+        setIsDragging
     };
 } 
