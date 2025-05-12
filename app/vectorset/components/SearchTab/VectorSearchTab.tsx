@@ -195,23 +195,8 @@ export default function VectorSearchTab({
             // Reset the search type only if we have a new vector set
             if (metadata.embedding.provider && metadata.embedding.provider !== "none") {
                 let newSearchType: SearchType;
-                
-                // Check for multi-modal embedding model
-                if (isMultiModalEmbedding(metadata.embedding)) {
-                    newSearchType = "TextAndImage";
-                } 
-                // Check for image-only embedding model
-                else if (isImageEmbedding(metadata.embedding) && !isTextEmbedding(metadata.embedding)) {
-                    newSearchType = "ImageOrVector";
-                }
-                // Check for text-only embedding model
-                else if (isTextEmbedding(metadata.embedding) && !isImageEmbedding(metadata.embedding)) {
-                    newSearchType = "Vector";
-                }
-                // Default to Element if no embedding type is supported
-                else {
-                    newSearchType = "Element";
-                }
+
+                newSearchType = "Vector";
                 
                 // Only update search type if it's different
                 if (searchType !== newSearchType) {
@@ -222,12 +207,6 @@ export default function VectorSearchTab({
             }
         }, 0);
     }, [vectorSetName, metadata, setSearchType]);
-
-    const clearError = useCallback(() => {
-        if (error && hookClearError) {
-            hookClearError()
-        }
-    }, [error, hookClearError])
 
     const handleSearchQueryChange = (query: string) => {
         setSearchQuery(query)

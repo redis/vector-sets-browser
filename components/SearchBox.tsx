@@ -5,7 +5,10 @@ import { useCallback } from "react"
 
 import { VectorTuple } from "@/lib/redis-server/api"
 import RedisCommandBox from "./RedisCommandBox"
-import { isImageEmbedding, isMultiModalEmbedding } from "@/lib/embeddings/types/embeddingModels"
+import {
+    isImageEmbedding,
+    isMultiModalEmbedding,
+} from "@/lib/embeddings/types/embeddingModels"
 
 // Import custom hook
 import useSearchOptions from "@/app/vectorset/hooks/useSearchOptions"
@@ -105,27 +108,42 @@ export default function SearchBox({
     })
 
     // Handle image embedding generation - memoized to prevent unnecessary recreations
-    const handleImageSelect = useCallback((base64Data: string) => {
-        // Only change search type if we have image data and aren't already in an image mode
-        if (base64Data && !["Image", "TextAndImage", "ImageOrVector"].includes(searchType)) {
-            // For multi-modal models, use TextAndImage search type
-            if (metadata?.embedding && isMultiModalEmbedding(metadata.embedding)) {
-                setSearchType("TextAndImage")
+    const handleImageSelect = useCallback(
+        (base64Data: string) => {
+            // Only change search type if we have image data and aren't already in an image mode
+            if (
+                base64Data &&
+                !["Image", "TextAndImage", "ImageOrVector"].includes(searchType)
+            ) {
+                // For multi-modal models, use TextAndImage search type
+                if (
+                    metadata?.embedding &&
+                    isMultiModalEmbedding(metadata.embedding)
+                ) {
+                    setSearchType("TextAndImage")
+                }
+                // For image-only models, use Image search type
+                else if (
+                    metadata?.embedding &&
+                    isImageEmbedding(metadata.embedding)
+                ) {
+                    setSearchType("Image")
+                }
             }
-            // For image-only models, use Image search type
-            else if (metadata?.embedding && isImageEmbedding(metadata.embedding)) {
-                setSearchType("Image")
-            }
-        }
-        
-        // Don't set the base64 image data as the search query
-        // The embedding will be handled by the handleImageEmbeddingGenerated function
-    }, [setSearchType, searchType, metadata])
 
-    const handleImageEmbeddingGenerated = useCallback((embedding: number[]) => {
-        // Set search query to a vector representation (needed for the search)
-        setSearchQuery(embedding.join(", "))
-    }, [setSearchQuery])
+            // Don't set the base64 image data as the search query
+            // The embedding will be handled by the handleImageEmbeddingGenerated function
+        },
+        [setSearchType, searchType, metadata]
+    )
+
+    const handleImageEmbeddingGenerated = useCallback(
+        (embedding: number[]) => {
+            // Set search query to a vector representation (needed for the search)
+            setSearchQuery(embedding.join(", "))
+        },
+        [setSearchQuery]
+    )
 
     return (
         <section className="mb-2">
@@ -172,24 +190,22 @@ export default function SearchBox({
                             />
 
                             {/* Filter Button - Only shown for non-image searches */}
-                            {searchType !== "Image" && (
-                                <Button
-                                    variant="outline"
-                                    size="icon"
-                                    className={`h-9 ${
-                                        searchOptions.showFilters
-                                            ? "bg-gray-500 hover:bg-gray-600 text-white"
-                                            : "bg-[white] hover:bg-gray-100"
-                                    }`}
-                                    onClick={() =>
-                                        searchOptions.setShowFilters(
-                                            !searchOptions.showFilters
-                                        )
-                                    }
-                                >
-                                    <Filter className="h-4 w-4" />
-                                </Button>
-                            )}
+                            <Button
+                                variant="outline"
+                                size="icon"
+                                className={`h-9 ${
+                                    searchOptions.showFilters
+                                        ? "bg-gray-500 hover:bg-gray-600 text-white"
+                                        : "bg-[white] hover:bg-gray-100"
+                                }`}
+                                onClick={() =>
+                                    searchOptions.setShowFilters(
+                                        !searchOptions.showFilters
+                                    )
+                                }
+                            >
+                                <Filter className="h-4 w-4" />
+                            </Button>
                         </div>
 
                         {/* Filter Section */}
