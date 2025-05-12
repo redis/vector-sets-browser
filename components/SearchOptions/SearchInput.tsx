@@ -353,7 +353,7 @@ export default function SearchInput({
                         <Shuffle className="h-4 w-4" />
                     </Button>
                 )}
-                <div className="absolute bottom-0 right-0 flex flex-row gap-2">
+                <div className="absolute bottom-1 right-1 flex flex-row gap-2 backdrop-blur-sm bg-white/80 rounded-tl-md px-0">
                     <div className="flex-grow"></div>
                     <div className="text-xs text-gray-400 p-0.5 px-1 rounded-lg w-fit mt-1">
                         Embedding model:{" "}
