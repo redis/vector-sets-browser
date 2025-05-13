@@ -65,7 +65,7 @@ export function useVectorSearch({
     const initialSearchDone = useRef(false)
     const lastSearchRef = useRef<{
         query: string
-        type: "Vector" | "Element" | "Image"
+        type: "Vector" | "Multi-vector" | "Element" | "Image" 
         count: string
         filter: string
     }>({ query: "", type: "Vector", count: "10", filter: "" })
@@ -453,7 +453,7 @@ export function useVectorSearch({
     const handleVectorSearch = useCallback(
         async (count: number) => {
             if (!vectorSetName) return
-            console.log("handleVectorSearch")
+            console.log(`[useVectorSearch] handleVectorSearch for type: ${internalSearchState.searchType}`)
             // Clear any previous errors when starting a new search
             clearError()
 
@@ -468,10 +468,17 @@ export function useVectorSearch({
             if (!vectorData.some(isNaN)) {
                 // Valid vector data
                 searchVector = vectorData
-                // Set status message to show the first 3 numbers of the vector
-                const firstThreeNumbers = searchVector.slice(0, 3).join(", ")
-                searchString = `Results for Vector [${firstThreeNumbers}${searchVector.length > 3 ? "..." : ""
-                    }]`
+                
+                // Set different message based on search type
+                if (internalSearchState.searchType === "Multi-vector") {
+                    console.log(`[useVectorSearch] Using combined vector for Multi-vector search. Length: ${searchVector.length}`)
+                    searchString = "Results for Combined Vectors"
+                } else {
+                    // Set status message to show the first 3 numbers of the vector
+                    const firstThreeNumbers = searchVector.slice(0, 3).join(", ")
+                    searchString = `Results for Vector [${firstThreeNumbers}${searchVector.length > 3 ? "..." : ""
+                        }]`
+                }
 
                 // Clear any previous text embedding since this is a raw vector search
                 updateSearchState({ lastTextEmbedding: undefined })
@@ -486,6 +493,13 @@ export function useVectorSearch({
                 // Store the text embedding
                 updateSearchState({ lastTextEmbedding: searchVector })
             }
+
+            console.log("=============================================");
+            console.log("SEARCH VECTOR DETAILS:");
+            console.log(`Search type: ${internalSearchState.searchType}`);
+            console.log(`Vector length: ${searchVector.length}`);
+            console.log(`First 10 values: [${searchVector.slice(0, 10).join(", ")}${searchVector.length > 10 ? '...' : ''}]`);
+            console.log("=============================================");
 
             // Perform vector-based search and measure time
             const vsimResponse = await vsim({
@@ -523,6 +537,7 @@ export function useVectorSearch({
         [
             vectorSetName,
             internalSearchState.searchQuery,
+            internalSearchState.searchType,
             internalSearchState.searchFilter,
             internalSearchState.searchExplorationFactor,
             internalSearchState.forceLinearScan,
@@ -724,12 +739,14 @@ export function useVectorSearch({
             // If we have no query but have a filter, use zero vector search
             if (
                 (internalSearchState.searchType === "Vector" || 
+                 internalSearchState.searchType === "Multi-vector" ||
                  internalSearchState.searchType === "TextAndImage") &&
                 !internalSearchState.searchQuery.trim()
             ) {
                 await performZeroVectorSearch(count)
             } else if (
                 internalSearchState.searchType === "Vector" || 
+                internalSearchState.searchType === "Multi-vector" ||
                 internalSearchState.searchType === "TextAndImage" ||
                 internalSearchState.searchType === "ImageOrVector"
             ) {

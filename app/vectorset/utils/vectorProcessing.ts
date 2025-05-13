@@ -117,7 +117,9 @@ export const processTextContent = async (
 // Process image file and generate embedding
 export const processImageFile = async (
     file: File,
-    onAddVector?: (element: string, embedding: number[]) => Promise<void>
+    metadata: VectorSetMetadata,
+    onAddVector?: (element: string, embedding: number[]) => Promise<void>,
+    onError?: (message: string) => void
 ): Promise<void> => {
     if (!onAddVector) {
         console.error("onAddVector function not provided");
@@ -125,32 +127,76 @@ export const processImageFile = async (
     }
 
     try {
-        // Convert to base64
-        const base64Data = await fileToBase64(file);
+        // Check file size before processing
+        if (file.size > 10 * 1024 * 1024) { // 10MB limit
+            const errorMsg = `Image ${file.name} is too large (${(file.size / (1024 * 1024)).toFixed(2)}MB). Maximum size is 10MB.`;
+            console.error(errorMsg);
+            if (onError) onError(errorMsg);
+            return;
+        }
 
-        // Generate embedding using CLIP
-        const config = {
-            provider: "clip" as const,
-            clip: {
-                model: "clip-vit-base-patch32",
-            },
-        };
+        // Check image MIME type
+        if (!file.type.startsWith("image/")) {
+            const errorMsg = `File ${file.name} is not a supported image format.`;
+            console.error(errorMsg);
+            if (onError) onError(errorMsg);
+            return;
+        }
 
-        const embedding = await clientEmbeddingService.getEmbedding(
-            base64Data,
-            config,
-            true
-        );
+        try {
+            // Convert to base64
+            const base64Data = await fileToBase64(file);
 
-        // Use the file name as the element ID (without extension)
-        const elementId = file.name
-            .replace(/\.[^/.]+$/, "")
-            .replace(/[^a-zA-Z0-9]/g, "_");
+            // Generate embedding using CLIP
+            const config = {
+                provider: "clip" as const,
+                clip: {
+                    model: "clip-vit-base-patch32",
+                },
+            };
 
-        // Add the vector
-        await onAddVector(elementId, embedding);
+            const embedding = await clientEmbeddingService.getEmbedding(
+                base64Data,
+                config,
+                true
+            );
+
+            // Use the file name as the element ID (without extension)
+            const elementId = file.name
+                .replace(/\.[^/.]+$/, "")
+                .replace(/[^a-zA-Z0-9]/g, "_");
+
+            // Add the vector
+            await onAddVector(elementId, embedding);
+        } catch (processingError) {
+            let errorMessage = processingError instanceof Error 
+                ? processingError.message 
+                : `Unknown error processing image ${file.name}`;
+            
+            // Provide more specific guidance for common errors
+            if (errorMessage.includes("offset is out of bounds") || 
+                errorMessage.includes("memory limitations")) {
+                errorMessage = `Image ${file.name} could not be processed. The image may be too large or complex. Try using a smaller or simpler image.`;
+            }
+            
+            console.error(`Error processing image ${file.name}:`, processingError);
+            
+            if (onError) {
+                onError(errorMessage);
+            }
+            
+            throw new Error(errorMessage); // re-throw to signal failure to caller
+        }
     } catch (error) {
+        const errorMessage = error instanceof Error 
+            ? error.message 
+            : `Unknown error processing image ${file.name}`;
+            
         console.error(`Error processing image ${file.name}:`, error);
+        
+        if (onError) {
+            onError(errorMessage);
+        }
     }
 };
 

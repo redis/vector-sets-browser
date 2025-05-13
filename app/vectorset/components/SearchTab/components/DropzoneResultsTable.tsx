@@ -10,6 +10,7 @@ import {
     isImageEmbedding,
     isMultiModalEmbedding,
 } from "@/lib/embeddings/types/embeddingModels"
+import { toast } from "sonner"
 
 interface DropzoneResultsTableProps extends CompactResultsTableProps {
     handleAddVector: (element: string, embedding: number[]) => Promise<void>
@@ -24,6 +25,7 @@ export default function DropzoneResultsTable({
     ...compactResultsTableProps
 }: DropzoneResultsTableProps) {
     const [isDragging, setIsDragging] = useState(false)
+    const [isProcessing, setIsProcessing] = useState(false)
 
     // Get the appropriate drop message based on embedding type
     const getDropMessage = () => {
@@ -61,10 +63,17 @@ export default function DropzoneResultsTable({
         embedding: number[]
     ) => {
         try {
+            setIsProcessing(true)
             await handleAddVector(element, embedding)
+        } catch (error) {
+            console.error("Error adding vector:", error)
+            toast.error(
+                error instanceof Error ? error.message : "An unknown error occurred"
+            )
         } finally {
             // Make sure isDragging is reset regardless of success or failure
             setIsDragging(false)
+            setIsProcessing(false)
         }
     }
 
@@ -79,7 +88,11 @@ export default function DropzoneResultsTable({
         >
             <div className="flex flex-col">
                 <CompactResultsTable {...compactResultsTableProps} metadata={metadata} />
-                <DropzoneFooter isDragging={isDragging} metadata={metadata} />
+                <DropzoneFooter 
+                    isDragging={isDragging} 
+                    isProcessing={isProcessing} 
+                    metadata={metadata} 
+                />
             </div>
         </DropZone>
     )

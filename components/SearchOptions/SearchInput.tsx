@@ -6,9 +6,10 @@ import {
     isTextEmbedding
 } from "@/lib/embeddings/types/embeddingModels"
 import { type VectorSetMetadata } from "@/lib/types/vectors"
-import { ImageIcon, Shuffle, X } from "lucide-react"
+import { ImageIcon, Search, Shuffle, X } from "lucide-react"
 import { useCallback, useMemo, useState } from "react"
 import { type SearchType } from "./SearchTypeSelector"
+
 interface SearchInputProps {
     searchType: SearchType
     searchQuery: string
@@ -17,6 +18,7 @@ interface SearchInputProps {
     dim: number | null
     onImageSelect: (base64Data: string) => void
     onImageEmbeddingGenerated: (embedding: number[]) => void
+    triggerSearch?: () => void // Optional function to explicitly trigger search
 }
 
 export default function SearchInput({
@@ -27,6 +29,7 @@ export default function SearchInput({
     dim,
     onImageSelect,
     onImageEmbeddingGenerated,
+    triggerSearch
 }: SearchInputProps) {
     const supportsEmbeddings =
         metadata?.embedding.provider && metadata?.embedding.provider !== "none"
@@ -130,6 +133,14 @@ export default function SearchInput({
     // Show shuffle button for Vector searches
     const showShuffleButton = searchType === "Vector"
 
+    // Handler for search button click
+    const handleSearchClick = () => {
+        if (triggerSearch) {
+            console.log("Manually triggering search from SearchInput");
+            triggerSearch();
+        }
+    };
+
     // For the simplified embedded image uploader
     const handleImageButtonClick = () => {
         // Open a file dialog
@@ -170,32 +181,18 @@ export default function SearchInput({
         input.click()
     }
 
-    // Modified image embedding handler to put the vector in the textarea
-    const handleImageEmbeddingGenerated = useCallback(
-        (embedding: number[]) => {
-            if (embedding && embedding.length > 0) {
-                // Format the vector nicely with limited decimal places
-                const formattedVector = embedding
-                    .map((n) => n.toFixed(6))
-                    .join(", ")
-                // Set search query to the vector representation
-                setSearchQuery(formattedVector)
-                // Keep track that we're still using an image (even though we have text)
-                setActiveSearchMode("image")
-            }
-
-            // Call the original handler to ensure proper behavior
-            onImageEmbeddingGenerated(embedding)
-        },
-        [setSearchQuery, onImageEmbeddingGenerated]
-    )
+    // Modified handler for image embedding generation
+    const handleImageEmbeddingGenerated = (embedding: number[]) => {
+        // Set search query to a vector representation (needed for the search)
+        setSearchQuery(embedding.join(", "))
+    }
 
     // Render the integrated search input for all types
     return (
         <div className="relative flex-1 w-full">
             <div
                 className={`border rounded w-full flex items-stretch overflow-hidden ${
-                    showShuffleButton ? "pr-12" : ""
+                    showShuffleButton ? "pr-24" : "pr-12"
                 }`}
             >
                 {/* Image button - simplified alternative to ImageUploader */}
@@ -339,6 +336,19 @@ export default function SearchInput({
                             </p>
                         </div>
                     </div>
+                )}
+
+                {/* Search button */}
+                {triggerSearch && (
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className="absolute right-12 top-0 h-full"
+                        onClick={handleSearchClick}
+                        title="Search"
+                    >
+                        <Search className="h-4 w-4" />
+                    </Button>
                 )}
 
                 {/* Random vector button */}

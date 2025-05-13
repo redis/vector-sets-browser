@@ -6,6 +6,7 @@ import {
     containsValidItems 
 } from "../utils/vectorProcessing";
 import { VectorSetMetadata } from "@/lib/types/vectors";
+import { toast } from "sonner";
 
 interface UseDropZoneOptions {
     onAddVector?: (element: string, embedding: number[]) => Promise<void>;
@@ -108,15 +109,27 @@ export function useDropZone({
         
         // Only respond to drag leave events from the current target, not children
         if (e.currentTarget === e.target) {
-            // Clear existing timeout if any
-            if (dragLeaveTimeoutRef.current) {
-                clearTimeout(dragLeaveTimeoutRef.current);
-            }
+            // Check if the mouse position is actually outside the element
+            const rect = e.currentTarget.getBoundingClientRect();
+            const { clientX, clientY } = e;
             
-            // Set a small delay before removing the dragging state to prevent flickering
-            dragLeaveTimeoutRef.current = setTimeout(() => {
-                setIsDragging(false);
-            }, 50);
+            // Only set isDragging to false if the cursor is actually outside the dropzone
+            if (
+                clientX < rect.left || 
+                clientX > rect.right || 
+                clientY < rect.top || 
+                clientY > rect.bottom
+            ) {
+                // Clear existing timeout if any
+                if (dragLeaveTimeoutRef.current) {
+                    clearTimeout(dragLeaveTimeoutRef.current);
+                }
+                
+                // Set a small delay before removing the dragging state to prevent flickering
+                dragLeaveTimeoutRef.current = setTimeout(() => {
+                    setIsDragging(false);
+                }, 100);
+            }
         }
     }, []);
 
@@ -184,30 +197,49 @@ export function useDropZone({
 
                     if (item.kind === "string" && item.type === "text/plain") {
                         item.getAsString(async (text) => {
-                            await processTextContent(
-                                text,
-                                metadata,
-                                undefined,
-                                onAddVector
-                            );
-                            setProcessedCount((prev) => prev + 1);
+                            try {
+                                await processTextContent(
+                                    text,
+                                    metadata,
+                                    undefined,
+                                    onAddVector
+                                );
+                            } catch (error) {
+                                console.error("Error processing clipboard text:", error);
+                                toast.error(
+                                    error instanceof Error 
+                                        ? error.message 
+                                        : "Failed to process clipboard text"
+                                );
+                            } finally {
+                                setProcessedCount((prev) => prev + 1);
+                            }
                         });
                     }
                 }
             }
 
-            // Process each image
+            // Process each image with error handling for individual files
             for (let i = 0; i < imageFiles.length; i++) {
                 const file = imageFiles[i];
                 try {
-                    await processImageFile(file, onAddVector);
-                    setProcessedCount((prev) => prev + 1);
+                    await processImageFile(
+                        file, 
+                        metadata,
+                        onAddVector,
+                        (errorMessage) => {
+                            toast.error(errorMessage);
+                        }
+                    );
                 } catch (error) {
-                    console.error(`Error processing image ${file.name}:`, error);
+                    // Error already logged and reported by processImageFile
+                    // Just continue with next file
+                } finally {
+                    setProcessedCount((prev) => prev + 1);
                 }
             }
 
-            // Process each text file
+            // Process each text file with error handling for individual files
             for (let i = 0; i < textFiles.length; i++) {
                 const file = textFiles[i];
                 try {
@@ -220,12 +252,15 @@ export function useDropZone({
                         elementId,
                         onAddVector
                     );
-                    setProcessedCount((prev) => prev + 1);
                 } catch (error) {
-                    console.error(
-                        `Error processing text file ${file.name}:`,
-                        error
+                    console.error(`Error processing text file ${file.name}:`, error);
+                    toast.error(
+                        error instanceof Error 
+                            ? error.message 
+                            : `Failed to process file ${file.name}`
                     );
+                } finally {
+                    setProcessedCount((prev) => prev + 1);
                 }
             }
 

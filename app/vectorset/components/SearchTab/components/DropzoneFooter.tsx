@@ -1,15 +1,24 @@
-import { UploadCloud } from "lucide-react"
+import { UploadCloud, Loader2 } from "lucide-react"
 import { VectorSetMetadata } from "@/lib/types/vectors"
 import { isTextEmbedding, isImageEmbedding, isMultiModalEmbedding } from "@/lib/embeddings/types/embeddingModels"
 
 interface DropzoneFooterProps {
   isDragging?: boolean
+  isProcessing?: boolean
   metadata?: VectorSetMetadata | null
 }
 
-export default function DropzoneFooter({ isDragging = false, metadata }: DropzoneFooterProps) {
+export default function DropzoneFooter({ 
+  isDragging = false, 
+  isProcessing = false, 
+  metadata 
+}: DropzoneFooterProps) {
   // Determine the placeholder text based on embedding type
   const getDropzoneText = () => {
+    if (isProcessing) {
+      return "Processing files..."
+    }
+    
     if (!metadata?.embedding) {
       return "Drag and Drop files here"
     }
@@ -28,12 +37,18 @@ export default function DropzoneFooter({ isDragging = false, metadata }: Dropzon
   return (
     <div 
       className={`mt-4 border-1 border-dashed rounded w-full py-2 px-6 my-2 flex items-center justify-center transition-colors duration-200 ${
-        isDragging ? "border-blue-400 bg-blue-50" : "border-gray-300 hover:bg-gray-50"
+        isDragging ? "border-blue-400 bg-blue-50" : 
+        isProcessing ? "border-blue-400 bg-blue-50" : 
+        "border-gray-300 hover:bg-gray-50"
       }`}
     >
       <div className="flex items-center space-x-3 text-sm">
-        <UploadCloud className={`h-6 w-6 ${isDragging ? "text-blue-500" : "text-gray-400"}`} />
-        <span className={`${isDragging ? "text-blue-700" : "text-gray-400"}`}>
+        {isProcessing ? (
+          <Loader2 className="h-6 w-6 text-blue-500 animate-spin" />
+        ) : (
+          <UploadCloud className={`h-6 w-6 ${isDragging ? "text-blue-500" : "text-gray-400"}`} />
+        )}
+        <span className={`${isDragging || isProcessing ? "text-blue-700" : "text-gray-400"}`}>
           {getDropzoneText()}
         </span>
       </div>

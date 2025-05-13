@@ -54,6 +54,13 @@ export async function POST(
                     throw new Error("Vector set already exists")
                 }
 
+                // IMPORTANT: Always clean up any existing metadata for this key
+                // even if the vector set doesn't exist anymore - this prevents issues
+                // when recreating a vector set with the same name
+                const configKey = "vector-set-browser:config"
+                const hashKey = `vset:${keyName}:metadata`
+                await client.hDel(configKey, hashKey)
+
                 let effectiveDimensions = dimensions
 
                 // If dimensions is not specified or zero, try to determine from metadata and/or embedding service

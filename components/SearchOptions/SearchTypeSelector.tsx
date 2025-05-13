@@ -17,13 +17,18 @@ export const searchTypes = [
         forEmbeddings: ["text", "image", "text-and-image"] as string[],
     },
     {
+        value: "Multi-vector",
+        label: "Multi-vector",
+        forEmbeddings: ["text", "image", "text-and-image"] as string[],
+    },
+    {
         value: "Element",
         label: "Element",
         forEmbeddings: ["text", "image", "text-and-image"] as string[],
     },
 ] as const
 
-export type SearchType = "Vector" | "Element"
+export type SearchType = "Vector" | "Multi-vector" | "Element"
 
 interface SearchTypeSelectorProps {
     searchType: SearchType

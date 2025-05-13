@@ -31,9 +31,18 @@ export class CLIPProvider implements EmbeddingProvider {
             try {
                 // Process the image
                 const image = await RawImage.read(objectUrl)
-                const imageInputs = await this.imageProcessor(image)
-                const { image_embeds } = await this.visionModel(imageInputs)
-                return Array.from(image_embeds.data)
+                
+                try {
+                    const imageInputs = await this.imageProcessor(image)
+                    const { image_embeds } = await this.visionModel(imageInputs)
+                    return Array.from(image_embeds.data)
+                } catch (processingError) {
+                    // Handle specific memory-related errors
+                    if (processingError instanceof RangeError && processingError.message.includes('offset')) {
+                        throw new Error('Image processing failed due to memory limitations. Try a smaller or less complex image.')
+                    }
+                    throw processingError
+                }
             } finally {
                 // Clean up the object URL
                 URL.revokeObjectURL(objectUrl)

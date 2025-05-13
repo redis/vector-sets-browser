@@ -59,18 +59,18 @@ export default function DropZone({
         if (isDragging) {
             // Check if the mouse is truly leaving the element and not just entering a child
             if (e.currentTarget === e.target) {
-                // Extra check to see if the mouse is actually leaving the element
+                // Get the mouse position
+                const { clientX, clientY } = e;
                 const rect = dropzoneRef.current?.getBoundingClientRect();
+                
                 if (rect) {
-                    const { clientX, clientY } = e;
+                    // Only set isDragging to false if the cursor is actually outside the dropzone
                     const isOutsideX = clientX < rect.left || clientX > rect.right;
                     const isOutsideY = clientY < rect.top || clientY > rect.bottom;
                     
                     if (isOutsideX || isOutsideY) {
                         setIsDragging(false);
                     }
-                } else {
-                    setIsDragging(false);
                 }
             }
         }
@@ -81,8 +81,8 @@ export default function DropZone({
         return (
             <div
                 ref={dropzoneRef}
-                className={`w-full max-w-4xl p-2 border-1 border-dashed rounded-lg flex flex-col items-center justify-center
-                  ${isDragging ? "bg-blue-50 border-blue-300" : "border-gray-300 hover:bg-gray-50"} 
+                className={`w-full max-w-4xl p-2 border-1 border-dashed rounded-lg flex flex-col items-center justify-center transition-colors duration-200
+                  ${isDragging ? "bg-blue-100 border-blue-300" : "border-gray-300 hover:bg-blue-100"} 
                   ${className}`}
                 onDragOver={handleDragOver}
                 onDragEnter={handleDragEnter}
