@@ -15,27 +15,21 @@ import {
     TooltipProvider,
     TooltipTrigger,
 } from "@/components/ui/tooltip"
-import { clientEmbeddingService } from "@/lib/embeddings/client/embeddingService"
 import { VectorSetMetadata } from "@/lib/types/vectors"
 import {
-    combineAndNormalizeVectors,
-    combineVectorsWithMethod,
-    formatVector,
-    parseVectorString,
-    VectorCombinationMethod,
+    VectorCombinationMethod
 } from "@/lib/vector/vectorUtils"
 import { Info, Minus, Plus, Search } from "lucide-react"
 import { useCallback, useEffect, useRef, useState } from "react"
+import {
+    combinationMethodOptions,
+    generateId,
+    VectorInput
+} from "./MultiVectorInputUtils"
 import SearchInput from "./SearchInput"
+import { VectorCombinationService } from "./VectorCombinationService"
 import VectorSimilarityVisualizer from "./VectorSimilarityVisualizer"
 import WeightVisualization from "./WeightVisualization"
-import { 
-    VectorInput, 
-    combinationMethodOptions, 
-    generateId, 
-    getMethodDescription 
-} from "./MultiVectorInputUtils"
-import { VectorCombinationService } from "./VectorCombinationService"
 
 interface MultiVectorInputProps {
     metadata: VectorSetMetadata | null
