@@ -92,15 +92,15 @@ export default function VectorHeatmap({
                     {renderVectorStats()}
                     <div className="flex justify-center mt-4 gap-6 p-2 bg-slate-50 rounded w-full">
                         <div className="flex items-center gap-2">
-                            <div className="w-5 h-5 bg-blue-600 rounded-sm"></div>
+                            <div className="w-5 h-5 rounded-sm" style={{ backgroundColor: "#3b4cc0" }}></div>
                             <span>-1 (Negative)</span>
                         </div>
                         <div className="flex items-center gap-2">
-                            <div className="w-5 h-5 bg-white border rounded-sm"></div>
+                            <div className="w-5 h-5 border rounded-sm" style={{ backgroundColor: "#f7f7f7" }}></div>
                             <span>0 (Neutral)</span>
                         </div>
                         <div className="flex items-center gap-2">
-                            <div className="w-5 h-5 bg-red-600 rounded-sm"></div>
+                            <div className="w-5 h-5 rounded-sm" style={{ backgroundColor: "#b40426" }}></div>
                             <span>1 (Positive)</span>
                         </div>
                     </div>

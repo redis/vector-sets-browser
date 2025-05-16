@@ -48,9 +48,8 @@ export default function MiniVectorHeatmap({ vector, disabled = false }: MiniVect
                     <VectorHeatmapRenderer 
                         vector={vector}
                         showStats={false}
-                        width={80}
-                        height={80}
-                        cellSize={2}
+                        size={60}
+                        // Let the renderer calculate optimal cell size based on the fixed size
                     />
                 </div>
             </div>

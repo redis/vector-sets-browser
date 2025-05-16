@@ -3,29 +3,24 @@ import { useRef, useEffect, useState, useLayoutEffect } from "react"
 interface VectorHeatmapRendererProps {
     vector: number[] | null
     className?: string
-    cellSize?: number
+    size?: number
     showStats?: boolean
-    width?: number
-    height?: number
 }
 
 export default function VectorHeatmapRenderer({ 
     vector, 
     className = "",
-    cellSize: initialCellSize,
-    showStats = false,
-    width,
-    height
+    size = 300,
+    showStats = false
 }: VectorHeatmapRendererProps) {
     const canvasRef = useRef<HTMLCanvasElement>(null)
     const [hoveredCell, setHoveredCell] = useState<{ index: number; value: number } | null>(null)
-    const [cellSize, setCellSize] = useState(initialCellSize || 20)
     const [isCanvasReady, setIsCanvasReady] = useState(false)
     const [forceRender, setForceRender] = useState(0)
 
-    // Calculate optimal dimensions based on vector length
-    const getDimensions = (length: number, size: number) => {
-        const cols = Math.min(Math.ceil(Math.sqrt(length)), 32)
+    // Calculate optimal grid dimensions based on vector length
+    const getGridDimensions = (length: number) => {
+        const cols = Math.ceil(Math.sqrt(length))
         const rows = Math.ceil(length / cols)
         return { cols, rows }
     }
@@ -68,48 +63,51 @@ export default function VectorHeatmapRenderer({
             return
         }
 
-        // Determine optimal cell size based on vector length
-        let optimalCellSize = initialCellSize || 20
-        if (!initialCellSize) {
-            if (vector.length > 1000) optimalCellSize = 12
-            else if (vector.length > 500) optimalCellSize = 16
-        }
-        setCellSize(optimalCellSize)
-
         // Determine grid dimensions
-        const { cols, rows } = getDimensions(vector.length, optimalCellSize)
+        const { cols, rows } = getGridDimensions(vector.length)
 
-        // Set canvas size
-        if (width && height) {
-            canvas.width = width
-            canvas.height = height
-            
-            // If fixed dimensions are provided, adjust cell size to fit
-            const adjustedCellWidth = width / cols
-            const adjustedCellHeight = height / rows
-            optimalCellSize = Math.min(adjustedCellWidth, adjustedCellHeight)
-        } else {
-            canvas.width = cols * optimalCellSize
-            canvas.height = rows * optimalCellSize
-        }
+        // Set canvas size to be square
+        canvas.width = size
+        canvas.height = size
+
+        // Calculate cell size to fit the grid in the square
+        const cellWidth = size / cols
+        const cellHeight = size / rows
+
+        // Use the smaller dimension to ensure square cells
+        const cellSize = Math.min(cellWidth, cellHeight)
 
         // Clear canvas
         ctx.clearRect(0, 0, canvas.width, canvas.height)
 
+        // Calculate the actual used width and height
+        const usedWidth = cols * cellSize
+        const usedHeight = rows * cellSize
+
+        // Center the grid in the canvas
+        const offsetX = (size - usedWidth) / 2
+        const offsetY = (size - usedHeight) / 2
+
         // Draw heatmap
         vector.forEach((value, index) => {
-            drawCell(ctx, index, value, cols, optimalCellSize)
+            drawCell(ctx, index, value, cols, cellSize, offsetX, offsetY)
         })
 
         // Add hover handler only if showStats is true
         if (showStats) {
             const handleMouseMove = (e: MouseEvent) => {
                 const rect = canvas.getBoundingClientRect()
-                const x = e.clientX - rect.left
-                const y = e.clientY - rect.top
+                const x = e.clientX - rect.left - offsetX
+                const y = e.clientY - rect.top - offsetY
                 
-                const col = Math.floor(x / optimalCellSize)
-                const row = Math.floor(y / optimalCellSize)
+                // Ignore if outside the grid area
+                if (x < 0 || y < 0 || x >= usedWidth || y >= usedHeight) {
+                    setHoveredCell(null)
+                    return
+                }
+                
+                const col = Math.floor(x / cellSize)
+                const row = Math.floor(y / cellSize)
                 
                 const index = row * cols + col
                 
@@ -132,7 +130,7 @@ export default function VectorHeatmapRenderer({
                 canvas.removeEventListener('mouseleave', handleMouseLeave)
             }
         }
-    }, [vector, isCanvasReady, forceRender, initialCellSize, width, height])
+    }, [vector, isCanvasReady, forceRender, size])
 
     // Function to draw a single cell
     const drawCell = (
@@ -140,30 +138,34 @@ export default function VectorHeatmapRenderer({
         index: number, 
         value: number, 
         cols: number,
-        cellSize: number
+        cellSize: number,
+        offsetX: number,
+        offsetY: number
     ) => {
         try {
             const col = index % cols
             const row = Math.floor(index / cols)
-            const x = col * cellSize
-            const y = row * cellSize
+            const x = offsetX + col * cellSize
+            const y = offsetY + row * cellSize
 
             // Normalize value to be between -1 and 1
             const normalizedValue = Math.max(-1, Math.min(1, value))
             
             let r, g, b
             if (normalizedValue < 0) {
-                // Blue to white (-1 to 0)
+                // Blue to white for negative values (-1 to 0)
+                // #3b4cc0 (dark blue) → #f7f7f7 (white)
                 const intensity = 1 + normalizedValue
-                r = Math.round(255 * intensity)
-                g = Math.round(255 * intensity)
-                b = 255
+                r = Math.round(59 + (247 - 59) * intensity)
+                g = Math.round(76 + (247 - 76) * intensity)
+                b = Math.round(192 + (247 - 192) * intensity)
             } else {
-                // White to red (0 to 1)
+                // White to red for positive values (0 to 1)
+                // #f7f7f7 (white) → #b40426 (red)
                 const intensity = 1 - normalizedValue
-                r = 255
-                g = Math.round(255 * intensity)
-                b = Math.round(255 * intensity)
+                r = Math.round(180 + (247 - 180) * intensity)
+                g = Math.round(4 + (247 - 4) * intensity)
+                b = Math.round(38 + (247 - 38) * intensity)
             }
 
             ctx.fillStyle = `rgb(${r}, ${g}, ${b})`
@@ -180,10 +182,6 @@ export default function VectorHeatmapRenderer({
     // Render vector stats if requested
     const renderVectorStats = () => {
         if (!vector || vector.length === 0 || !showStats) return null
-
-        const min = Math.min(...vector)
-        const max = Math.max(...vector)
-        const avg = vector.reduce((sum, val) => sum + val, 0) / vector.length
 
         return (
             <div className="mt-2 text-xs text-gray-600">
@@ -202,8 +200,8 @@ export default function VectorHeatmapRenderer({
                 ref={canvasRef} 
                 style={{ 
                     display: 'block',
-                    width: width || 'auto',
-                    height: height || 'auto'
+                    width: size,
+                    height: size
                 }} 
             />
             {renderVectorStats()}
