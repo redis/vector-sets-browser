@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button"
 import { type VectorSetMetadata } from "@/lib/types/vectors"
 import { Filter, X } from "lucide-react"
-import { useCallback } from "react"
+import { useCallback, useMemo } from "react"
 
 import { VectorTuple } from "@/lib/redis-server/api"
 import RedisCommandBox from "./RedisCommandBox"
@@ -64,6 +64,7 @@ interface SearchBoxProps {
     setNoThread: (value: boolean) => void
     executedCommand?: string
     results?: VectorTuple[]
+    lastTextEmbedding?: number[]
 }
 
 export default function SearchBox({
@@ -90,6 +91,7 @@ export default function SearchBox({
     setNoThread,
     executedCommand,
     results = [],
+    lastTextEmbedding,
 }: SearchBoxProps) {
     // Use custom hook for search options state
     const searchOptions = useSearchOptions({
@@ -158,6 +160,22 @@ export default function SearchBox({
         }, 100);
     }, [searchOptions]);
 
+    // Determine if we should show the image uploader - always show for Vector searches
+    const showImageUploader = searchType === "Vector"
+
+    // Always show text input
+    const showTextInput = true
+
+    // Show shuffle button for Vector searches
+    const showShuffleButton = searchType === "Vector"
+    
+    // Debug logging for lastTextEmbedding
+    console.log("SearchBox lastTextEmbedding:", {
+        exists: !!lastTextEmbedding,
+        length: lastTextEmbedding?.length,
+        firstFew: lastTextEmbedding?.slice(0, 5)
+    });
+
     return (
         <section className="mb-2">
             <div className="bg-[white] rounded shadow-md p-2">
@@ -205,6 +223,7 @@ export default function SearchBox({
                             onImageSelect={handleImageSelect}
                             onImageEmbeddingGenerated={handleEmbeddingGenerated}
                             triggerSearch={triggerSearch}
+                            lastTextEmbedding={lastTextEmbedding}
                         />
                     )}
 

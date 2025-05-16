@@ -171,6 +171,7 @@ export default function VectorSearchTab({
         noThread,
         setNoThread,
         executedCommand,
+        lastTextEmbedding,
     } = useVectorSearch({
         vectorSetName,
         metadata,
@@ -317,6 +318,7 @@ export default function VectorSearchTab({
                 setNoThread={setNoThread}
                 executedCommand={executedCommand}
                 results={results}
+                lastTextEmbedding={lastTextEmbedding}
             />
             <div className="bg-[white] p-4 rounded shadow-md">
                 <Tabs

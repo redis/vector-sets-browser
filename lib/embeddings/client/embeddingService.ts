@@ -129,18 +129,7 @@ export class ClientEmbeddingService {
             // This gives us the feature vector (embedding) before classification
             let activationLayer
 
-            try {
-                // MobileNet v1 has a layer usually called 'global_average_pooling2d'
-                activationLayer = internalModel.execute(tensor, [
-                    "global_average_pooling2d",
-                ])
-            } catch (_e) {
-                console.log(
-                    "Couldn't find global_average_pooling2d layer, using default model output"
-                )
-                // If we can't get the specific layer, just use the model directly
-                activationLayer = model.infer(tensor, true)
-            }
+            activationLayer = model.infer(tensor, true)
 
             // Convert to array and check values
             const embedding = Array.from(await activationLayer.data()) as number[]

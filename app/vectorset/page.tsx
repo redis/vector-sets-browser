@@ -285,10 +285,10 @@ function VectorSetPageContent() {
                                 Search / Explore
                             </TabsTrigger>
                             <TabsTrigger className="w-full" value="info">
-                                Information
+                                Info & Settings
                             </TabsTrigger>
                             <TabsTrigger className="w-full" value="settings">
-                                Configuration
+                                Embedding Model
                             </TabsTrigger>
                             <TabsTrigger className="w-full" value="import">
                                 Import Data
@@ -300,6 +300,7 @@ function VectorSetPageContent() {
                                 vectorSetName={vectorSetName}
                                 dim={dim}
                                 metadata={metadata}
+                                onMetadataUpdate={updateMetadata}
                             />
                         </TabsContent>
 

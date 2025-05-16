@@ -1,17 +1,27 @@
 import { vectorSets } from "@/app/api/vector-sets"
 import EditEmbeddingConfigModal from "@/components/EmbeddingConfig/EditEmbeddingConfigDialog"
-import { getEmbeddingIcon } from "@/components/EmbeddingConfig/EmbeddingIcons"
+import { 
+    BinaryEmbeddingIcon, 
+    getEmbeddingIcon, 
+    ImageEmbeddingIcon, 
+    MultiModalEmbeddingIcon, 
+    TextEmbeddingIcon 
+} from "@/components/EmbeddingConfig/EmbeddingIcons"
 import {
     EmbeddingConfig,
+    EmbeddingDataFormat,
     getEmbeddingDataFormat,
     getExpectedDimensions,
+    getModelData,
     getModelName,
     getProviderInfo,
+    isImageEmbedding,
+    isMultiModalEmbedding,
+    isTextEmbedding,
 } from "@/lib/embeddings/types/embeddingModels"
 import { vadd, vcard, vdim, vrem, vsim } from "@/lib/redis-server/api"
 import { VectorSetMetadata } from "@/lib/types/vectors"
 import eventBus, { AppEvents } from "@/lib/client/events/eventEmitter"
-import AdvancedConfigEdit from "@/app/vectorset/components/AdvancedConfigEdit"
 import {
     DEFAULT_EMBEDDING,
     DEFAULT_EMBEDDING_CONFIG,
@@ -29,13 +39,126 @@ import {
 } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
-import { AlertTriangle } from "lucide-react"
+import { AlertTriangle, BrainCircuit, Cpu, Image, LetterText } from "lucide-react"
 import { useEffect, useState } from "react"
 
 interface VectorSettingsProps {
     vectorSetName: string
     metadata: VectorSetMetadata | null
     onMetadataUpdate?: (metadata: VectorSetMetadata) => void
+}
+
+// Add this new component for the embedding process visualization
+function EmbeddingProcessVisualization({ dataFormat }: { dataFormat: EmbeddingDataFormat }) {
+    return (
+        <div className="flex items-center justify-center mt-4 mb-2 py-3 bg-slate-50 rounded-md">
+            <div className="flex items-center space-x-2">
+                {/* Input side */}
+                <div className="flex flex-col items-center">
+                    {dataFormat === "text" && (
+                        <div className="p-2 bg-white rounded-md border border-slate-200 w-16 h-16 flex items-center justify-center">
+                            <LetterText className="h-8 w-8 text-blue-500" />
+                        </div>
+                    )}
+                    {dataFormat === "image" && (
+                        <div className="p-2 bg-white rounded-md border border-slate-200 w-16 h-16 flex items-center justify-center">
+                            <Image className="h-8 w-8 text-purple-500" />
+                        </div>
+                    )}
+                    {dataFormat === "text-and-image" && (
+                        <div className="p-2 bg-white rounded-md border border-slate-200 w-16 h-16 flex flex-col items-center justify-center">
+                            <LetterText className="h-5 w-5 text-blue-500" />
+                            <div className="text-xs font-semibold">+</div>
+                            <Image className="h-5 w-5 text-purple-500" />
+                        </div>
+                    )}
+                    <div className="text-xs font-medium mt-1 text-slate-600">Input</div>
+                </div>
+
+                {/* Arrow */}
+                <div className="flex flex-col items-center">
+                    <svg width="40" height="24" viewBox="0 0 40 24" className="text-slate-400">
+                        <path 
+                            d="M32 12H8M32 12L26 6M32 12L26 18" 
+                            stroke="currentColor" 
+                            strokeWidth="2" 
+                            strokeLinecap="round" 
+                            strokeLinejoin="round" 
+                            fill="none" 
+                        />
+                    </svg>
+                    <div className="text-xs font-medium mt-1 text-slate-600">Embedding</div>
+                </div>
+
+                {/* Model */}
+                <div className="flex flex-col items-center">
+                    <div className="p-2 bg-white rounded-md border border-slate-200 w-16 h-16 flex items-center justify-center">
+                        <BrainCircuit className="h-8 w-8 text-indigo-500" />
+                    </div>
+                    <div className="text-xs font-medium mt-1 text-slate-600">Model</div>
+                </div>
+
+                {/* Arrow */}
+                <div className="flex flex-col items-center">
+                    <svg width="40" height="24" viewBox="0 0 40 24" className="text-slate-400">
+                        <path 
+                            d="M32 12H8M32 12L26 6M32 12L26 18" 
+                            stroke="currentColor" 
+                            strokeWidth="2" 
+                            strokeLinecap="round" 
+                            strokeLinejoin="round" 
+                            fill="none" 
+                        />
+                    </svg>
+                    <div className="text-xs font-medium mt-1 text-slate-600">Output</div>
+                </div>
+
+                {/* Output side (vector) */}
+                <div className="flex flex-col items-center">
+                    <div className="p-2 bg-white rounded-md border border-slate-200 w-16 h-16 flex items-center justify-center">
+                        <div className="text-xs font-mono text-slate-800 flex flex-col items-center">
+                            <span>[0.23,</span>
+                            <span>0.85,</span>
+                            <span>-0.12,</span>
+                            <span>...]</span>
+                        </div>
+                    </div>
+                    <div className="text-xs font-medium mt-1 text-slate-600">Vector</div>
+                </div>
+            </div>
+        </div>
+    )
+}
+
+// Add this component for supported data type badges
+function DataTypeBadges({ config }: { config: EmbeddingConfig }) {
+    const supportsText = isTextEmbedding(config)
+    const supportsImage = isImageEmbedding(config)
+    const isMultiModal = isMultiModalEmbedding(config)
+    
+    return (
+        <div className="flex items-center gap-2 my-2">
+            <div className="text-sm text-slate-600 mr-1">Supports:</div>
+            {supportsText && (
+                <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${isMultiModal ? 'bg-indigo-100 text-indigo-800' : 'bg-blue-100 text-blue-800'}`}>
+                    <LetterText className="h-3 w-3" />
+                    <span>Text</span>
+                </div>
+            )}
+            {supportsImage && (
+                <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${isMultiModal ? 'bg-indigo-100 text-indigo-800' : 'bg-purple-100 text-purple-800'}`}>
+                    <Image className="h-3 w-3" />
+                    <span>Image</span>
+                </div>
+            )}
+            {isMultiModal && (
+                <div className="flex items-center gap-1 px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">
+                    <BrainCircuit className="h-3 w-3" />
+                    <span>Multi-modal</span>
+                </div>
+            )}
+        </div>
+    )
 }
 
 export default function VectorSettings({
@@ -269,207 +392,15 @@ export default function VectorSettings({
         }
     }
 
+    const handleEnableEmbedding = (checked: boolean) => {
+        if (checked) {
+            // Open the modal to configure embedding
+            setIsEditConfigModalOpen(true)
+        }
+    }
+
     return (
         <div className="flex flex-col gap-4">
-            <Card>
-                <CardHeader>
-                    <div className="flex items-center w-full space-x-2">
-                        <CardTitle>Vector Set Options</CardTitle>
-                        <div className="grow"></div>
-                    </div>
-                </CardHeader>
-                <CardContent>
-                    <p className="text-sm text-gray-600">
-                        These advanced settings control how Redis manages and
-                        stores your vector set. Modifying these settings may
-                        require recreating the vector set.
-                    </p>
-                    <div className="flex items-center gap-4 p-4">
-                        <div className="grow">
-                            <div className="grid grid-cols-2 gap-2 text-sm">
-                                <div className="text-gray-600">
-                                    Vector Quantization{" "}
-                                    <span className="text-xs text-gray-400">
-                                        (NOQUANT, Q8, BIN options)
-                                    </span>
-                                    :
-                                </div>
-                                <div>
-                                    {metadata?.redisConfig?.quantization || (
-                                        <span>
-                                            Default:{" "}
-                                            <span className="font-bold">
-                                                Q8
-                                            </span>
-                                        </span>
-                                    )}
-                                </div>
-
-                                <div className="text-gray-600">
-                                    Reduced Dimensions{" "}
-                                    <span className="text-xs text-gray-400">
-                                        (REDUCE option)
-                                    </span>
-                                    :
-                                </div>
-                                <div>
-                                    {metadata?.redisConfig
-                                        ?.reduceDimensions || (
-                                        <span>
-                                            Default:{" "}
-                                            <span className="font-bold">
-                                                None (No dimension reduction)
-                                            </span>
-                                        </span>
-                                    )}
-                                </div>
-
-                                <div className="text-gray-600">
-                                    Default Check-and-Set{" "}
-                                    <span className="text-xs text-gray-400">
-                                        (CAS option)
-                                    </span>
-                                    :
-                                </div>
-                                <div>
-                                    {metadata?.redisConfig?.defaultCAS !==
-                                    undefined ? (
-                                        metadata?.redisConfig.defaultCAS ? (
-                                            "Enabled"
-                                        ) : (
-                                            "Disabled"
-                                        )
-                                    ) : (
-                                        <span>
-                                            Default:{" "}
-                                            <span className="font-bold">
-                                                Disabled
-                                            </span>
-                                        </span>
-                                    )}
-                                </div>
-
-                                <div className="text-gray-600">
-                                    Build Exploration Factor{" "}
-                                    <span className="text-xs text-gray-400">
-                                        (EF option)
-                                    </span>
-                                    :
-                                </div>
-                                <div>
-                                    {metadata?.redisConfig
-                                        ?.buildExplorationFactor || (
-                                        <span>
-                                            Default:{" "}
-                                            <span className="font-bold">
-                                                200
-                                            </span>
-                                        </span>
-                                    )}
-                                </div>
-
-                                <div className="text-gray-600">
-                                    Maximum Connections{" "}
-                                    <span className="text-xs text-gray-400">
-                                        (M option)
-                                    </span>
-                                    :
-                                </div>
-                                <div>
-                                    {metadata?.redisConfig?.maxConnections || (
-                                        <span>
-                                            Default:{" "}
-                                            <span className="font-bold">
-                                                16
-                                            </span>
-                                        </span>
-                                    )}
-                                </div>
-                                {/* <div className="text-gray-600">
-                                    Force Linear Scan <span className="text-xs text-gray-400">(TRUTH option)</span>:
-                                </div>
-                                <div>
-                                    {metadata?.redisConfig
-                                        ?.forceLinearScan ? (
-                                        "Enabled"
-                                    ) : (
-                                        <span>
-                                            Default:{" "}
-                                            <span className="font-bold">
-                                                False
-                                            </span>
-                                        </span>
-                                    )}
-                                </div>
-                                <div className="text-gray-600">
-                                    No Thread <span className="text-xs text-gray-400">(NOTHREAD option)</span>:
-                                </div>
-                                <div>
-                                    {metadata?.redisConfig?.noThread ? (
-                                        "Enabled"
-                                    ) : (
-                                        <span>
-                                            Default:{" "}
-                                            <span className="font-bold">
-                                                False
-                                            </span>
-                                        </span>
-                                    )}
-                                </div> */}
-                            </div>
-                        </div>
-                    </div>
-                    <div className="w-full flex">
-                        <div className="grow"></div>
-                        <Button
-                            variant="default"
-                            onClick={() => {
-                                // For CLI-created vector sets, create a proper metadata structure
-                                let initialMetadata: VectorSetMetadata
-
-                                if (metadata) {
-                                    // If metadata exists, use it as a base
-                                    initialMetadata = { ...metadata }
-
-                                    // If embedding doesn't exist, add a placeholder one to satisfy the type requirements
-                                    if (!initialMetadata.embedding) {
-                                        initialMetadata.embedding = {
-                                            provider:
-                                                DEFAULT_EMBEDDING.PROVIDER,
-                                            none: {
-                                                model: DEFAULT_EMBEDDING.MODEL,
-                                                dimensions:
-                                                    metadata.dimensions ||
-                                                    DEFAULT_EMBEDDING.DIMENSIONS,
-                                            },
-                                        }
-                                    }
-
-                                    // If redisConfig doesn't exist, initialize it as an empty object
-                                    if (!initialMetadata.redisConfig) {
-                                        initialMetadata.redisConfig = {}
-                                    }
-                                } else {
-                                    // If no metadata at all, create a minimal valid structure
-                                    initialMetadata = {
-                                        embedding: DEFAULT_EMBEDDING_CONFIG,
-                                        created: new Date().toISOString(),
-                                        lastUpdated: new Date().toISOString(),
-                                        description: "",
-                                        redisConfig: {},
-                                    }
-                                }
-
-                                setWorkingMetadata(initialMetadata)
-                                setIsAdvancedConfigPanelOpen(true)
-                            }}
-                        >
-                            Edit
-                        </Button>
-                    </div>
-                </CardContent>
-            </Card>
-
             <Card>
                 <CardHeader>
                     <div className="flex items-center w-full space-x-2">
@@ -507,317 +438,119 @@ export default function VectorSettings({
                             </Alert>
                         )}
 
-                    {/* Toggle for using embedding model or not */}
-                    <div className="flex items-center justify-between bg-slate-50 p-4 rounded-lg mt-4 mb-2">
-                        <div className="flex gap-2 items-center">
-                            <span className="font-medium">
-                                Use embedding model
-                            </span>
-                            <span className="text-xs text-gray-500">
-                                (Required for search and import)
-                            </span>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                            <Label
-                                htmlFor="embedding-toggle"
-                                className="text-sm text-gray-600"
-                            >
-                                {metadata?.embedding &&
-                                metadata.embedding.provider === "none"
-                                    ? "Disabled"
-                                    : "Enabled"}
-                            </Label>
-                            <Switch
-                                id="embedding-toggle"
-                                checked={
-                                    metadata?.embedding &&
-                                    metadata.embedding.provider !== "none"
-                                }
-                                onCheckedChange={(checked) => {
-                                    if (checked) {
-                                        // Toggle to use an embedding model
-                                        setIsEditConfigModalOpen(true)
-                                    } else if (
-                                        metadata?.embedding &&
-                                        metadata.embedding.provider !== "none"
-                                    ) {
-                                        // Set to none provider
-                                        const dimensions = metadata.embedding
-                                            ? getExpectedDimensions(
-                                                  metadata.embedding
-                                              ) || DEFAULT_EMBEDDING.DIMENSIONS
-                                            : DEFAULT_EMBEDDING.DIMENSIONS
-
-                                        handleEditConfig({
-                                            provider: "none",
-                                            none: {
-                                                model: "direct-vectors",
-                                                dimensions,
-                                            },
-                                        })
-                                    }
-                                }}
-                            />
-                        </div>
-                    </div>
-
-                    {metadata?.embedding &&
-                    metadata.embedding.provider !== "none" ? (
-                        <div className="flex items-center gap-4 p-4 border rounded-md">
-                            <div className="grow flex gap-2 flex-col">
-                                <div className="flex items-center space-x-2">
-                                    <div className="text-gray-600">
-                                        Data Format:
-                                    </div>
-                                    <div className="flex items-center space-x-1 font-bold">
-                                        {(() => {
-                                            const dataFormat =
-                                                getEmbeddingDataFormat(
-                                                    metadata.embedding
-                                                )
-                                            const Icon =
-                                                getEmbeddingIcon(dataFormat)
-                                            return (
-                                                <>
-                                                    <Icon />
-                                                    <span className="capitalize">
-                                                        {dataFormat.replace(
-                                                            "-",
-                                                            " & "
-                                                        )}
-                                                    </span>
-                                                </>
-                                            )
-                                        })()}
-                                    </div>
-                                </div>
-                                <div className="flex items-center space-x-2">
-                                    <div className="text-gray-600">
-                                        Provider:
-                                    </div>
-                                    <div className="font-bold">
-                                        {metadata?.embedding?.provider
-                                            ? getProviderInfo(
-                                                  metadata.embedding.provider
-                                              ).displayName
-                                            : "None"}
-                                    </div>
-                                </div>
-                                <div className="flex items-center space-x-2">
-                                    <div className="text-gray-600">Model:</div>
-                                    <div className="font-bold">
-                                        {getModelName(metadata.embedding)}
-                                    </div>
-                                </div>
-                                {actualVectorDim !== null && (
-                                    <div className="flex items-center space-x-2">
-                                        <div className="text-gray-600">
-                                            Vector Dimensions:
-                                        </div>
-                                        <div
-                                            className={`font-bold ${
-                                                dimensionMismatch
-                                                    ? "text-red-600"
-                                                    : ""
-                                            }`}
-                                        >
-                                            {getExpectedDimensions(
-                                                metadata.embedding
+                    {/* Embedding content */}
+                    {metadata?.embedding && metadata.embedding.provider !== "none" ? (
+                        <div className="flex flex-col p-4 bg-white rounded-md border border-slate-200">
+                            {/* Top part with model info */}
+                            <div className="flex items-start">
+                                {/* Provider logo and model info */}
+                                <div className="grow">
+                                    <div className="flex items-center mb-2">
+                                        <div className="p-2 bg-slate-100 rounded-md mr-3 flex items-center justify-center">
+                                            {getEmbeddingDataFormat(metadata.embedding) === "text" && (
+                                                <TextEmbeddingIcon />
                                             )}
-                                            {dimensionMismatch &&
-                                                actualVectorDim !== null &&
-                                                ` (VectorSet has ${actualVectorDim})`}
+                                            {getEmbeddingDataFormat(metadata.embedding) === "image" && (
+                                                <ImageEmbeddingIcon />
+                                            )}
+                                            {getEmbeddingDataFormat(metadata.embedding) === "text-and-image" && (
+                                                <MultiModalEmbeddingIcon />
+                                            )}
                                         </div>
+                                        <div>
+                                            <div className="text-sm font-semibold text-slate-500">
+                                                {getProviderInfo(metadata.embedding.provider).displayName}
+                                            </div>
+                                            <div className="text-lg font-bold">
+                                                {getModelName(metadata.embedding)}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    {/* Data type badges */}
+                                    <DataTypeBadges config={metadata.embedding} />
+                                    
+                                    {/* Dimensions info */}
+                                    {actualVectorDim !== null && (
+                                        <div className="flex items-center mt-2">
+                                            <div className="flex items-center gap-1 px-2 py-1 bg-slate-100 text-slate-800 rounded-md text-xs font-mono">
+                                                <Cpu className="h-3 w-3" />
+                                                <span>
+                                                    {getExpectedDimensions(metadata.embedding)}-d
+                                                    {dimensionMismatch &&
+                                                        actualVectorDim !== null &&
+                                                        ` (VectorSet: ${actualVectorDim}-d)`}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                                
+                                {/* Configure button */}
+                                <Button
+                                    variant="outline"
+                                    onClick={() => setIsEditConfigModalOpen(true)}
+                                >
+                                    Configure
+                                </Button>
+                            </div>
+                            
+                            {/* Embedding process visualization */}
+                            <EmbeddingProcessVisualization 
+                                dataFormat={getEmbeddingDataFormat(metadata.embedding)} 
+                            />
+                            
+                            {/* Additional info based on model */}
+                            {metadata.embedding.provider === "clip" && (
+                                <div className="text-xs text-slate-600 mt-2 p-2 bg-slate-50 rounded">
+                                    <p className="font-medium">Multi-modal embedding:</p>
+                                    <p>This model creates embeddings where text and images share the same vector space, 
+                                    enabling similarity search across different data types.</p>
+                                </div>
+                            )}
+                        </div>
+                    ) : (
+                        <div className="flex items-center gap-4 p-4">
+                            <div className="grow">
+                                {metadata?.embedding?.provider === "none" ? (
+                                    <div className="flex justify-between items-center w-full">
+                                        <div className="font-bold text-red-600">
+                                            Embedding is disabled
+                                        </div>
+                                        <Switch
+                                            id="enable-embedding"
+                                            checked={false}
+                                            onCheckedChange={(checked) => {
+                                                handleEnableEmbedding(checked)
+                                            }}
+                                        />
+                                    </div>
+                                ) : (
+                                    <div className="text-sm bg-yellow-50 border border-yellow-200 rounded p-4 w-full">
+                                        <p className="font-medium text-yellow-800">
+                                            No Embedding Configuration
+                                        </p>
+                                        <p className="text-yellow-700">
+                                            This vector set was created outside of
+                                            the browser and doesn{`'`}t have an
+                                            embedding configuration. Enable
+                                            embedding above to use VSIM search and
+                                            VADD operations in the web interface.
+                                        </p>
                                     </div>
                                 )}
                             </div>
-                            <Button
-                                variant="default"
-                                onClick={() => setIsEditConfigModalOpen(true)}
-                            >
-                                Configure
-                            </Button>
-                        </div>
-                    ) : (
-                        <div className="p-4 border rounded-md text-gray-600">
-                            {metadata?.embedding &&
-                            metadata.embedding.provider === "none" ? (
-                                <div className="flex flex-col">
-                                    <p className="mb-2">
-                                        <span className="font-medium">
-                                            Direct vector input mode.
-                                        </span>{" "}
-                                        No automatic encoding will be performed.
-                                    </p>
-                                    <p>
-                                        <span className="font-medium">
-                                            Vector dimensions:
-                                        </span>{" "}
-                                        {metadata.embedding.none?.dimensions ||
-                                            DEFAULT_EMBEDDING.DIMENSIONS}
-                                        {dimensionMismatch &&
-                                            actualVectorDim !== null &&
-                                            ` (VectorSet has ${actualVectorDim} - mismatch)`}
-                                    </p>
-                                </div>
-                            ) : (
-                                <div className="text-sm bg-yellow-50 border border-yellow-200 rounded p-4 w-full">
-                                    <p className="font-medium text-yellow-800">
-                                        No Embedding Configuration
-                                    </p>
-                                    <p className="text-yellow-700">
-                                        This vector set was created outside of
-                                        the browser and doesn{`'`}t have an
-                                        embedding configuration. Enable
-                                        embedding above to use VSIM search and
-                                        VADD operations in the web interface.
-                                    </p>
-                                </div>
-                            )}
                         </div>
                     )}
                 </CardContent>
             </Card>
 
-            <Dialog
-                open={isAdvancedConfigPanelOpen}
-                onOpenChange={setIsAdvancedConfigPanelOpen}
-            >
-                <DialogContent className="max-w-[900px] max-h-[90vh] overflow-y-auto">
-                    <DialogHeader>
-                        <DialogTitle>Edit Advanced Configuration</DialogTitle>
-                    </DialogHeader>
-                    {workingMetadata && (
-                        <div className="flex flex-col gap-4">
-                            <AdvancedConfigEdit redisConfig={workingMetadata} />
-                            <div className="flex justify-end gap-2 mt-4">
-                                <Button
-                                    variant="ghost"
-                                    onClick={() =>
-                                        setIsAdvancedConfigPanelOpen(false)
-                                    }
-                                >
-                                    Cancel
-                                </Button>
-                                <Button
-                                    variant="default"
-                                    onClick={handleSaveAdvancedConfig}
-                                >
-                                    Save Changes
-                                </Button>
-                            </div>
-                        </div>
-                    )}
-                </DialogContent>
-            </Dialog>
-
-            {isEditConfigModalOpen && (
-                <EditEmbeddingConfigModal
-                    isOpen={isEditConfigModalOpen}
-                    onClose={() => setIsEditConfigModalOpen(false)}
-                    config={
-                        metadata?.embedding &&
-                        metadata.embedding.provider !== "none"
-                            ? metadata.embedding
-                            : {
-                                  // Default to a reasonable embedding config like OpenAI
-                                  provider: "openai",
-                                  openai: {
-                                      model: "text-embedding-3-small",
-                                      batchSize: 100,
-                                  },
-                              }
-                    }
-                    onSave={handleEditConfig}
-                />
-            )}
-
-            <Dialog
-                open={isWarningDialogOpen}
-                onOpenChange={setIsWarningDialogOpen}
-            >
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>
-                            Warning: Embedding Model Change
-                        </DialogTitle>
-                        <DialogDescription>
-                            You are changing the vector embedding model, and
-                            there are already vectors in this vectorset which
-                            are possibly using a different model. Using vectors
-                            from different embedding models in a single vector
-                            set is not recommended and does not make sense.
-                        </DialogDescription>
-                    </DialogHeader>
-                    <DialogFooter>
-                        <Button
-                            variant="ghost"
-                            onClick={() => {
-                                setIsWarningDialogOpen(false)
-                                setPendingEmbeddingConfig(null)
-                            }}
-                        >
-                            Cancel
-                        </Button>
-                        <Button
-                            variant="destructive"
-                            onClick={handleConfirmEmbeddingChange}
-                        >
-                            Change it anyway
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
-
-            {/* Success Dialog */}
-            <Dialog
-                open={isSuccessDialogOpen}
-                onOpenChange={setIsSuccessDialogOpen}
-            >
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>
-                            Embedding Model Updated Successfully
-                        </DialogTitle>
-                        <DialogDescription>
-                            <div className="space-y-2 pt-2">
-                                <p>
-                                    The vector set has been updated to use a new
-                                    embedding model:
-                                </p>
-                                <div className="grid grid-cols-2 gap-2 text-sm">
-                                    <div className="text-gray-600">
-                                        Previous Model:
-                                    </div>
-                                    <div className="font-medium">
-                                        {successInfo?.oldModel}
-                                    </div>
-                                    <div className="text-gray-600">
-                                        New Model:
-                                    </div>
-                                    <div className="font-medium">
-                                        {successInfo?.newModel}
-                                    </div>
-                                    <div className="text-gray-600">
-                                        Vector Dimensions:
-                                    </div>
-                                    <div className="font-medium">
-                                        {successInfo?.dimensions}
-                                    </div>
-                                </div>
-                            </div>
-                        </DialogDescription>
-                    </DialogHeader>
-                    <DialogFooter>
-                        <Button
-                            variant="default"
-                            onClick={() => setIsSuccessDialogOpen(false)}
-                        >
-                            Close
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+            <EditEmbeddingConfigModal
+                isOpen={isEditConfigModalOpen}
+                onClose={() => setIsEditConfigModalOpen(false)}
+                config={metadata?.embedding as EmbeddingConfig || DEFAULT_EMBEDDING}
+                onSave={handleEditConfig}
+            />
         </div>
     )
 }

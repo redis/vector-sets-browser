@@ -143,21 +143,22 @@ export const processImageFile = async (
             return;
         }
 
+        // Use the embedding configuration from metadata
+        if (!metadata?.embedding) {
+            const errorMsg = "No embedding configuration in metadata";
+            console.error(errorMsg);
+            if (onError) onError(errorMsg);
+            return;
+        }
+
         try {
             // Convert to base64
             const base64Data = await fileToBase64(file);
 
-            // Generate embedding using CLIP
-            const config = {
-                provider: "clip" as const,
-                clip: {
-                    model: "clip-vit-base-patch32",
-                },
-            };
-
+            // Generate embedding using the model from metadata
             const embedding = await clientEmbeddingService.getEmbedding(
                 base64Data,
-                config,
+                metadata.embedding,
                 true
             );
 

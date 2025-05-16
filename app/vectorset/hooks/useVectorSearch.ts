@@ -491,6 +491,10 @@ export function useVectorSearch({
                 searchString = `Results for "${internalSearchState.searchQuery}"`
 
                 // Store the text embedding
+                console.log("Setting lastTextEmbedding in useVectorSearch:", { 
+                    length: searchVector.length,
+                    firstFew: searchVector.slice(0, 5)
+                });
                 updateSearchState({ lastTextEmbedding: searchVector })
             }
 

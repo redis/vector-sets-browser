@@ -84,6 +84,7 @@ export default function VectorSetVisualization({
         searchTime,
         searchFilter,
         setSearchFilter,
+        lastTextEmbedding,
     } = useVectorSearch({
         vectorSetName,
         metadata,
@@ -184,6 +185,7 @@ export default function VectorSetVisualization({
                     if (value === searchState.noThread) return
                     setSearchState({ ...searchState, noThread: value })
                 }}
+                lastTextEmbedding={lastTextEmbedding}
             />
             <div className="bg-[white] rounded shadow-md h-[calc(100vh-300px)]">
                 <div className="p-4 rounded shadow-md flex-1 flex flex-col">
