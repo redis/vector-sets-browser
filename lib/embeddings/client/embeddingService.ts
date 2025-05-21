@@ -236,4 +236,4 @@ export class ClientEmbeddingService {
 }
 
 // Create a singleton instance
-export const clientEmbeddingService = new ClientEmbeddingService() 
+export const clientEmbeddingService = new ClientEmbeddingService();

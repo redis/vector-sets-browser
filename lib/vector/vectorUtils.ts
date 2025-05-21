@@ -319,12 +319,13 @@ export function normalizeVector(vec: number[]): number[] {
  */
 export function parseVectorString(vectorStr: string): number[] {
   if (!vectorStr) return [];
-  
+
   return vectorStr
     .split(",")
-    .map(s => s.trim())
-    .filter(s => s.length > 0)
-    .map(s => parseFloat(s));
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0)
+    .map((s) => parseFloat(s))
+    .filter((n) => !Number.isNaN(n));
 }
 
 /**
