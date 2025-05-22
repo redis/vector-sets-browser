@@ -34,7 +34,9 @@ export async function POST(request: Request) {
             return NextResponse.json({ command })
         }
 
-        const commandStr = command[0].join(' ')
+        const commandStr = command[0]
+            .map((arg) => (arg instanceof Buffer ? '<binary>' : String(arg)))
+            .join(' ')
         const redisResult = await RedisConnection.withClient(redisUrl, async (client) => {
             return await client.sendCommand(command[0])
         })
