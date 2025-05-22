@@ -55,6 +55,7 @@ export function validateVsimRequest(body: any): { isValid: boolean; error?: stri
             filterExplorationFactor: body.filterExplorationFactor,
             returnCommandOnly: body.returnCommandOnly === true,
             withEmbeddings: body.withEmbeddings === true,
+            withAttributes: body.withAttributes === true,
             forceLinearScan: body.forceLinearScan === true,
             noThread: body.noThread === true
         }
@@ -81,6 +82,11 @@ export function buildVsimCommand(request: VsimRequestBody): string[][] {
 
     // Always add WITHSCORES for consistent result format
     baseCommand.push("WITHSCORES")
+
+    // Include attributes directly from VSIM if requested
+    if (request.withAttributes) {
+        baseCommand.push("WITHATTRIBS")
+    }
 
     // Add count
     baseCommand.push("COUNT", String(request.count))

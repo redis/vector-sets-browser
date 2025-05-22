@@ -2,7 +2,6 @@ import {
     ColumnConfig,
     useVectorResultsSettings,
 } from "@/app/vectorset/hooks/useVectorResultsSettings"
-import { vgetattr_multi } from "@/lib/redis-server/api"
 import { useEffect, useMemo, useRef, useState } from "react"
 import AttributeColumnsDialog from "./components/AttributeColumnsDialog"
 import DropzoneResultsTable from "./components/DropzoneResultsTable"
@@ -164,96 +163,40 @@ export default function VectorResults({
         setIsLoadingAttributes(false)
     }, [keyName])
 
-    // Single source of truth for attribute fetching
-    const fetchAttributes = async (elements: string[]) => {
-        try {
-            const response = await vgetattr_multi({
-                keyName,
-                elements,
-                returnCommandOnly: false,
-            })
-
-            if (!response?.success || !response?.result) {
-                console.error(`Error fetching attributes`, response?.error)
-                return null
-            }
-            return response.result
-        } catch (error) {
-            console.error(`Error fetching attributes`, error)
-            return null
-        }
-    }
-
-    // Fetch attributes for visible results
+    // Populate attribute caches from results
     useEffect(() => {
-        if (!showAttributes || results.length === 0) return
+        if (results.length === 0) return
 
-        let isCancelled = false
-        const elements = results.map((row) => row[0])
+        const newCache: AttributeCache = {}
+        const newParsedCache: Record<string, ParsedAttributes> = {}
+        const allAttributeColumns = new Set<string>()
 
-        const fetchAndProcessAttributes = async () => {
-            setIsLoadingAttributes(true)
-            try {
-                const attributes = await fetchAttributes(elements)
-
-                if (isCancelled || !attributes) return
-
-                const newCache = { ...attributeCache }
-                const newParsedCache: Record<string, ParsedAttributes> = {}
-                const allAttributeColumns = new Set<string>()
-
-                elements.forEach((element, i) => {
-                    newCache[element] = attributes[i]
-                    if (attributes[i]) {
-                        try {
-                            const parsed = JSON.parse(attributes[i])
-                            newParsedCache[element] = parsed
-                            Object.keys(parsed).forEach((key) =>
-                                allAttributeColumns.add(key)
-                            )
-                        } catch (error) {
-                            console.error(
-                                `Error parsing attributes for ${element}:`,
-                                error
-                            )
-                        }
-                    }
-                })
-
-                if (!isCancelled) {
-                    setAttributeCache(newCache)
-                    setParsedAttributeCache(newParsedCache)
-
-                    // Update columns in a single operation
-                    setAvailableColumns((prev) => {
-                        const systemColumns = prev.filter(
-                            (col) => col.type === "system"
-                        )
-                        const attributeColumns = Array.from(
-                            allAttributeColumns
-                        ).map((name) => ({
-                            name,
-                            visible: getColumnVisibilityRef.current(name, true),
-                            type: "attribute" as const,
-                        }))
-                        return [...systemColumns, ...attributeColumns]
-                    })
-                }
-            } catch (error) {
-                console.error("Error fetching attributes:", error)
-            } finally {
-                if (!isCancelled) {
-                    setIsLoadingAttributes(false)
+        results.forEach(([element, _score, _vector, attrs]) => {
+            if (attrs) {
+                newCache[element] = attrs
+                try {
+                    const parsed = JSON.parse(attrs)
+                    newParsedCache[element] = parsed
+                    Object.keys(parsed).forEach((key) => allAttributeColumns.add(key))
+                } catch (error) {
+                    console.error(`Error parsing attributes for ${element}:`, error)
                 }
             }
-        }
+        })
 
-        fetchAndProcessAttributes()
+        setAttributeCache(newCache)
+        setParsedAttributeCache(newParsedCache)
 
-        return () => {
-            isCancelled = true
-        }
-    }, [showAttributes, results, keyName])
+        setAvailableColumns((prev) => {
+            const systemColumns = prev.filter((col) => col.type === "system")
+            const attributeColumns = Array.from(allAttributeColumns).map((name) => ({
+                name,
+                visible: getColumnVisibilityRef.current(name, true),
+                type: "attribute" as const,
+            }))
+            return [...systemColumns, ...attributeColumns]
+        })
+    }, [results, keyName])
 
     // Extract field names from searchFilter
     const filteredFields = useMemo(() => {
