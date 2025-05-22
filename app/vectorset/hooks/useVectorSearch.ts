@@ -166,6 +166,7 @@ export function useVectorSearch({
                     searchVector: zeroVector,
                     count,
                     withEmbeddings: fetchEmbeddings,
+                    withAttributes: true,
                     filter: internalSearchState.searchFilter,
                     searchExplorationFactor: internalSearchState.searchExplorationFactor,
                     filterExplorationFactor: internalSearchState.filterExplorationFactor,
@@ -506,11 +507,12 @@ export function useVectorSearch({
             console.log("=============================================");
 
             // Perform vector-based search and measure time
-            const vsimResponse = await vsim({
-                keyName: vectorSetName!,
-                searchVector,
-                count,
-                withEmbeddings: fetchEmbeddings,
+                const vsimResponse = await vsim({
+                    keyName: vectorSetName!,
+                    searchVector,
+                    count,
+                    withEmbeddings: fetchEmbeddings,
+                    withAttributes: true,
                 filter: internalSearchState.searchFilter,
                 searchExplorationFactor: internalSearchState.searchExplorationFactor,
                 filterExplorationFactor: internalSearchState.filterExplorationFactor,
@@ -565,11 +567,12 @@ export function useVectorSearch({
 
             onStatusChange(`Element: "${internalSearchState.searchQuery}"`)
 
-            const vsimResponse = await vsim({
-                keyName: vectorSetName!,
-                searchElement: internalSearchState.searchQuery,
-                count,
-                withEmbeddings: fetchEmbeddings,
+                const vsimResponse = await vsim({
+                    keyName: vectorSetName!,
+                    searchElement: internalSearchState.searchQuery,
+                    count,
+                    withEmbeddings: fetchEmbeddings,
+                    withAttributes: true,
                 filter: internalSearchState.searchFilter,
                 searchExplorationFactor: internalSearchState.searchExplorationFactor,
                 filterExplorationFactor: internalSearchState.filterExplorationFactor,
@@ -661,6 +664,7 @@ export function useVectorSearch({
                     searchVector: vectorData,
                     count,
                     withEmbeddings: fetchEmbeddings,
+                    withAttributes: true,
                     filter: internalSearchState.searchFilter,
                     searchExplorationFactor: internalSearchState.searchExplorationFactor,
                     filterExplorationFactor: internalSearchState.filterExplorationFactor,
