@@ -92,3 +92,12 @@ export function validateVector(vector: unknown): { isValid: boolean; error?: str
 export function validateElement(element: string | undefined): boolean {
     return typeof element === 'string' && element.length > 0
 }
+
+// Helper to encode an array of numbers into a Buffer of FP32 little-endian values
+export function vectorToFp32Buffer(vector: number[]): Buffer {
+    const buffer = Buffer.allocUnsafe(vector.length * 4)
+    for (let i = 0; i < vector.length; i++) {
+        buffer.writeFloatLE(vector[i], i * 4)
+    }
+    return buffer
+}

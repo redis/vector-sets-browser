@@ -1,4 +1,4 @@
-import { validateKeyName } from '@/lib/redis-server/utils'
+import { validateKeyName, vectorToFp32Buffer } from '@/lib/redis-server/utils'
 import { VsimRequestBody } from '@/lib/redis-server/api'
 
 export function validateVsimRequest(body: any): { isValid: boolean; error?: string; value?: VsimRequestBody } {
@@ -61,15 +61,11 @@ export function validateVsimRequest(body: any): { isValid: boolean; error?: stri
     }
 }
 
-export function buildVsimCommand(request: VsimRequestBody): string[][] {
-    const baseCommand = ["VSIM", request.keyName]
+export function buildVsimCommand(request: VsimRequestBody): (string | Buffer)[][] {
+    const baseCommand: (string | Buffer)[] = ["VSIM", request.keyName]
 
     if (request.searchVector) {
-        baseCommand.push(
-            "VALUES",
-            String(request.searchVector.length),
-            ...request.searchVector.map(String)
-        )
+        baseCommand.push("FP32", vectorToFp32Buffer(request.searchVector))
     } else if (request.searchElement) {
         baseCommand.push("ELE", request.searchElement)
     }
