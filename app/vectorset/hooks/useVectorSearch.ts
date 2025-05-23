@@ -166,6 +166,7 @@ export function useVectorSearch({
                     searchVector: zeroVector,
                     count,
                     withEmbeddings: fetchEmbeddings,
+                    withAttribs: userSettings.getUseWithAttribs(),
                     filter: internalSearchState.searchFilter,
                     searchExplorationFactor: internalSearchState.searchExplorationFactor,
                     filterExplorationFactor: internalSearchState.filterExplorationFactor,
@@ -511,11 +512,12 @@ export function useVectorSearch({
                 searchVector,
                 count,
                 withEmbeddings: fetchEmbeddings,
+                withAttribs: userSettings.getUseWithAttribs(),
                 filter: internalSearchState.searchFilter,
                 searchExplorationFactor: internalSearchState.searchExplorationFactor,
                 filterExplorationFactor: internalSearchState.filterExplorationFactor,
                 forceLinearScan: internalSearchState.forceLinearScan,
-                noThread: internalSearchState.noThread
+                noThread: internalSearchState.noThread,
             })
 
             // Use the execution time from the server response
@@ -570,11 +572,12 @@ export function useVectorSearch({
                 searchElement: internalSearchState.searchQuery,
                 count,
                 withEmbeddings: fetchEmbeddings,
+                withAttribs: userSettings.getUseWithAttribs(),
                 filter: internalSearchState.searchFilter,
                 searchExplorationFactor: internalSearchState.searchExplorationFactor,
                 filterExplorationFactor: internalSearchState.filterExplorationFactor,
                 forceLinearScan: internalSearchState.forceLinearScan,
-                noThread: internalSearchState.noThread
+                noThread: internalSearchState.noThread,
             })
 
             // Use the execution time from the server response
@@ -661,11 +664,12 @@ export function useVectorSearch({
                     searchVector: vectorData,
                     count,
                     withEmbeddings: fetchEmbeddings,
+                    withAttribs: userSettings.getUseWithAttribs(),
                     filter: internalSearchState.searchFilter,
                     searchExplorationFactor: internalSearchState.searchExplorationFactor,
                     filterExplorationFactor: internalSearchState.filterExplorationFactor,
                     forceLinearScan: internalSearchState.forceLinearScan,
-                    noThread: internalSearchState.noThread
+                    noThread: internalSearchState.noThread,
                 })
 
                 // Use the execution time from the server response

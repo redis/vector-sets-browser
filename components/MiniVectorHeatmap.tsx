@@ -10,16 +10,7 @@ interface MiniVectorHeatmapProps {
 
 export default function MiniVectorHeatmap({ vector, disabled = false }: MiniVectorHeatmapProps) {
     const [showHeatmap, setShowHeatmap] = useState(false)
-    
-    // Add detailed debug logging
-    console.log("MiniVectorHeatmap received vector:", {
-        isNull: vector === null,
-        isArray: Array.isArray(vector),
-        length: vector?.length,
-        firstFewValues: vector?.slice(0, 5),
-        hasNaN: vector?.some(v => isNaN(v) || !isFinite(v))
-    });
-    
+        
     // Check if we have a valid vector to display
     const hasValidVector = vector && vector.length > 0 && vector.every(val => 
         typeof val === 'number' && !isNaN(val) && isFinite(val)
@@ -27,15 +18,8 @@ export default function MiniVectorHeatmap({ vector, disabled = false }: MiniVect
     
     // Skip rendering if disabled or no valid vector
     if (disabled || !hasValidVector) {
-        console.log("No valid vector to display", {
-            disabled,
-            hasValidVector,
-            vectorLength: vector?.length
-        })
         return null
-    } else {
-        console.log("Valid vector to display", vector?.length)
-    }
+    } 
     
     return (
         <>

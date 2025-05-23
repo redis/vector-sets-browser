@@ -224,6 +224,7 @@ export interface VsimRequestBody {
     count?: number
     filter?: string
     withEmbeddings?: boolean
+    withAttribs?: boolean // New flag for WITHATTRIBS support
     searchExplorationFactor?: number
     filterExplorationFactor?: number
     returnCommandOnly?: boolean

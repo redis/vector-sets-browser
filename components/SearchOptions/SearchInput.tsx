@@ -55,15 +55,8 @@ export default function SearchInput({
     const [currentVector, setCurrentVector] = useState<number[] | null>(null)
 
     // Update current vector when lastTextEmbedding changes
-    useEffect(() => {
-        console.log("SearchInput useEffect for lastTextEmbedding:", {
-            hasLastTextEmbedding: !!lastTextEmbedding,
-            lastTextEmbeddingLength: lastTextEmbedding?.length,
-            firstFewValues: lastTextEmbedding?.slice(0, 5)
-        });
-        
+    useEffect(() => {        
         if (lastTextEmbedding && lastTextEmbedding.length > 0) {
-            console.log("Setting currentVector from lastTextEmbedding");
             setCurrentVector(lastTextEmbedding)
         }
     }, [lastTextEmbedding])
@@ -219,17 +212,6 @@ export default function SearchInput({
         // Update the current vector for visualization
         setCurrentVector(embedding)
     }
-
-    // Add debug logging for vector rendering
-    useEffect(() => {
-        if (searchType === "Vector") {
-            console.log("Rendering MiniVectorHeatmap with: ", {
-                currentVector: currentVector?.length,
-                lastTextEmbedding: lastTextEmbedding?.length,
-                passedVector: (currentVector || lastTextEmbedding || null)?.length
-            });
-        }
-    }, [searchType, currentVector, lastTextEmbedding]);
 
     // Render the integrated search input for all types
     return (

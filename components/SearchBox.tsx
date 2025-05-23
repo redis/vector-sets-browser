@@ -126,27 +126,17 @@ export default function SearchBox({
             const vectorStr = embedding
                 .map((n) => n.toFixed(4))
                 .join(", ")
-            
-            console.log(`[SearchBox] Embedding generated for search type: ${searchType}`);
-            console.log(`[SearchBox] Vector length: ${embedding.length}, first values:`, embedding.slice(0, 5));
-            
+                        
             // Set the search query with the vector representation
             setSearchQuery(vectorStr);
             
             // If this is a multi-vector search, log that we received a combined vector
             if (searchType === "Multi-vector") {
-                console.log("=============================================");
-                console.log("MULTI-VECTOR SEARCH RECEIVED COMBINED VECTOR:");
-                console.log(`Vector length: ${embedding.length}`);
-                console.log(`First 10 values: [${embedding.slice(0, 10).join(", ")}${embedding.length > 10 ? '...' : ''}]`);
-                console.log("=============================================");
                 
                 // The MultiVectorInput component will call triggerSearch separately,
                 // so we don't need to trigger a search here.
             }
-        } else {
-            console.log("[SearchBox] Received invalid or empty embedding");
-        }
+        } 
     }
 
     // Function to explicitly trigger a search
@@ -169,12 +159,6 @@ export default function SearchBox({
     // Show shuffle button for Vector searches
     const showShuffleButton = searchType === "Vector"
     
-    // Debug logging for lastTextEmbedding
-    console.log("SearchBox lastTextEmbedding:", {
-        exists: !!lastTextEmbedding,
-        length: lastTextEmbedding?.length,
-        firstFew: lastTextEmbedding?.slice(0, 5)
-    });
 
     return (
         <section className="mb-2">
@@ -296,6 +280,8 @@ export default function SearchBox({
                 handleForceLinearScanToggle={searchOptions.handleForceLinearScanToggle}
                 noThread={searchOptions.localNoThread}
                 handleNoThreadToggle={searchOptions.handleNoThreadToggle}
+                useWithAttribs={searchOptions.useWithAttribs}
+                handleWithAttribsToggle={searchOptions.handleWithAttribsToggle}
                 onDone={searchOptions.handleDoneButtonClick}
             />
         </section>

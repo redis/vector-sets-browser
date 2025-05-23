@@ -64,6 +64,11 @@ export default function useSearchOptions({
         return userSettings.get("filterEFValue") ?? "100"
     })
 
+    // State for WITHATTRIBS option
+    const [useWithAttribs, setUseWithAttribs] = useState(() => {
+        return userSettings.getUseWithAttribs()
+    })
+
     // Update local filter when searchFilter prop changes or vectorset changes
     useEffect(() => {
         setLocalFilter(initialSearchFilter)
@@ -172,6 +177,13 @@ export default function useSearchOptions({
         triggerSearchAfterOptionChange()
     }
 
+    // Handle WITHATTRIBS toggle
+    const handleWithAttribsToggle = (checked: boolean) => {
+        setUseWithAttribs(checked)
+        userSettings.setUseWithAttribs(checked)
+        triggerSearchAfterOptionChange()
+    }
+
     // Handle done button click
     const handleDoneButtonClick = () => {
         triggerSearchAfterOptionChange()
@@ -219,6 +231,10 @@ export default function useSearchOptions({
     useEffect(() => {
         userSettings.set("noThread", noThread)
     }, [noThread])
+
+    useEffect(() => {
+        userSettings.setUseWithAttribs(useWithAttribs)
+    }, [useWithAttribs])
 
     // Initialize props from localStorage on component mount - only runs once
     const isFirstRun = useRef(true)
@@ -292,6 +308,10 @@ export default function useSearchOptions({
         filterEFValue,
         handleFilterEFToggle,
         handleFilterEFValueChange,
+        
+        // WITHATTRIBS state
+        useWithAttribs,
+        handleWithAttribsToggle,
         
         // Handlers
         handleDoneButtonClick,

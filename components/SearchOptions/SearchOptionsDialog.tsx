@@ -34,6 +34,10 @@ interface SearchOptionsDialogProps {
     noThread: boolean
     handleNoThreadToggle: (checked: boolean) => void
     
+    // WITHATTRIBS option
+    useWithAttribs: boolean
+    handleWithAttribsToggle: (checked: boolean) => void
+    
     // Done button handler
     onDone: () => void
 }
@@ -53,6 +57,8 @@ export default function SearchOptionsDialog({
     handleForceLinearScanToggle,
     noThread,
     handleNoThreadToggle,
+    useWithAttribs,
+    handleWithAttribsToggle,
     onDone,
 }: SearchOptionsDialogProps) {
     return (
@@ -180,6 +186,25 @@ export default function SearchOptionsDialog({
                                 id="no-thread"
                                 checked={noThread}
                                 onCheckedChange={handleNoThreadToggle}
+                            />
+                        </div>
+
+                        {/* WITHATTRIBS */}
+                        <div className="flex items-center justify-between pt-4 border-t">
+                            <div className="space-y-0.5">
+                                <Label htmlFor="use-with-attribs">
+                                    Use WITHATTRIBS
+                                </Label>
+                                <p className="text-sm text-gray-500">
+                                    Use the new WITHATTRIBS flag to fetch attributes 
+                                    directly with VSIM instead of separate VGETATTR calls. 
+                                    Improves performance but falls back to old method if unsupported.
+                                </p>
+                            </div>
+                            <Switch
+                                id="use-with-attribs"
+                                checked={useWithAttribs}
+                                onCheckedChange={handleWithAttribsToggle}
                             />
                         </div>
                     </div>
