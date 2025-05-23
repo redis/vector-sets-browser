@@ -19,14 +19,14 @@ import { VectorSetMetadata } from "@/lib/types/vectors"
 import {
     VectorCombinationMethod
 } from "@/lib/vector/vectorUtils"
-import { Info, Minus, Plus, Search } from "lucide-react"
+import { Info, Minus, Plus } from "lucide-react"
 import { useCallback, useEffect, useRef, useState } from "react"
 import {
     combinationMethodOptions,
     generateId,
     VectorInput
 } from "./MultiVectorInputUtils"
-import SearchInput from "./SearchInput"
+import VectorSearchInput from "./VectorSearchInput"
 import { VectorCombinationService } from "./VectorCombinationService"
 import VectorSimilarityVisualizer from "./VectorSimilarityVisualizer"
 import WeightVisualization from "./WeightVisualization"
@@ -82,15 +82,6 @@ export default function MultiVectorInput({
         }
     }
     
-    // Update vector input text
-    const updateVectorInput = (id: string, vector: string) => {
-        setVectorInputs(
-            vectorInputs.map((input) =>
-                input.id === id ? { ...input, vector } : input
-            )
-        )
-    }
-    
     // Update vector weight
     const updateVectorWeight = (id: string, weight: number) => {
         setVectorInputs(
@@ -116,25 +107,27 @@ export default function MultiVectorInput({
         )
     }
     
-    // Handle image selection for a vector input
-    const handleImageSelect = (id: string) => (base64Data: string) => {
-        // This is only for tracking which inputs have images
-        setVectorInputs(
-            vectorInputs.map((input) =>
-                input.id === id
-                    ? { ...input, imageData: base64Data || undefined }
-                    : input
-            )
-        )
-    }
-    
     // Handle embedding generation for a vector input
     const handleEmbeddingGenerated = (id: string) => (embedding: number[]) => {
         if (embedding && embedding.length > 0) {
-            // Format the vector as a string and update the input
-            const vectorStr = VectorCombinationService.formatVector(embedding)
-            updateVectorInput(id, vectorStr)
+            console.log("Embedding generated for input", id, "length:", embedding.length)
+            // Store the embedding for visualization and search
+            // Use functional update to avoid race condition with captured vectorInputs
+            setVectorInputs(prevInputs =>
+                prevInputs.map((input) =>
+                    input.id === id ? { ...input, embedding } : input
+                )
+            )
         }
+    }
+    
+    // Update display text for a vector input
+    const updateDisplayText = (id: string) => (text: string) => {
+        setVectorInputs(
+            vectorInputs.map((input) =>
+                input.id === id ? { ...input, vector: text } : input
+            )
+        )
     }
     
     // Memoized function to compute the combined vector with debounce
@@ -442,18 +435,13 @@ export default function MultiVectorInput({
                         )}
                     </div>
                     
-                    <SearchInput
-                        searchType="Vector"
-                        searchQuery={input.vector}
-                        setSearchQuery={(vector) =>
-                            updateVectorInput(input.id, vector)
-                        }
+                    <VectorSearchInput
+                        displayText={input.vector}
+                        onDisplayTextChange={updateDisplayText(input.id)}
+                        onEmbeddingGenerated={handleEmbeddingGenerated(input.id)}
                         metadata={metadata}
                         dim={dim}
-                        onImageSelect={handleImageSelect(input.id)}
-                        onImageEmbeddingGenerated={handleEmbeddingGenerated(
-                            input.id
-                        )}
+                        searchType="Multi-vector"
                     />
                 </div>
             ))}

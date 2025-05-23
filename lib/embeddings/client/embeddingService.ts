@@ -153,8 +153,11 @@ export class ClientEmbeddingService {
         config: EmbeddingConfig
     ): Promise<number[]> {
         try {
-            const baseUrl =
-                process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"
+            // Use window.location.origin in browser, fallback to env var or localhost:3000
+            const baseUrl = typeof window !== 'undefined' 
+                ? window.location.origin 
+                : process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"
+                
             const response = await fetch(`${baseUrl}/api/embeddings`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },

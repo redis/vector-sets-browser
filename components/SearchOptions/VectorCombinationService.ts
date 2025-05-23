@@ -41,6 +41,18 @@ export class VectorCombinationService {
             }
 
             try {
+                // First check if we have a stored embedding (from text input)
+                if (input.embedding && input.embedding.length > 5) {
+                    console.log(
+                        `- Vector ${input.id}: Using stored embedding from text "${input.vector.substring(0, 30)}${
+                            input.vector.length > 30 ? "..." : ""
+                        }" (${input.embedding.length} dims, weight: ${input.weight})`
+                    )
+                    parsedVectors.push(input.embedding)
+                    weights.push(input.weight)
+                    continue
+                }
+
                 // Check if the input is a comma-separated vector or text
                 const potentialVector = parseVectorString(input.vector)
 
@@ -61,7 +73,7 @@ export class VectorCombinationService {
                     parsedVectors.push(potentialVector)
                     weights.push(input.weight)
                 }
-                // Handle as text that needs embedding
+                // Handle as text that needs embedding (fallback for when embedding isn't available)
                 else if (
                     metadata?.embedding &&
                     metadata.embedding.provider !== "none"

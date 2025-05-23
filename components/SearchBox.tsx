@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button"
 import { type VectorSetMetadata } from "@/lib/types/vectors"
 import { Filter, X, ChevronRight } from "lucide-react"
-import { useCallback } from "react"
+import { useCallback, useState } from "react"
 
 import { VectorTuple } from "@/lib/redis-server/api"
 import RedisCommandBox from "./RedisCommandBox"
@@ -13,12 +13,12 @@ import useSearchOptions from "@/app/vectorset/hooks/useSearchOptions"
 import {
     FilterHelpDialog,
     FilterSection,
-    SearchInput,
     SearchOptionsDialog,
     SearchSettingsDropdown,
     SearchTypeSelector,
 } from "./SearchOptions"
 import MultiVectorInput from "./SearchOptions/MultiVectorInput"
+import VectorSearchInput from "./SearchOptions/VectorSearchInput"
 import { SearchType } from "./SearchOptions/SearchTypeSelector"
 
 const searchTypes = [
@@ -112,41 +112,23 @@ export default function SearchBox({
         setVectorFormat,
     })
 
-    // Handle image selection for embedding generation
-    const handleImageSelect = useCallback((base64Data: string) => {
-        // Only store the image data in memory for generating embeddings
-        // We don't store it in the search query directly
-    }, [])
-
-    // Handle embedding generation for vector search
+    // Handle embedding generation for multi-vector search
     const handleEmbeddingGenerated = (embedding: number[]) => {
-        // If embedding is valid, update search query with the vector
-        if (embedding && embedding.length > 0) {
+        // This function receives the COMBINED vector from MultiVectorInput 
+        // Set it as the search query to trigger the search
+        if (embedding && embedding.length > 0 && searchType === "Multi-vector") {
+            console.log("Received combined vector in SearchBox, length:", embedding.length)
             const vectorStr = embedding.map((n) => n.toFixed(4)).join(", ")
-
-            // Set the search query with the vector representation
             setSearchQuery(vectorStr)
-
-            // If this is a multi-vector search, log that we received a combined vector
-            if (searchType === "Multi-vector") {
-                // The MultiVectorInput component will call triggerSearch separately,
-                // so we don't need to trigger a search here.
-            }
         }
     }
-
-    // Function to explicitly trigger a search
-    const triggerSearch = useCallback(() => {
-        console.log("[SearchBox] Explicitly triggering search")
-
-        // Add a small delay to ensure the search query has been updated
-        setTimeout(() => {
-            searchOptions.triggerSearchAfterOptionChange()
-            console.log(
-                "[SearchBox] Search triggered via triggerSearchAfterOptionChange"
-            )
-        }, 100)
-    }, [searchOptions])
+    
+    // For single vector search, don't interfere - let useVectorSearch handle it
+    const handleSingleVectorEmbedding = () => {
+        // The VectorSearchInput will show the embedding visually,
+        // but useVectorSearch will generate its own embedding from the text
+        // This function should NOT receive individual text embeddings from VectorSearchInput
+    }
 
     // Determine if we should show the image uploader - always show for Vector searches
     const showImageUploader = searchType === "Vector"
@@ -216,18 +198,16 @@ export default function SearchBox({
                             onVectorCombinationGenerated={
                                 handleEmbeddingGenerated
                             }
-                            triggerSearch={triggerSearch}
+                            triggerSearch={handleSingleVectorEmbedding}
                         />
                     ) : (
-                        <SearchInput
-                            searchType={searchType}
-                            searchQuery={searchQuery}
-                            setSearchQuery={setSearchQuery}
+                        <VectorSearchInput
+                            displayText={searchQuery}
+                            onDisplayTextChange={setSearchQuery}
+                            onEmbeddingGenerated={handleSingleVectorEmbedding}
                             metadata={metadata}
                             dim={dim}
-                            onImageSelect={handleImageSelect}
-                            onImageEmbeddingGenerated={handleEmbeddingGenerated}
-                            triggerSearch={triggerSearch}
+                            searchType={searchType}
                             lastTextEmbedding={lastTextEmbedding}
                         />
                     )}
@@ -293,7 +273,7 @@ export default function SearchBox({
                                     variant="default"
                                     size="sm"
                                     className="flex items-center gap-1"
-                                    onClick={triggerSearch}
+                                    onClick={handleSingleVectorEmbedding}
                                     title="Run command"
                                 >
                                     <span className="text-xs">Run</span>

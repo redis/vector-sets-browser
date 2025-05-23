@@ -1,0 +1,6 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+don't run npm build. I always have npm run dev running, so you don't need to run the program we are working on at any time. 

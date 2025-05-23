@@ -1,14 +1,9 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { Button } from "@/components/ui/button";
 import { cosineSimilarity, parseVectorString } from '@/lib/vector/vectorUtils';
 import { Expand, Minimize2, Plus, Minus, Equal } from 'lucide-react';
 import MiniVectorHeatmap from '../MiniVectorHeatmap';
-
-interface VectorInput {
-    id: string;
-    vector: string;
-    weight: number;
-}
+import { VectorInput } from './MultiVectorInputUtils';
 
 interface VectorSimilarityVisualizerProps {
     inputs: VectorInput[];
@@ -18,9 +13,15 @@ interface VectorSimilarityVisualizerProps {
 export default function VectorSimilarityVisualizer({ inputs, combinedVector }: VectorSimilarityVisualizerProps) {
     const [expanded, setExpanded] = useState(false);
     
-    // Only include inputs that have valid vectors
+    // Filter inputs to get only valid vectors (with embeddings or parseable vector strings)
     const validInputs = useMemo(() => {
         return inputs.filter(input => {
+            // Prefer stored embedding if available
+            if (input.embedding && input.embedding.length > 5) {
+                return true;
+            }
+            
+            // Fall back to parsing vector string
             const vec = parseVectorString(input.vector);
             return vec.length > 5 && !vec.some(isNaN);
         });
@@ -31,18 +32,34 @@ export default function VectorSimilarityVisualizer({ inputs, combinedVector }: V
         return null;
     }
     
+    // Helper function to get vector data (embedding or parsed string)
+    const getVectorData = (input: VectorInput): number[] | null => {
+        // Prefer stored embedding
+        if (input.embedding && input.embedding.length > 5) {
+            return input.embedding;
+        }
+        
+        // Fall back to parsing vector string
+        const parsed = parseVectorString(input.vector);
+        if (parsed.length > 5 && !parsed.some(isNaN)) {
+            return parsed;
+        }
+        
+        return null;
+    };
+    
     // Calculate similarity matrix
     const similarityMatrix = validInputs.map((input1, i) => {
-        const vec1 = parseVectorString(input1.vector);
+        const vec1 = getVectorData(input1);
         
         return validInputs.map((input2, j) => {
             // For the diagonal, just return 1 (self-similarity)
             if (i === j) return 1;
             
-            const vec2 = parseVectorString(input2.vector);
+            const vec2 = getVectorData(input2);
             
-            // Both vectors must have the same dimension
-            if (vec1.length !== vec2.length) return null;
+            // Both vectors must be valid and have the same dimension
+            if (!vec1 || !vec2 || vec1.length !== vec2.length) return null;
             
             try {
                 return cosineSimilarity(vec1, vec2);
@@ -124,8 +141,11 @@ export default function VectorSimilarityVisualizer({ inputs, combinedVector }: V
                     <div className="flex items-center justify-center gap-4 mb-3">
                         <div className="flex flex-wrap items-center gap-3">
                             {validInputs.map((input, index) => {
-                                const vector = parseVectorString(input.vector);
+                                const vector = getVectorData(input);
                                 const isPositive = input.weight >= 0;
+                                
+                                // Skip invalid vectors
+                                if (!vector) return null;
                                 
                                 return (
                                     <div key={input.id} className="flex items-center gap-2">
@@ -215,7 +235,7 @@ export default function VectorSimilarityVisualizer({ inputs, combinedVector }: V
             </div>
             
             <div className="text-xs text-gray-400 mt-2">
-                Higher similarity between vectors means they'll reinforce each other in the combined result.
+                Higher similarity between vectors means they&apos;ll reinforce each other in the combined result.
                 Dissimilar vectors help explore different semantic directions.
             </div>
         </div>

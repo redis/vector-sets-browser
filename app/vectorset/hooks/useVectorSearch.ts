@@ -471,13 +471,13 @@ export function useVectorSearch({
             clearError()
 
             let searchVector: number[]
+            let searchString = ""
 
             // Try to parse as raw vector first
             const vectorData = internalSearchState.searchQuery
                 .split(",")
                 .map((n) => parseFloat(n.trim()))
 
-            let searchString = ""
             if (!vectorData.some(isNaN)) {
                 // Valid vector data
                 searchVector = vectorData

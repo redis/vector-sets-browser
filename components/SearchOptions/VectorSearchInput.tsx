@@ -8,41 +8,52 @@ import {
 import { type VectorSetMetadata } from "@/lib/types/vectors"
 import { ImageIcon, Shuffle, X } from "lucide-react"
 import { useCallback, useMemo, useState, useEffect, useRef } from "react"
-import { type SearchType } from "./SearchTypeSelector"
 import MiniVectorHeatmap from "../MiniVectorHeatmap"
 
-interface SearchInputProps {
-    searchType: SearchType
-    searchQuery: string
-    setSearchQuery: (query: string) => void
+export interface VectorSearchInputProps {
+    // Display text (what user sees and types)
+    displayText: string
+    onDisplayTextChange: (text: string) => void
+    
+    // Generated embedding (called when embedding is ready)
+    onEmbeddingGenerated?: (embedding: number[]) => void
+    
+    // Metadata for embedding generation
     metadata: VectorSetMetadata | null
     dim: number | null
-    onImageSelect: (base64Data: string) => void
-    onImageEmbeddingGenerated: (embedding: number[]) => void
-    onTextEmbeddingGenerated?: (embedding: number[]) => void // Add callback for text embeddings
-    triggerSearch?: () => void // Optional function to explicitly trigger search
-    lastTextEmbedding?: number[] // Add lastTextEmbedding from useVectorSearch
+    
+    // Optional props to match SearchInput interface
+    placeholder?: string
+    disabled?: boolean
+    className?: string
+    searchType?: "Vector" | "Element" | "Multi-vector" // For compatibility
+    lastTextEmbedding?: number[] // From useVectorSearch for single vector mode
 }
 
-export default function SearchInput({
-    searchType,
-    searchQuery,
-    setSearchQuery,
+/**
+ * Unified Vector Search Input Component
+ * 
+ * This component matches the exact visual design and functionality of SearchInput
+ * while providing unified behavior for both single and multi-vector modes
+ */
+export default function VectorSearchInput({
+    displayText,
+    onDisplayTextChange,
+    onEmbeddingGenerated,
     metadata,
     dim,
-    onImageSelect,
-    onImageEmbeddingGenerated,
-    onTextEmbeddingGenerated,
-    triggerSearch,
+    placeholder,
+    disabled = false,
+    className = "",
+    searchType = "Vector",
     lastTextEmbedding
-}: SearchInputProps) {
+}: VectorSearchInputProps) {
+    
     const supportsEmbeddings =
         metadata?.embedding.provider && metadata?.embedding.provider !== "none"
 
     // Keep track of whether we're using image or text for multimodal search
-    const [activeSearchMode, setActiveSearchMode] = useState<"text" | "image">(
-        "text"
-    )
+    const [activeSearchMode, setActiveSearchMode] = useState<"text" | "image">("text")
 
     // Track whether an image is selected for visual feedback
     const [hasImage, setHasImage] = useState<boolean>(false)
@@ -59,7 +70,7 @@ export default function SearchInput({
     // Add debouncing for text embedding generation
     const textEmbeddingTimerRef = useRef<NodeJS.Timeout | null>(null)
 
-    // Update current vector when lastTextEmbedding changes
+    // Update current vector when lastTextEmbedding changes (for single vector mode)
     useEffect(() => {        
         if (lastTextEmbedding && lastTextEmbedding.length > 0) {
             setCurrentVector(lastTextEmbedding)
@@ -90,15 +101,18 @@ export default function SearchInput({
                 if (embedding && embedding.length > 0) {
                     console.log("Generated text embedding, length:", embedding.length)
                     setCurrentVector(embedding)
-                    if (onTextEmbeddingGenerated) {
-                        onTextEmbeddingGenerated(embedding)
+                    
+                    // Call onEmbeddingGenerated for both single and multi-vector modes
+                    // MultiVectorInput needs this to store embeddings for visualization
+                    if (onEmbeddingGenerated) {
+                        onEmbeddingGenerated(embedding)
                     }
                 }
             } catch (error) {
                 console.error("Error generating text embedding:", error)
             }
         }, 800) // Debounce text embedding generation
-    }, [metadata, onTextEmbeddingGenerated])
+    }, [metadata, onEmbeddingGenerated])
     
     // Cleanup timer on unmount
     useEffect(() => {
@@ -115,16 +129,16 @@ export default function SearchInput({
         
         if (newValue && activeSearchMode === "image") {
             // Clear image when text is entered
-            onImageSelect("")
+            handleImageSelect("")
             setActiveSearchMode("text")
             setHasImage(false)
             setImagePreviewUrl(null)
         }
         
-        setSearchQuery(newValue)
+        onDisplayTextChange(newValue)
         
-        // Generate text embedding if we have a text embedding callback and this looks like text (not a vector)
-        if (onTextEmbeddingGenerated && newValue.trim() && supportsEmbeddings) {
+        // Generate text embedding if this looks like text (not a vector)
+        if (onEmbeddingGenerated && newValue.trim() && supportsEmbeddings) {
             // Try to parse as vector first
             const vectorData = newValue.split(",").map((n) => parseFloat(n.trim()))
             const isVector = !vectorData.some(isNaN) && vectorData.length > 1
@@ -145,36 +159,34 @@ export default function SearchInput({
             // Update image preview
             setImagePreviewUrl(base64Data)
 
-            // Only set the image mode, but don't change the textarea content
-            // The vector will be placed there by handleImageEmbeddingGenerated
+            // Only set the image mode, but don't change the textarea content for multi-vector
+            // For single vector mode, we may want to clear text
             setActiveSearchMode("image")
             setHasImage(true)
 
-            // Clear text only if explicitly requested for Vector search type
-            if (searchType === "Vector" && searchQuery) {
-                setSearchQuery("")
+            // Clear text only for single vector mode
+            if (searchType === "Vector" && displayText) {
+                onDisplayTextChange("")
                 setCurrentVector(null)
             }
         } else {
             setHasImage(false)
             setImagePreviewUrl(null)
         }
-
-        // Pass the base64 data to the parent component for embedding generation
-        // But don't set it as the searchQuery
-        onImageSelect(base64Data)
     }
 
     // Clear the selected image
     const clearSelectedImage = () => {
         handleImageSelect("")
         // Also clear any vector data in the textarea
-        setSearchQuery("")
+        onDisplayTextChange("")
         setCurrentVector(null)
     }
 
     // Compute the placeholder text based on current searchType and metadata
     const searchBoxPlaceholder = useMemo(() => {
+        if (placeholder) return placeholder
+        
         if (!metadata?.embedding) return ""
 
         switch (searchType) {
@@ -185,9 +197,9 @@ export default function SearchInput({
                     ? "Enter text or vector (0.1, 0.2, ...)"
                     : "Enter vector data (0.1, 0.2, ...)"
             default:
-                return ""
+                return "Enter text or vector (0.1, 0.2, ...)"
         }
-    }, [searchType, supportsEmbeddings, metadata?.embedding])
+    }, [searchType, supportsEmbeddings, metadata?.embedding, placeholder])
 
     // Memoize the random vector generation function
     const generateRandomVector = useCallback(() => {
@@ -198,9 +210,9 @@ export default function SearchInput({
         ).map((n) => n.toFixed(4))
 
         const vectorString = randomVector.join(", ")
-        setSearchQuery(vectorString)
+        onDisplayTextChange(vectorString)
         setCurrentVector(randomVector.map(Number))
-    }, [dim, setSearchQuery])
+    }, [dim, onDisplayTextChange])
 
     // For image-related search types, generate the helper text
     const imageHelpText = useMemo(() => {
@@ -208,21 +220,13 @@ export default function SearchInput({
     }, [])
 
     // Determine if we should show the image uploader - always show for Vector searches
-    const showImageUploader = searchType === "Vector"
+    const showImageUploader = searchType === "Vector" || searchType === "Multi-vector"
 
     // Always show text input
     const showTextInput = true
 
     // Show shuffle button for Vector searches
-    const showShuffleButton = searchType === "Vector"
-
-    // Handler for search button click
-    const handleSearchClick = () => {
-        if (triggerSearch) {
-            console.log("Manually triggering search from SearchInput");
-            triggerSearch();
-        }
-    };
+    const showShuffleButton = searchType === "Vector" || searchType === "Multi-vector"
 
     // For the simplified embedded image uploader
     const handleImageButtonClick = () => {
@@ -269,16 +273,24 @@ export default function SearchInput({
 
     // Modified handler for image embedding generation
     const handleImageEmbeddingGenerated = (embedding: number[]) => {
-        // Set search query to a vector representation (needed for the search)
-        setSearchQuery(embedding.join(", "))
+        // For single vector mode, set search query to vector representation
+        // For multi-vector mode, keep the original text and store embedding separately
+        if (searchType === "Vector") {
+            onDisplayTextChange(embedding.join(", "))
+        }
         
         // Update the current vector for visualization
         setCurrentVector(embedding)
+        
+        // Notify parent of embedding
+        if (onEmbeddingGenerated) {
+            onEmbeddingGenerated(embedding)
+        }
     }
 
-    // Render the integrated search input for all types
+    // Render the integrated search input matching SearchInput exactly
     return (
-        <div className="relative flex-1 w-full flex items-stretch">
+        <div className={`relative flex-1 w-full flex items-stretch ${className}`}>
             <div
                 className={`relative border rounded w-full flex items-stretch overflow-hidden ${
                     showShuffleButton ? "pr-24" : "pr-12"
@@ -408,20 +420,21 @@ export default function SearchInput({
                 {showTextInput && (
                     <div className="flex-1 flex flex-col relative">
                         <Textarea
-                            value={searchQuery}
+                            value={displayText}
                             onChange={handleTextChange}
                             placeholder={
                                 showImageUploader
                                     ? imageHelpText
                                     : searchBoxPlaceholder
                             }
+                            disabled={disabled}
                             className="border-0 flex-1 px-4 py-3 min-w-0 h-20 resize-none focus-visible:ring-0"
                         />
                     </div>
                 )}
 
                 {/* For Image type only, show a message instead of an input */}
-                {!searchQuery && showImageUploader && !showTextInput && (
+                {!displayText && showImageUploader && !showTextInput && (
                     <div className="flex-1 flex items-center justify-center px-4 text-gray-500 text-sm h-20">
                         <div className="text-center">
                             <p>Drop an image to search by image</p>
@@ -432,19 +445,6 @@ export default function SearchInput({
                     </div>
                 )}
 
-                {/* Search button */}
-                {/* {triggerSearch && (
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        className="absolute right-12 top-0 h-full"
-                        onClick={handleSearchClick}
-                        title="Search"
-                    >
-                        <Search className="h-4 w-4" />
-                    </Button>
-                )} */}
-
                 {/* Random vector button */}
                 {showShuffleButton && (
                     <Button
@@ -453,10 +453,13 @@ export default function SearchInput({
                         className="absolute right-0 top-0 h-full"
                         onClick={generateRandomVector}
                         title="Generate random vector"
+                        disabled={disabled}
                     >
                         <Shuffle className="h-4 w-4" />
                     </Button>
                 )}
+                
+                {/* Embedding model info */}
                 <div className="absolute bottom-1 right-1 flex flex-row gap-2 backdrop-blur-sm bg-white/80 rounded-tl-md px-0">
                     <div className="flex-grow"></div>
                     <div className="text-xs text-gray-400 p-0.5 px-1 rounded-lg w-fit mt-1">
@@ -472,7 +475,7 @@ export default function SearchInput({
             </div>
 
             {/* Mini vector heatmap - moved outside the search input and full height */}
-            {searchType === "Vector" && (
+            {(searchType === "Vector" || searchType === "Multi-vector") && (
                 <div className="h-full flex items-stretch ml-2">
                     <MiniVectorHeatmap
                         vector={
@@ -485,4 +488,4 @@ export default function SearchInput({
             )}
         </div>
     )
-}
+} 

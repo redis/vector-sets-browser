@@ -5,6 +5,7 @@ export interface VectorInput {
     vector: string
     weight: number
     imageData?: string
+    embedding?: number[] // Store generated embedding for visualization
 }
 
 // Combination method options with descriptions
