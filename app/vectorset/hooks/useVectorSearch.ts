@@ -47,6 +47,8 @@ interface UseVectorSearchReturn {
     setNoThread: (value: boolean) => void
     lastTextEmbedding?: number[] // Add lastTextEmbedding to the return type
     executedCommand?: string
+    vectorFormat?: 'FP32' | 'VALUES'
+    setVectorFormat: (format: 'FP32' | 'VALUES') => void
 }
 
 export function useVectorSearch({
@@ -88,11 +90,15 @@ export function useVectorSearch({
         const forceLinearScan = userSettings.get("forceLinearScan") === true;
         const noThread = userSettings.get("noThread") === true;
         
+        // Get vector format
+        const vectorFormat = userSettings.get("vectorFormat") as 'FP32' | 'VALUES' || 'FP32';
+        
         return {
             searchExplorationFactor,
             filterExplorationFactor,
             forceLinearScan,
-            noThread
+            noThread,
+            vectorFormat
         };
     }, []);
 
@@ -113,6 +119,7 @@ export function useVectorSearch({
                 forceLinearScan: userSettingsOptions.forceLinearScan,
                 noThread: userSettingsOptions.noThread,
                 lastTextEmbedding: undefined,
+                vectorFormat: userSettingsOptions.vectorFormat,
             };
         });
         
@@ -172,6 +179,7 @@ export function useVectorSearch({
                     filterExplorationFactor: internalSearchState.filterExplorationFactor,
                     forceLinearScan: internalSearchState.forceLinearScan,
                     noThread: internalSearchState.noThread,
+                    vectorFormat: internalSearchState.vectorFormat,
                 })
 
                 if (!vsimResponse || !vsimResponse.success) {
@@ -214,6 +222,7 @@ export function useVectorSearch({
             internalSearchState.filterExplorationFactor,
             internalSearchState.forceLinearScan,
             internalSearchState.noThread,
+            internalSearchState.vectorFormat,
             clearError,
             handleError,
             updateSearchState,
@@ -270,6 +279,7 @@ export function useVectorSearch({
             filterExplorationFactor: userSettingsOptions.filterExplorationFactor,
             forceLinearScan: userSettingsOptions.forceLinearScan,
             noThread: userSettingsOptions.noThread,
+            vectorFormat: userSettingsOptions.vectorFormat,
         };
 
         setInternalSearchState(newState)
@@ -329,6 +339,7 @@ export function useVectorSearch({
                         filterExplorationFactor: userSettingsOptions.filterExplorationFactor,
                         forceLinearScan: userSettingsOptions.forceLinearScan,
                         noThread: userSettingsOptions.noThread,
+                        vectorFormat: userSettingsOptions.vectorFormat,
                     });
                 }
             }
@@ -349,7 +360,8 @@ export function useVectorSearch({
                 searchExplorationFactor: searchState.searchExplorationFactor,
                 filterExplorationFactor: searchState.filterExplorationFactor,
                 forceLinearScan: searchState.forceLinearScan,
-                noThread: searchState.noThread
+                noThread: searchState.noThread,
+                vectorFormat: searchState.vectorFormat,
             }));
         }
     }, [searchState]);
@@ -518,6 +530,7 @@ export function useVectorSearch({
                 filterExplorationFactor: internalSearchState.filterExplorationFactor,
                 forceLinearScan: internalSearchState.forceLinearScan,
                 noThread: internalSearchState.noThread,
+                vectorFormat: internalSearchState.vectorFormat,
             })
 
             // Use the execution time from the server response
@@ -578,6 +591,7 @@ export function useVectorSearch({
                 filterExplorationFactor: internalSearchState.filterExplorationFactor,
                 forceLinearScan: internalSearchState.forceLinearScan,
                 noThread: internalSearchState.noThread,
+                vectorFormat: internalSearchState.vectorFormat,
             })
 
             // Use the execution time from the server response
@@ -670,6 +684,7 @@ export function useVectorSearch({
                     filterExplorationFactor: internalSearchState.filterExplorationFactor,
                     forceLinearScan: internalSearchState.forceLinearScan,
                     noThread: internalSearchState.noThread,
+                    vectorFormat: internalSearchState.vectorFormat,
                 })
 
                 // Use the execution time from the server response
@@ -817,5 +832,9 @@ export function useVectorSearch({
         },
         lastTextEmbedding: internalSearchState.lastTextEmbedding, // Expose the last text embedding
         executedCommand: internalSearchState.executedCommand,
+        vectorFormat: internalSearchState.vectorFormat,
+        setVectorFormat: (format) => {
+            updateSearchState({ vectorFormat: format })
+        },
     }
 }

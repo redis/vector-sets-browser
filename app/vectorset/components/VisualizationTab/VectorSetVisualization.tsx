@@ -35,7 +35,7 @@ export default function VectorSetVisualization({
 
     // Initialize with basic search state - advanced options will be loaded from userSettings by useVectorSearch
     const [searchState, setSearchState] = useState<VectorSetSearchOptions>({
-        searchType: "Vector" as const,
+        searchType: "Vector" as SearchType,
         searchQuery: "",
         searchCount: "10",
         searchFilter: "",
@@ -45,6 +45,7 @@ export default function VectorSetVisualization({
         filterExplorationFactor: undefined,
         forceLinearScan: false,
         noThread: false,
+        vectorFormat: 'FP32', // Default vector format
     })
 
     // Track vector set changes
@@ -184,6 +185,11 @@ export default function VectorSetVisualization({
                 setNoThread={(value) => {
                     if (value === searchState.noThread) return
                     setSearchState({ ...searchState, noThread: value })
+                }}
+                vectorFormat={searchState.vectorFormat}
+                setVectorFormat={(format) => {
+                    if (format === searchState.vectorFormat) return
+                    setSearchState({ ...searchState, vectorFormat: format })
                 }}
                 lastTextEmbedding={lastTextEmbedding}
             />

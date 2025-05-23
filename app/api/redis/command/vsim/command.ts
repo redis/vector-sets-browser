@@ -27,6 +27,11 @@ export function validateVsimRequest(body: any): { isValid: boolean; error?: stri
         return { isValid: false, error: 'Search element must be a string' }
     }
 
+    // Validate vectorFormat if provided
+    if (body.vectorFormat && !['FP32', 'VALUES'].includes(body.vectorFormat)) {
+        return { isValid: false, error: 'Vector format must be either FP32 or VALUES' }
+    }
+
     // Validate count if provided
     if (body.count !== undefined) {
         const count = Number(body.count)
@@ -57,7 +62,8 @@ export function validateVsimRequest(body: any): { isValid: boolean; error?: stri
             withEmbeddings: body.withEmbeddings === true,
             withAttribs: body.withAttribs === true,
             forceLinearScan: body.forceLinearScan === true,
-            noThread: body.noThread === true
+            noThread: body.noThread === true,
+            vectorFormat: body.vectorFormat || 'FP32' // Default to FP32 for backward compatibility
         }
     }
 }
@@ -66,7 +72,17 @@ export function buildVsimCommand(request: VsimRequestBody): (string | Buffer)[][
     const baseCommand: (string | Buffer)[] = ["VSIM", request.keyName]
 
     if (request.searchVector) {
-        baseCommand.push("FP32", vectorToFp32Buffer(request.searchVector))
+        // Support both FP32 and VALUES formats
+        if (request.vectorFormat === 'VALUES') {
+            baseCommand.push(
+                "VALUES",
+                request.searchVector.length.toString(),
+                ...request.searchVector.map(v => v.toString())
+            )
+        } else {
+            // Default to FP32 for backward compatibility
+            baseCommand.push("FP32", vectorToFp32Buffer(request.searchVector))
+        }
     } else if (request.searchElement) {
         baseCommand.push("ELE", request.searchElement)
     }

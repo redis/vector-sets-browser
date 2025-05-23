@@ -61,6 +61,8 @@ interface SearchBoxProps {
     executedCommand?: string
     results?: VectorTuple[]
     lastTextEmbedding?: number[]
+    vectorFormat?: 'FP32' | 'VALUES'
+    setVectorFormat?: (format: 'FP32' | 'VALUES') => void
 }
 
 export default function SearchBox({
@@ -88,6 +90,8 @@ export default function SearchBox({
     executedCommand,
     results = [],
     lastTextEmbedding,
+    vectorFormat,
+    setVectorFormat,
 }: SearchBoxProps) {
     // Use custom hook for search options state
     const searchOptions = useSearchOptions({
@@ -104,6 +108,8 @@ export default function SearchBox({
         setSearchExplorationFactor,
         filterExplorationFactor,
         setFilterExplorationFactor,
+        vectorFormat,
+        setVectorFormat,
     })
 
     // Handle image selection for embedding generation
@@ -305,6 +311,8 @@ export default function SearchBox({
                 handleNoThreadToggle={searchOptions.handleNoThreadToggle}
                 useWithAttribs={searchOptions.useWithAttribs}
                 handleWithAttribsToggle={searchOptions.handleWithAttribsToggle}
+                vectorFormat={searchOptions.vectorFormat}
+                handleVectorFormatChange={searchOptions.handleVectorFormatChange}
                 onDone={searchOptions.handleDoneButtonClick}
             />
         </section>

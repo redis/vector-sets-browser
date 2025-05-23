@@ -230,6 +230,7 @@ export interface VsimRequestBody {
     returnCommandOnly?: boolean
     forceLinearScan?: boolean
     noThread?: boolean
+    vectorFormat?: 'FP32' | 'VALUES' // New field for vector format selection
 }
 
 export async function vsim(

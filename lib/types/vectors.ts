@@ -33,6 +33,7 @@ export interface VectorSetSearchOptions {
     noThread: boolean
     lastTextEmbedding?: number[]
     executedCommand?: string
+    vectorFormat?: 'FP32' | 'VALUES'
 }
 
 export function createVectorSetMetadata(

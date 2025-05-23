@@ -9,6 +9,13 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select"
 
 interface SearchOptionsDialogProps {
     open: boolean
@@ -38,6 +45,10 @@ interface SearchOptionsDialogProps {
     useWithAttribs: boolean
     handleWithAttribsToggle: (checked: boolean) => void
     
+    // Vector format option
+    vectorFormat: 'FP32' | 'VALUES'
+    handleVectorFormatChange: (format: 'FP32' | 'VALUES') => void
+    
     // Done button handler
     onDone: () => void
 }
@@ -59,6 +70,8 @@ export default function SearchOptionsDialog({
     handleNoThreadToggle,
     useWithAttribs,
     handleWithAttribsToggle,
+    vectorFormat,
+    handleVectorFormatChange,
     onDone,
 }: SearchOptionsDialogProps) {
     return (
@@ -71,6 +84,38 @@ export default function SearchOptionsDialog({
                 </DialogHeader>
                 <div className="space-y-6">
                     <div className="space-y-4">
+                        {/* Vector Format Selection */}
+                        <div className="flex items-center justify-between pt-4 border-t">
+                            <div className="space-y-0.5 flex-1">
+                                <Label htmlFor="vector-format">
+                                    Vector Data Format
+                                </Label>
+                                <p className="text-sm text-gray-500">
+                                    Choose how vector data is sent to Redis
+                                </p>
+                            </div>
+                            <div className="ml-4">
+                                <Select
+                                    value={vectorFormat}
+                                    onValueChange={handleVectorFormatChange}
+                                >
+                                    <SelectTrigger className="w-32">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="FP32">FP32</SelectItem>
+                                        <SelectItem value="VALUES">VALUES</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        </div>
+                        
+                        <div className="text-sm text-gray-500 pb-4">
+                            <strong>FP32:</strong> Binary format (faster, less bandwidth) 
+                            <br />
+                            <strong>VALUES:</strong> Text format (slower, more readable)
+                        </div>
+
                         <div className="flex items-center justify-between">
                             <div className="space-y-0.5">
                                 <Label htmlFor="custom-ef">

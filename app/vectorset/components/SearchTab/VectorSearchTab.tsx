@@ -67,6 +67,7 @@ export default function VectorSearchTab({
         filterExplorationFactor: undefined,
         forceLinearScan: false,
         noThread: false,
+        vectorFormat: 'FP32', // Default vector format
     })
 
     // Ref to track the last vector set name we processed
@@ -172,6 +173,8 @@ export default function VectorSearchTab({
         setNoThread,
         executedCommand,
         lastTextEmbedding,
+        vectorFormat,
+        setVectorFormat,
     } = useVectorSearch({
         vectorSetName,
         metadata,
@@ -319,6 +322,8 @@ export default function VectorSearchTab({
                 executedCommand={executedCommand}
                 results={results}
                 lastTextEmbedding={lastTextEmbedding}
+                vectorFormat={vectorFormat}
+                setVectorFormat={setVectorFormat}
             />
             <div className="bg-[white] p-4 rounded shadow-md">
                 <Tabs

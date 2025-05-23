@@ -15,6 +15,8 @@ interface UseSearchOptionsParams {
     setSearchExplorationFactor?: (value: number | undefined) => void
     filterExplorationFactor?: number
     setFilterExplorationFactor?: (value: number | undefined) => void
+    vectorFormat?: 'FP32' | 'VALUES'
+    setVectorFormat?: (format: 'FP32' | 'VALUES') => void
 }
 
 export default function useSearchOptions({
@@ -31,6 +33,8 @@ export default function useSearchOptions({
     setSearchExplorationFactor,
     filterExplorationFactor,
     setFilterExplorationFactor,
+    vectorFormat,
+    setVectorFormat,
 }: UseSearchOptionsParams) {
     // UI State
     const [showFilters, setShowFilters] = useState(() => {
@@ -67,6 +71,12 @@ export default function useSearchOptions({
     // State for WITHATTRIBS option
     const [useWithAttribs, setUseWithAttribs] = useState(() => {
         return userSettings.getUseWithAttribs()
+    })
+
+    // State for vector format option
+    const [localVectorFormat, setVectorFormatState] = useState<'FP32' | 'VALUES'>(() => {
+        const stored = userSettings.get("vectorFormat") as 'FP32' | 'VALUES' | undefined
+        return stored === 'VALUES' ? 'VALUES' : 'FP32' // Default to FP32 if undefined or invalid
     })
 
     // Update local filter when searchFilter prop changes or vectorset changes
@@ -181,6 +191,16 @@ export default function useSearchOptions({
     const handleWithAttribsToggle = (checked: boolean) => {
         setUseWithAttribs(checked)
         userSettings.setUseWithAttribs(checked)
+        triggerSearchAfterOptionChange()
+    }
+
+    // Handle vector format change
+    const handleVectorFormatChange = (format: 'FP32' | 'VALUES') => {
+        setVectorFormatState(format)
+        userSettings.set("vectorFormat", format)
+        if (setVectorFormat) {
+            setVectorFormat(format)
+        }
         triggerSearchAfterOptionChange()
     }
 
@@ -312,6 +332,10 @@ export default function useSearchOptions({
         // WITHATTRIBS state
         useWithAttribs,
         handleWithAttribsToggle,
+        
+        // Vector format state
+        vectorFormat: localVectorFormat,
+        handleVectorFormatChange,
         
         // Handlers
         handleDoneButtonClick,
