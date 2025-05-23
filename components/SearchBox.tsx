@@ -1,14 +1,10 @@
 import { Button } from "@/components/ui/button"
 import { type VectorSetMetadata } from "@/lib/types/vectors"
 import { Filter, X } from "lucide-react"
-import { useCallback, useMemo } from "react"
+import { useCallback } from "react"
 
 import { VectorTuple } from "@/lib/redis-server/api"
 import RedisCommandBox from "./RedisCommandBox"
-import {
-    isImageEmbedding,
-    isMultiModalEmbedding,
-} from "@/lib/embeddings/types/embeddingModels"
 
 // Import custom hook
 import useSearchOptions from "@/app/vectorset/hooks/useSearchOptions"
@@ -111,44 +107,40 @@ export default function SearchBox({
     })
 
     // Handle image selection for embedding generation
-    const handleImageSelect = useCallback(
-        (base64Data: string) => {
-            // Only store the image data in memory for generating embeddings
-            // We don't store it in the search query directly
-        },
-        []
-    )
+    const handleImageSelect = useCallback((base64Data: string) => {
+        // Only store the image data in memory for generating embeddings
+        // We don't store it in the search query directly
+    }, [])
 
     // Handle embedding generation for vector search
     const handleEmbeddingGenerated = (embedding: number[]) => {
         // If embedding is valid, update search query with the vector
         if (embedding && embedding.length > 0) {
-            const vectorStr = embedding
-                .map((n) => n.toFixed(4))
-                .join(", ")
-                        
+            const vectorStr = embedding.map((n) => n.toFixed(4)).join(", ")
+
             // Set the search query with the vector representation
-            setSearchQuery(vectorStr);
-            
+            setSearchQuery(vectorStr)
+
             // If this is a multi-vector search, log that we received a combined vector
             if (searchType === "Multi-vector") {
-                
                 // The MultiVectorInput component will call triggerSearch separately,
                 // so we don't need to trigger a search here.
             }
-        } 
+        }
     }
 
     // Function to explicitly trigger a search
     const triggerSearch = useCallback(() => {
-        console.log("[SearchBox] Explicitly triggering search");
-        
+        console.log("[SearchBox] Explicitly triggering search")
+
         // Add a small delay to ensure the search query has been updated
         setTimeout(() => {
-            searchOptions.triggerSearchAfterOptionChange();
-            console.log("[SearchBox] Search triggered via triggerSearchAfterOptionChange");
-        }, 100);
-    }, [searchOptions]);
+            searchOptions.triggerSearchAfterOptionChange()
+            console.log(
+                "[SearchBox] Search triggered via triggerSearchAfterOptionChange"
+            )
+        }, 100)
+    }, [searchOptions])
 
     // Determine if we should show the image uploader - always show for Vector searches
     const showImageUploader = searchType === "Vector"
@@ -158,7 +150,6 @@ export default function SearchBox({
 
     // Show shuffle button for Vector searches
     const showShuffleButton = searchType === "Vector"
-    
 
     return (
         <section className="mb-2">
@@ -176,17 +167,39 @@ export default function SearchBox({
                         />
 
                         {/* Settings Dropdown */}
-                        <SearchSettingsDropdown
-                            showFilters={searchOptions.showFilters}
-                            setShowFilters={searchOptions.setShowFilters}
-                            showRedisCommand={searchOptions.showRedisCommand}
-                            setShowRedisCommand={
-                                searchOptions.setShowRedisCommand
-                            }
-                            setShowSearchOptions={
-                                searchOptions.setShowSearchOptions
-                            }
-                        />
+                        <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2">
+                                <Button
+                                    className={`${
+                                        searchOptions.showFilters
+                                            ? "bg-gray-500 text-white"
+                                            : ""
+                                    }`}
+                                    variant="outline"
+                                    size="icon"
+                                    onClick={() => {
+                                        searchOptions.setShowFilters(
+                                            !searchOptions.showFilters
+                                        )
+                                    }}
+                                >
+                                    <Filter className="h-3 w-3" />
+                                </Button>
+                            </div>
+                            <SearchSettingsDropdown
+                                showFilters={searchOptions.showFilters}
+                                setShowFilters={searchOptions.setShowFilters}
+                                showRedisCommand={
+                                    searchOptions.showRedisCommand
+                                }
+                                setShowRedisCommand={
+                                    searchOptions.setShowRedisCommand
+                                }
+                                setShowSearchOptions={
+                                    searchOptions.setShowSearchOptions
+                                }
+                            />
+                        </div>
                     </div>
 
                     {/* Search Input */}
@@ -194,7 +207,9 @@ export default function SearchBox({
                         <MultiVectorInput
                             metadata={metadata}
                             dim={dim}
-                            onVectorCombinationGenerated={handleEmbeddingGenerated}
+                            onVectorCombinationGenerated={
+                                handleEmbeddingGenerated
+                            }
                             triggerSearch={triggerSearch}
                         />
                     ) : (
@@ -234,9 +249,13 @@ export default function SearchBox({
                             <div className="flex flex-1 items-center relative">
                                 <FilterSection
                                     showFilters={searchOptions.showFilters}
-                                    setShowFilters={searchOptions.setShowFilters}
+                                    setShowFilters={
+                                        searchOptions.setShowFilters
+                                    }
                                     localFilter={searchOptions.localFilter}
-                                    handleFilterChange={searchOptions.handleFilterChange}
+                                    handleFilterChange={
+                                        searchOptions.handleFilterChange
+                                    }
                                     results={results}
                                     error={error || null}
                                     clearError={clearError}
@@ -275,9 +294,13 @@ export default function SearchBox({
                 useCustomFilterEF={searchOptions.useCustomFilterEF}
                 filterEFValue={searchOptions.filterEFValue}
                 handleFilterEFToggle={searchOptions.handleFilterEFToggle}
-                handleFilterEFValueChange={searchOptions.handleFilterEFValueChange}
+                handleFilterEFValueChange={
+                    searchOptions.handleFilterEFValueChange
+                }
                 forceLinearScan={searchOptions.localForceLinearScan}
-                handleForceLinearScanToggle={searchOptions.handleForceLinearScanToggle}
+                handleForceLinearScanToggle={
+                    searchOptions.handleForceLinearScanToggle
+                }
                 noThread={searchOptions.localNoThread}
                 handleNoThreadToggle={searchOptions.handleNoThreadToggle}
                 useWithAttribs={searchOptions.useWithAttribs}
