@@ -743,22 +743,15 @@ export function useVectorSearch({
             // If we have no query but have a filter, use zero vector search
             if (
                 (internalSearchState.searchType === "Vector" || 
-                 internalSearchState.searchType === "Multi-vector" ||
-                 internalSearchState.searchType === "TextAndImage") &&
+                 internalSearchState.searchType === "Multi-vector") &&
                 !internalSearchState.searchQuery.trim()
             ) {
                 await performZeroVectorSearch(count)
             } else if (
                 internalSearchState.searchType === "Vector" || 
-                internalSearchState.searchType === "Multi-vector" ||
-                internalSearchState.searchType === "TextAndImage" ||
-                internalSearchState.searchType === "ImageOrVector"
+                internalSearchState.searchType === "Multi-vector"
             ) {
                 await handleVectorSearch(count)
-            } else if (
-                internalSearchState.searchType === "Image"
-            ) {
-                await handleImageSearch(count)
             } else {
                 await handleElementSearch(count)
             }
