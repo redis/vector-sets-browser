@@ -156,7 +156,7 @@ export default function VectorSimilarityVisualizer({ inputs, combinedVector }: V
                                         )}
                                         
                                         <div className="flex flex-col items-center gap-1">
-                                            <MiniVectorHeatmap vector={vector} />
+                                            <MiniVectorHeatmap vector={vector} isGeneratingEmbedding={false} />
                                             <div className="text-xs text-gray-600">
                                                 Vector {index + 1}
                                             </div>
@@ -175,7 +175,7 @@ export default function VectorSimilarityVisualizer({ inputs, combinedVector }: V
                             
                             {/* Combined result */}
                             <div className="flex flex-col items-center gap-1">
-                                <MiniVectorHeatmap vector={combinedVector} />
+                                <MiniVectorHeatmap vector={combinedVector} isGeneratingEmbedding={false} />
                                 <div className="text-xs text-gray-600 font-medium">
                                     Combined
                                 </div>

@@ -56,6 +56,9 @@ export default function SearchInput({
     // Store the current vector (for visualization)
     const [currentVector, setCurrentVector] = useState<number[] | null>(null)
     
+    // Add embedding loading state - separate from search loading
+    const [isGeneratingEmbedding, setIsGeneratingEmbedding] = useState<boolean>(false)
+    
     // Add debouncing for text embedding generation
     const textEmbeddingTimerRef = useRef<NodeJS.Timeout | null>(null)
 
@@ -81,6 +84,7 @@ export default function SearchInput({
         textEmbeddingTimerRef.current = setTimeout(async () => {
             try {
                 console.log("Generating text embedding for:", text)
+                setIsGeneratingEmbedding(true) // Start embedding generation loading
                 const embedding = await clientEmbeddingService.getEmbedding(
                     text,
                     metadata.embedding,
@@ -96,6 +100,8 @@ export default function SearchInput({
                 }
             } catch (error) {
                 console.error("Error generating text embedding:", error)
+            } finally {
+                setIsGeneratingEmbedding(false) // End embedding generation loading
             }
         }, 800) // Debounce text embedding generation
     }, [metadata, onTextEmbeddingGenerated])
@@ -244,6 +250,7 @@ export default function SearchInput({
                     // Generate the embedding for the image
                     if (base64 && metadata?.embedding) {
                         try {
+                            setIsGeneratingEmbedding(true) // Start embedding generation loading
                             // Generate embedding directly
                             const embedding =
                                 await clientEmbeddingService.getEmbedding(
@@ -258,6 +265,8 @@ export default function SearchInput({
                             setCurrentVector(embedding)
                         } catch (error) {
                             console.error("Error generating embedding:", error)
+                        } finally {
+                            setIsGeneratingEmbedding(false) // End embedding generation loading
                         }
                     }
                 }
@@ -335,6 +344,7 @@ export default function SearchInput({
                                         // Generate the embedding for the image
                                         if (base64 && metadata?.embedding) {
                                             try {
+                                                setIsGeneratingEmbedding(true) // Start embedding generation loading
                                                 // Generate embedding directly
                                                 const embedding =
                                                     await clientEmbeddingService.getEmbedding(
@@ -354,6 +364,8 @@ export default function SearchInput({
                                                     "Error generating embedding:",
                                                     error
                                                 )
+                                            } finally {
+                                                setIsGeneratingEmbedding(false) // End embedding generation loading
                                             }
                                         }
                                     }
@@ -480,6 +492,7 @@ export default function SearchInput({
                                 ? lastTextEmbedding
                                 : currentVector
                         }
+                        isGeneratingEmbedding={isGeneratingEmbedding}
                     />
                 </div>
             )}
