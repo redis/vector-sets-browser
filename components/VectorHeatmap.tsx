@@ -76,12 +76,10 @@ export default function VectorHeatmap({
                 </DialogHeader>
                 <div className="flex flex-col items-center">
                     <div 
-                        className="vector-heatmap overflow-auto max-w-full border rounded p-2 flex justify-center items-center" 
+                        className="vector-heatmap w-full h-full flex justify-center items-center" 
                         style={{ 
                             minWidth: '300px', 
-                            minHeight: '200px',
-                            width: '100%',
-                            backgroundColor: '#f9f9f9'
+                            minHeight: '200px'
                         }}
                     >
                         <VectorHeatmapRenderer 

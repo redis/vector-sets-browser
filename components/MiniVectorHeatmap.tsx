@@ -24,15 +24,15 @@ export default function MiniVectorHeatmap({ vector, disabled = false }: MiniVect
     return (
         <>
             <div 
-                className="mini-vector-heatmap cursor-pointer flex w-20 h-20 items-center justify-center p-1 rounded bg-gray-50 hover:bg-gray-100 transition-colors"
+                className="mini-vector-heatmap cursor-pointer flex w-20 h-20 items-center justify-center rounded bg-gray-50 hover:bg-gray-100 transition-colors"
                 onClick={() => setShowHeatmap(true)}
                 title="View vector visualization"
             >
-                <div className="relative h-full border rounded overflow-hidden bg-white flex items-center justify-center">
+                <div className="relative h-full overflow-hidden flex items-center justify-center">
                     <VectorHeatmapRenderer 
                         vector={vector}
                         showStats={false}
-                        size={60}
+                        size={80}
                         // Let the renderer calculate optimal cell size based on the fixed size
                     />
                 </div>
