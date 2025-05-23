@@ -177,6 +177,38 @@ export default function MultiVectorInput({
         }, 300) // 300ms debounce
     }, [vectorInputs, metadata, normalizeVector, combinationMethod, onVectorCombinationGenerated])
     
+    // Immediate vector combination without debounce (for method/normalization changes)
+    const combineVectorsImmediately = useCallback(async () => {
+        try {
+            const combined = await VectorCombinationService.combineVectors(
+                vectorInputs,
+                metadata,
+                normalizeVector,
+                combinationMethod
+            )
+            
+            // Only call the callback if we have a valid combined vector
+            if (combined) {
+                // Stringify to check if it has changed
+                const combinedString = JSON.stringify(combined)
+                
+                // Only call the callback if the combined vector has changed
+                if (combinedString !== lastCombinedVectorRef.current) {
+                    lastCombinedVectorRef.current = combinedString
+                    console.log("Sending combined vector to parent (immediate)")
+                    setCombinedVector(combined) // Store locally for visualization
+                    onVectorCombinationGenerated(combined)
+                } else {
+                    console.log("Combined vector unchanged, not sending (immediate)")
+                }
+            } else {
+                setCombinedVector(null) // Clear if no valid combined vector
+            }
+        } catch (error) {
+            console.error("Error in immediate vector combination:", error)
+        }
+    }, [vectorInputs, metadata, normalizeVector, combinationMethod, onVectorCombinationGenerated])
+    
     // Manually trigger vector combination and search
     const handleSearchClick = async () => {
         console.log("Search button clicked, generating combined vector...")
@@ -231,10 +263,10 @@ export default function MultiVectorInput({
         }
     }, [combineVectorsWithDebounce])
     
-    // Effect to recombine vectors when normalization preference changes
+    // Effect to recombine vectors immediately when method or normalization changes
     useEffect(() => {
-        combineVectorsWithDebounce()
-    }, [normalizeVector, combinationMethod, combineVectorsWithDebounce])
+        combineVectorsImmediately()
+    }, [normalizeVector, combinationMethod, combineVectorsImmediately])
     
     return (
         <div className="w-full space-y-3">
