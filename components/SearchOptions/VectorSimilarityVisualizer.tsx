@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Button } from "@/components/ui/button";
 import { cosineSimilarity, parseVectorString } from '@/lib/vector/vectorUtils';
-import { Expand, Minimize2 } from 'lucide-react';
+import { Expand, Minimize2, Plus, Minus, Equal } from 'lucide-react';
+import MiniVectorHeatmap from '../MiniVectorHeatmap';
 
 interface VectorInput {
     id: string;
@@ -11,9 +12,10 @@ interface VectorInput {
 
 interface VectorSimilarityVisualizerProps {
     inputs: VectorInput[];
+    combinedVector?: number[] | null;
 }
 
-export default function VectorSimilarityVisualizer({ inputs }: VectorSimilarityVisualizerProps) {
+export default function VectorSimilarityVisualizer({ inputs, combinedVector }: VectorSimilarityVisualizerProps) {
     const [expanded, setExpanded] = useState(false);
     
     // Only include inputs that have valid vectors
@@ -112,6 +114,63 @@ export default function VectorSimilarityVisualizer({ inputs }: VectorSimilarityV
                 Values close to 1.0 indicate vectors pointing in the same direction, 
                 0.0 means orthogonal vectors, and -1.0 means opposite directions.
             </div>
+            
+            {/* Combined Vector Visualization - Visual Equation */}
+            {combinedVector && validInputs.length > 0 && (
+                <div className="mb-4 p-3 bg-gray-50 rounded-md">
+                    <h4 className="text-sm font-medium mb-3">Combined Vector Visualization</h4>
+                    
+                    {/* Visual equation showing X + Y = Z */}
+                    <div className="flex items-center justify-center gap-4 mb-3">
+                        <div className="flex flex-wrap items-center gap-3">
+                            {validInputs.map((input, index) => {
+                                const vector = parseVectorString(input.vector);
+                                const isPositive = input.weight >= 0;
+                                
+                                return (
+                                    <div key={input.id} className="flex items-center gap-2">
+                                        {index > 0 && (
+                                            <div className="flex items-center justify-center w-6 h-6 rounded-full bg-white border text-xs">
+                                                {isPositive ? <Plus size={12} /> : <Minus size={12} />}
+                                            </div>
+                                        )}
+                                        
+                                        <div className="flex flex-col items-center gap-1">
+                                            <MiniVectorHeatmap vector={vector} />
+                                            <div className="text-xs text-gray-600">
+                                                Vector {index + 1}
+                                            </div>
+                                            <div className="text-xs text-gray-500">
+                                                weight: {input.weight.toFixed(1)}
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                            
+                            {/* Equals sign */}
+                            <div className="flex items-center justify-center w-6 h-6 rounded-full bg-blue-100 border text-xs">
+                                <Equal size={12} />
+                            </div>
+                            
+                            {/* Combined result */}
+                            <div className="flex flex-col items-center gap-1">
+                                <MiniVectorHeatmap vector={combinedVector} />
+                                <div className="text-xs text-gray-600 font-medium">
+                                    Combined
+                                </div>
+                                <div className="text-xs text-gray-500">
+                                    dim: {combinedVector.length}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div className="text-xs text-gray-500 text-center">
+                        Click any heatmap to view detailed vector visualization
+                    </div>
+                </div>
+            )}
             
             <div className="overflow-x-auto">
                 <table className="w-full border-collapse text-xs">

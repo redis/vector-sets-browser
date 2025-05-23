@@ -57,6 +57,9 @@ export default function MultiVectorInput({
     const [combinationMethod, setCombinationMethod] =
         useState<VectorCombinationMethod>(VectorCombinationMethod.LINEAR)
     
+    // Add state to track the current combined vector
+    const [combinedVector, setCombinedVector] = useState<number[] | null>(null)
+    
     // Store the last combined vector to avoid unnecessary updates
     const lastCombinedVectorRef = useRef<string>("")
     
@@ -160,10 +163,13 @@ export default function MultiVectorInput({
                     if (combinedString !== lastCombinedVectorRef.current) {
                         lastCombinedVectorRef.current = combinedString
                         console.log("Sending combined vector to parent")
+                        setCombinedVector(combined) // Store locally for visualization
                         onVectorCombinationGenerated(combined)
                     } else {
                         console.log("Combined vector unchanged, not sending")
                     }
+                } else {
+                    setCombinedVector(null) // Clear if no valid combined vector
                 }
             } catch (error) {
                 console.error("Error in debounced vector combination:", error)
@@ -190,7 +196,8 @@ export default function MultiVectorInput({
                     "..."
                 )
                 
-                // First update the vector combination
+                // Store the combined vector locally and update parent
+                setCombinedVector(combined)
                 onVectorCombinationGenerated(combined)
                 
                 // Then explicitly trigger the search after a small delay to ensure the vector is set
@@ -202,6 +209,7 @@ export default function MultiVectorInput({
                     }, 200)
                 }
             } else {
+                setCombinedVector(null)
                 console.log(
                     "No valid vectors to search with. Please enter valid vector data in at least one input."
                 )
@@ -325,7 +333,7 @@ export default function MultiVectorInput({
             <WeightVisualization inputs={vectorInputs} />
             
             {/* Add vector similarity visualizer */}
-            <VectorSimilarityVisualizer inputs={vectorInputs} />
+            <VectorSimilarityVisualizer inputs={vectorInputs} combinedVector={combinedVector} />
             
             {vectorInputs.map((input, index) => (
                 <div
