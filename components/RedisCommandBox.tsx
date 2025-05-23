@@ -171,15 +171,6 @@ export default function RedisCommandBox({
             >
                 <Copy className="h-4 w-4" />
             </Button>
-
-            {/* <Button
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6 text-gray-500"
-                onClick={() => setShowRedisCommand(false)}
-            >
-                <X className="h-4 w-4" />
-            </Button> */}
         </div>
     )
 } 

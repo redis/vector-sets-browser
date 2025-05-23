@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button"
 import { type VectorSetMetadata } from "@/lib/types/vectors"
-import { Filter, X } from "lucide-react"
+import { Filter, X, ChevronRight } from "lucide-react"
 import { useCallback } from "react"
 
 import { VectorTuple } from "@/lib/redis-server/api"
@@ -277,14 +277,30 @@ export default function SearchBox({
 
                     {/* Redis Command Box */}
                     {searchOptions.showRedisCommand && executedCommand && (
-                        <RedisCommandBox
-                            vectorSetName={vectorSetName}
-                            dim={dim}
-                            executedCommand={executedCommand}
-                            searchQuery={searchQuery}
-                            searchFilter={searchFilter}
-                            showRedisCommand={searchOptions.showRedisCommand}
-                        />
+                        <div className="flex gap-2 items-center w-full">
+                            <div className="flex-1">
+                                <RedisCommandBox
+                                    vectorSetName={vectorSetName}
+                                    dim={dim}
+                                    executedCommand={executedCommand}
+                                    searchQuery={searchQuery}
+                                    searchFilter={searchFilter}
+                                    showRedisCommand={searchOptions.showRedisCommand}
+                                />
+                            </div>
+                            {searchType === "Multi-vector" && (
+                                <Button
+                                    variant="default"
+                                    size="sm"
+                                    className="flex items-center gap-1"
+                                    onClick={triggerSearch}
+                                    title="Run command"
+                                >
+                                    <span className="text-xs">Run</span>
+                                    <ChevronRight className="h-3 w-3" />
+                                </Button>
+                            )}
+                        </div>
                     )}
                 </div>
             </div>

@@ -341,15 +341,6 @@ export default function MultiVectorInput({
                 
                 <div className="flex gap-2 ml-auto">
                     <Button 
-                        onClick={handleSearchClick}
-                        variant="default" 
-                        size="sm"
-                        className="flex items-center gap-1"
-                    >
-                        <Search size={16} />
-                        <span>Search</span>
-                    </Button>
-                    <Button 
                         onClick={addVectorInput} 
                         variant="outline" 
                         size="sm"
