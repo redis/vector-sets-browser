@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { Download } from "lucide-react"
+import { Download, X } from "lucide-react"
 import VectorHeatmapRenderer from "./VectorHeatmapRenderer"
+import ColorSchemeSelector from "./ColorSchemeSelector"
+import { useVectorSettings } from "@/hooks/useVectorSettings"
 
 interface VectorHeatmapProps {
     vector: number[] | null
@@ -16,8 +18,9 @@ export default function VectorHeatmap({
     onOpenChange 
 }: VectorHeatmapProps) {
     const [forceRender, setForceRender] = useState(0)
+    const { settings, setColorScheme, setScalingMode } = useVectorSettings()
 
-    // Force redraw on dialog open
+    // Force redraw on dialog open or settings change
     useEffect(() => {
         if (open) {
             // Small delay to ensure DOM is ready
@@ -26,7 +29,7 @@ export default function VectorHeatmap({
             }, 100)
             return () => clearTimeout(timer)
         }
-    }, [open])
+    }, [open, settings.colorScheme, settings.scalingMode])
 
     // Download visualization as image
     const downloadVisualization = () => {
@@ -59,21 +62,99 @@ export default function VectorHeatmap({
         )
     }
 
+    // Render color legend based on current scheme
+    const renderColorLegend = () => {
+        type LegendItem = { color: string; label: string; border?: boolean }
+        
+        const legends: Record<string, LegendItem[]> = {
+            thermal: [
+                { color: "#000000", label: "Lowest" },
+                { color: "#400080", label: "Low" },
+                { color: "#ff0000", label: "Medium" },
+                { color: "#ffa500", label: "High" },
+                { color: "#ffffff", label: "Highest", border: true }
+            ],
+            viridis: [
+                { color: "#440154", label: "Lowest" },
+                { color: "#31688e", label: "Low" },
+                { color: "#35b779", label: "Medium" },
+                { color: "#fde725", label: "Highest" }
+            ],
+            classic: [
+                { color: "#6495ed", label: "Lowest" },
+                { color: "#ffffff", label: "Medium", border: true },
+                { color: "#dc1426", label: "Highest" }
+            ]
+        }
+
+        const currentLegend = legends[settings.colorScheme]
+
+        return (
+            <div className="flex justify-center mt-4 gap-4 p-2 bg-slate-50 rounded w-full flex-wrap">
+                {currentLegend.map((item, index) => (
+                    <div key={index} className="flex items-center gap-2">
+                        <div 
+                            className={`w-5 h-5 rounded-sm ${item.border ? 'border' : ''}`} 
+                            style={{ backgroundColor: item.color }}
+                        />
+                        <span className="text-sm">{item.label}</span>
+                    </div>
+                ))}
+            </div>
+        )
+    }
+
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader className="flex flex-row items-center justify-between">
                     <DialogTitle>Vector Visualization</DialogTitle>
-                    <Button 
-                        variant="outline" 
-                        size="sm" 
-                        className="gap-1"
-                        onClick={downloadVisualization}
-                    >
-                        <Download className="h-4 w-4" />
-                        <span>Download</span>
-                    </Button>
+                    <div className="flex gap-2">
+                        <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="gap-1"
+                            onClick={downloadVisualization}
+                        >
+                            <Download className="h-4 w-4" />
+                            <span>Download</span>
+                        </Button>
+                        <Button 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={() => onOpenChange(false)}
+                        >
+                            <X className="h-4 w-4" />
+                        </Button>
+                    </div>
                 </DialogHeader>
+
+                {/* Always Visible Settings Panel */}
+                <div className="border rounded-lg p-4 bg-gray-50">
+                    <h3 className="font-medium mb-3">Visualization Settings</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <ColorSchemeSelector
+                            value={settings.colorScheme}
+                            onChange={setColorScheme}
+                            showPreview={false}
+                        />
+                        <div>
+                            <label className="block text-sm font-medium mb-1">Scaling Mode:</label>
+                            <select 
+                                value={settings.scalingMode} 
+                                onChange={(e) => setScalingMode(e.target.value as any)}
+                                className="border rounded px-2 py-1 w-full"
+                            >
+                                <option value="relative">Relative (min/max)</option>
+                                <option value="absolute">Absolute (-1 to 1)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <p className="text-xs text-gray-600 mt-2">
+                        Settings are automatically saved and will be used for all vector visualizations.
+                    </p>
+                </div>
+
                 <div className="flex flex-col items-center">
                     <div 
                         className="vector-heatmap w-full h-full flex justify-center items-center" 
@@ -81,29 +162,19 @@ export default function VectorHeatmap({
                             minWidth: '300px', 
                             minHeight: '200px'
                         }}
+                        key={`${settings.colorScheme}-${settings.scalingMode}-${forceRender}`}
                     >
                         <VectorHeatmapRenderer 
                             vector={vector}
                             showStats={true}
+                            colorScheme={settings.colorScheme}
+                            scalingMode={settings.scalingMode}
                         />
                     </div>
                     {renderVectorStats()}
-                    <div className="flex justify-center mt-4 gap-6 p-2 bg-slate-50 rounded w-full">
-                        <div className="flex items-center gap-2">
-                            <div className="w-5 h-5 rounded-sm" style={{ backgroundColor: "#3b4cc0" }}></div>
-                            <span>-1 (Negative)</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <div className="w-5 h-5 border rounded-sm" style={{ backgroundColor: "#f7f7f7" }}></div>
-                            <span>0 (Neutral)</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <div className="w-5 h-5 rounded-sm" style={{ backgroundColor: "#b40426" }}></div>
-                            <span>1 (Positive)</span>
-                        </div>
-                    </div>
+                    {renderColorLegend()}
                     <p className="text-xs text-muted-foreground mt-2">
-                        Hover over cells to see exact values. Brighter colors indicate stronger values.
+                        Hover over cells to see exact values. Colors represent relative intensity.
                     </p>
                 </div>
             </DialogContent>

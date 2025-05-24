@@ -2,6 +2,7 @@ import { useState, useEffect } from "react"
 import VectorHeatmapRenderer from "./VectorHeatmapRenderer"
 import VectorHeatmap from "./VectorHeatmap"
 import { BarChart2 } from "lucide-react"
+import { useVectorSettings } from "@/hooks/useVectorSettings"
 
 interface MiniVectorHeatmapProps {
     vector: number[] | null
@@ -16,6 +17,7 @@ export default function MiniVectorHeatmap({
 }: MiniVectorHeatmapProps) {
     const [showHeatmap, setShowHeatmap] = useState(false)
     const [isResolving, setIsResolving] = useState(false)
+    const { settings } = useVectorSettings()
         
     // Check if we have a valid vector to display
     const hasValidVector = vector && vector.length > 0 && vector.every(val => 
@@ -98,7 +100,8 @@ export default function MiniVectorHeatmap({
                         vector={vector}
                         showStats={false}
                         size={80}
-                        // Let the renderer calculate optimal cell size based on the fixed size
+                        colorScheme={settings.colorScheme}
+                        scalingMode={settings.scalingMode}
                     />
                 </div>
             </div>

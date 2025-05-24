@@ -5,13 +5,17 @@ interface VectorHeatmapRendererProps {
     className?: string
     size?: number
     showStats?: boolean
+    scalingMode?: 'relative' | 'absolute'
+    colorScheme?: 'thermal' | 'viridis' | 'classic'
 }
 
 export default function VectorHeatmapRenderer({ 
     vector, 
     className = "",
     size = 300,
-    showStats = false
+    showStats = false,
+    scalingMode = 'relative',
+    colorScheme = 'thermal'
 }: VectorHeatmapRendererProps) {
     const canvasRef = useRef<HTMLCanvasElement>(null)
     const [hoveredCell, setHoveredCell] = useState<{ index: number; value: number } | null>(null)
@@ -23,6 +27,97 @@ export default function VectorHeatmapRenderer({
         const cols = Math.ceil(Math.sqrt(length))
         const rows = Math.ceil(length / cols)
         return { cols, rows }
+    }
+
+    // Get scaling parameters based on the vector and scaling mode
+    const getScalingParams = (vector: number[]) => {
+        if (scalingMode === 'absolute') {
+            return { min: -1, max: 1, range: 2 }
+        } else {
+            const min = Math.min(...vector)
+            const max = Math.max(...vector)
+            const range = max - min
+            return { min, max, range }
+        }
+    }
+
+    // Normalize value based on scaling mode
+    const normalizeValue = (value: number, min: number, max: number, range: number) => {
+        if (range === 0) return 0.5 // All values are the same
+        if (scalingMode === 'absolute') {
+            return Math.max(0, Math.min(1, (value + 1) / 2)) // Map [-1,1] to [0,1]
+        } else {
+            return (value - min) / range // Map [min,max] to [0,1]
+        }
+    }
+
+    // Get color based on normalized value (0-1) and color scheme
+    const getColor = (normalizedValue: number): [number, number, number] => {
+        // Clamp to ensure we're in [0,1]
+        const t = Math.max(0, Math.min(1, normalizedValue))
+
+        switch (colorScheme) {
+            case 'thermal':
+                // Black -> Purple -> Red -> Orange -> Yellow -> White
+                if (t < 0.2) {
+                    // Black to Purple
+                    const s = t / 0.2
+                    return [Math.round(s * 64), 0, Math.round(s * 128)]
+                } else if (t < 0.4) {
+                    // Purple to Red  
+                    const s = (t - 0.2) / 0.2
+                    return [Math.round(64 + s * (255 - 64)), 0, Math.round(128 * (1 - s))]
+                } else if (t < 0.6) {
+                    // Red to Orange
+                    const s = (t - 0.4) / 0.2
+                    return [255, Math.round(s * 165), 0]
+                } else if (t < 0.8) {
+                    // Orange to Yellow
+                    const s = (t - 0.6) / 0.2
+                    return [255, Math.round(165 + s * (255 - 165)), 0]
+                } else {
+                    // Yellow to White
+                    const s = (t - 0.8) / 0.2
+                    return [255, 255, Math.round(s * 255)]
+                }
+
+            case 'viridis':
+                // Inspired by matplotlib's viridis: Dark Purple -> Blue -> Green -> Yellow
+                if (t < 0.25) {
+                    const s = t / 0.25
+                    return [Math.round(s * 68), Math.round(s * 1), Math.round(84 + s * (140 - 84))]
+                } else if (t < 0.5) {
+                    const s = (t - 0.25) / 0.25
+                    return [Math.round(68 + s * (53 - 68)), Math.round(1 + s * (95 - 1)), Math.round(140 + s * (169 - 140))]
+                } else if (t < 0.75) {
+                    const s = (t - 0.5) / 0.25
+                    return [Math.round(53 + s * (35 - 53)), Math.round(95 + s * (140 - 95)), Math.round(169 + s * (69 - 169))]
+                } else {
+                    const s = (t - 0.75) / 0.25
+                    return [Math.round(35 + s * (253 - 35)), Math.round(140 + s * (231 - 140)), Math.round(69 + s * (37 - 69))]
+                }
+
+            case 'classic':
+            default:
+                // Classic blue -> white -> red scheme
+                if (t < 0.5) {
+                    // Blue to White
+                    const s = t / 0.5
+                    return [
+                        Math.round(100 + s * (255 - 100)), // 100 -> 255
+                        Math.round(149 + s * (255 - 149)), // 149 -> 255  
+                        Math.round(237 + s * (255 - 237))  // 237 -> 255
+                    ]
+                } else {
+                    // White to Red
+                    const s = (t - 0.5) / 0.5
+                    return [
+                        255, // Keep at 255
+                        Math.round(255 - s * (255 - 20)), // 255 -> 20
+                        Math.round(255 - s * (255 - 60))  // 255 -> 60
+                    ]
+                }
+        }
     }
 
     // Monitor canvas ref availability
@@ -63,6 +158,9 @@ export default function VectorHeatmapRenderer({
             return
         }
 
+        // Get scaling parameters once for the entire vector
+        const scalingParams = getScalingParams(vector)
+
         // Determine grid dimensions
         const { cols, rows } = getGridDimensions(vector.length)
 
@@ -90,7 +188,7 @@ export default function VectorHeatmapRenderer({
 
         // Draw heatmap
         vector.forEach((value, index) => {
-            drawCell(ctx, index, value, cols, cellSize, offsetX, offsetY)
+            drawCell(ctx, index, value, cols, cellSize, offsetX, offsetY, scalingParams)
         })
 
         // Add hover handler only if showStats is true
@@ -130,7 +228,7 @@ export default function VectorHeatmapRenderer({
                 canvas.removeEventListener('mouseleave', handleMouseLeave)
             }
         }
-    }, [vector, isCanvasReady, forceRender, size])
+    }, [vector, isCanvasReady, forceRender, size, scalingMode, colorScheme])
 
     // Function to draw a single cell
     const drawCell = (
@@ -140,7 +238,8 @@ export default function VectorHeatmapRenderer({
         cols: number,
         cellSize: number,
         offsetX: number,
-        offsetY: number
+        offsetY: number,
+        scalingParams: { min: number; max: number; range: number }
     ) => {
         try {
             const col = index % cols
@@ -149,26 +248,11 @@ export default function VectorHeatmapRenderer({
             const y = offsetY + row * cellSize
 
             // Normalize value to be between -1 and 1
-            const normalizedValue = Math.max(-1, Math.min(1, value))
+            const normalizedValue = normalizeValue(value, scalingParams.min, scalingParams.max, scalingParams.range)
             
-            let r, g, b
-            if (normalizedValue < 0) {
-                // Blue to white for negative values (-1 to 0)
-                // #3b4cc0 (dark blue) → #f7f7f7 (white)
-                const intensity = 1 + normalizedValue
-                r = Math.round(59 + (247 - 59) * intensity)
-                g = Math.round(76 + (247 - 76) * intensity)
-                b = Math.round(192 + (247 - 192) * intensity)
-            } else {
-                // White to red for positive values (0 to 1)
-                // #f7f7f7 (white) → #b40426 (red)
-                const intensity = 1 - normalizedValue
-                r = Math.round(180 + (247 - 180) * intensity)
-                g = Math.round(4 + (247 - 4) * intensity)
-                b = Math.round(38 + (247 - 38) * intensity)
-            }
+            const color = getColor(normalizedValue)
 
-            ctx.fillStyle = `rgb(${r}, ${g}, ${b})`
+            ctx.fillStyle = `rgb(${color[0]}, ${color[1]}, ${color[2]})`
             ctx.fillRect(x, y, cellSize, cellSize)
 
             // Add border
@@ -183,8 +267,14 @@ export default function VectorHeatmapRenderer({
     const renderVectorStats = () => {
         if (!vector || vector.length === 0 || !showStats) return null
 
+        const scalingParams = getScalingParams(vector)
+
         return (
             <div className="mt-2 text-xs text-gray-600">
+                <div className="mb-1 p-1 bg-slate-50 rounded text-center">
+                    <p><strong>Length:</strong> {vector.length} | <strong>Mode:</strong> {scalingMode}</p>
+                    <p><strong>Range:</strong> {scalingParams.min.toFixed(4)} to {scalingParams.max.toFixed(4)}</p>
+                </div>
                 {hoveredCell && (
                     <div className="p-1 bg-slate-100 rounded text-center">
                         <p><strong>Dim {hoveredCell.index}:</strong> {hoveredCell.value.toFixed(4)}</p>
