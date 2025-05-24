@@ -602,6 +602,7 @@ export default function VectorResults({
             <ResultsHeader
                 results={results}
                 searchTime={searchTime}
+                isSearching={isSearching}
                 isLoading={isLoading}
                 searchFilter={searchFilter}
                 searchQuery={searchQuery}

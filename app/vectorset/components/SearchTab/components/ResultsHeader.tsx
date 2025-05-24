@@ -16,6 +16,7 @@ import { ColumnConfig } from "@/app/vectorset/hooks/useVectorResultsSettings"
 interface ResultsHeaderProps {
     results: any[]
     searchTime?: string
+    isSearching?: boolean
     isLoading?: boolean
     searchFilter?: string
     searchQuery?: string
@@ -44,6 +45,7 @@ interface ResultsHeaderProps {
 const ResultsHeader = React.memo(function ResultsHeader({
     results,
     searchTime,
+    isSearching,
     isLoading,
     searchFilter,
     searchQuery,
@@ -74,9 +76,10 @@ const ResultsHeader = React.memo(function ResultsHeader({
                 {results.length > 0 ? (
                     <div className="flex items-center gap-2">
                         <div>
-                            {searchTime && (
+                            {(searchTime || isSearching) && (
                                 <SearchTimeIndicator
-                                    searchTime={parseFloat(searchTime)}
+                                    searchTime={searchTime ? parseFloat(searchTime) : undefined}
+                                    isSearching={isSearching}
                                 />
                             )}
                         </div>
