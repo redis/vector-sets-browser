@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react"
-import VectorHeatmapRenderer from "./VectorHeatmapRenderer"
+import VectorVisualizationRenderer from "./VectorVisualizationRenderer"
 import VectorHeatmap from "./VectorHeatmap"
 import { BarChart2 } from "lucide-react"
 import { useVectorSettings } from "@/hooks/useVectorSettings"
@@ -96,12 +96,13 @@ export default function MiniVectorHeatmap({
                         transform: isResolving ? 'scale(1)' : 'scale(1.05)'
                     }}
                 >
-                    <VectorHeatmapRenderer 
+                    <VectorVisualizationRenderer 
                         vector={vector}
                         showStats={false}
                         size={80}
                         colorScheme={settings.colorScheme}
                         scalingMode={settings.scalingMode}
+                        visualizationType={settings.visualizationType}
                     />
                 </div>
             </div>

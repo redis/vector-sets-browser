@@ -1,5 +1,5 @@
 import { useState } from "react"
-import VectorHeatmapRenderer from "./VectorHeatmapRenderer"
+import VectorVisualizationRenderer from "./VectorVisualizationRenderer"
 import ColorSchemeSelector from "./ColorSchemeSelector"
 
 export default function VectorHeatmapDemo() {
@@ -30,15 +30,16 @@ export default function VectorHeatmapDemo() {
     const [vectorType, setVectorType] = useState<'clustered' | 'wide' | 'normal'>('clustered')
     const [scalingMode, setScalingMode] = useState<'relative' | 'absolute'>('relative')
     const [colorScheme, setColorScheme] = useState<'thermal' | 'viridis' | 'classic'>('thermal')
+    const [visualizationType, setVisualizationType] = useState<'heatmap' | 'distribution'>('heatmap')
     
     const vector = generateVector(vectorType)
 
     return (
         <div className="p-6 space-y-6">
-            <h2 className="text-2xl font-bold">Vector Heatmap Renderer Demo</h2>
+            <h2 className="text-2xl font-bold">Vector Visualization Demo</h2>
             
             {/* Controls */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div>
                     <label className="block text-sm font-medium mb-1">Vector Type:</label>
                     <select 
@@ -49,6 +50,18 @@ export default function VectorHeatmapDemo() {
                         <option value="clustered">Clustered around 0</option>
                         <option value="wide">Wide range</option>
                         <option value="normal">Normal range</option>
+                    </select>
+                </div>
+                
+                <div>
+                    <label className="block text-sm font-medium mb-1">Visualization Type:</label>
+                    <select 
+                        value={visualizationType} 
+                        onChange={(e) => setVisualizationType(e.target.value as any)}
+                        className="border rounded px-2 py-1 w-full"
+                    >
+                        <option value="heatmap">Heatmap Grid</option>
+                        <option value="distribution">Distribution Graph</option>
                     </select>
                 </div>
                 
@@ -73,19 +86,20 @@ export default function VectorHeatmapDemo() {
 
             {/* Visualization */}
             <div className="flex flex-col items-center">
-                <VectorHeatmapRenderer
+                <VectorVisualizationRenderer
                     vector={vector}
                     size={400}
                     showStats={true}
                     scalingMode={scalingMode}
                     colorScheme={colorScheme}
+                    visualizationType={visualizationType}
                     className="border rounded shadow"
                 />
                 
                 <div className="mt-4 text-sm text-gray-600 max-w-md text-center">
                     <p>
-                        <strong>Tip:</strong> Try "Clustered around 0" with different scaling modes to see the difference. 
-                        Relative scaling uses the full color range for better contrast.
+                        <strong>Tip:</strong> Try different vector types and visualization modes to see how they represent the data. 
+                        Distribution graphs show value frequency, while heatmaps show spatial patterns.
                     </p>
                 </div>
             </div>

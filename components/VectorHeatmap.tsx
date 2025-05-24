@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Download, X } from "lucide-react"
-import VectorHeatmapRenderer from "./VectorHeatmapRenderer"
+import VectorVisualizationRenderer from "./VectorVisualizationRenderer"
 import ColorSchemeSelector from "./ColorSchemeSelector"
 import { useVectorSettings } from "@/hooks/useVectorSettings"
 
@@ -18,7 +18,7 @@ export default function VectorHeatmap({
     onOpenChange 
 }: VectorHeatmapProps) {
     const [forceRender, setForceRender] = useState(0)
-    const { settings, setColorScheme, setScalingMode } = useVectorSettings()
+    const { settings, setColorScheme, setScalingMode, setVisualizationType } = useVectorSettings()
 
     // Force redraw on dialog open or settings change
     useEffect(() => {
@@ -29,15 +29,15 @@ export default function VectorHeatmap({
             }, 100)
             return () => clearTimeout(timer)
         }
-    }, [open, settings.colorScheme, settings.scalingMode])
+    }, [open, settings.colorScheme, settings.scalingMode, settings.visualizationType])
 
     // Download visualization as image
     const downloadVisualization = () => {
-        const canvas = document.querySelector(".vector-heatmap canvas") as HTMLCanvasElement
+        const canvas = document.querySelector(".vector-visualization canvas") as HTMLCanvasElement
         if (!canvas) return
         
         const link = document.createElement('a')
-        link.download = 'vector-visualization.png'
+        link.download = `vector-${settings.visualizationType}.png`
         link.href = canvas.toDataURL('image/png')
         link.click()
     }
@@ -62,8 +62,10 @@ export default function VectorHeatmap({
         )
     }
 
-    // Render color legend based on current scheme
+    // Render color legend based on current scheme (only for heatmap)
     const renderColorLegend = () => {
+        if (settings.visualizationType !== 'heatmap') return null
+
         type LegendItem = { color: string; label: string; border?: boolean }
         
         const legends: Record<string, LegendItem[]> = {
@@ -132,7 +134,18 @@ export default function VectorHeatmap({
                 {/* Always Visible Settings Panel */}
                 <div className="border rounded-lg p-4 bg-gray-50">
                     <h3 className="font-medium mb-3">Visualization Settings</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium mb-1">Visualization Type:</label>
+                            <select 
+                                value={settings.visualizationType} 
+                                onChange={(e) => setVisualizationType(e.target.value as any)}
+                                className="border rounded px-2 py-1 w-full"
+                            >
+                                <option value="heatmap">Heatmap Grid</option>
+                                <option value="distribution">Distribution Graph</option>
+                            </select>
+                        </div>
                         <ColorSchemeSelector
                             value={settings.colorScheme}
                             onChange={setColorScheme}
@@ -157,24 +170,28 @@ export default function VectorHeatmap({
 
                 <div className="flex flex-col items-center">
                     <div 
-                        className="vector-heatmap w-full h-full flex justify-center items-center" 
+                        className="vector-visualization w-full h-full flex justify-center items-center" 
                         style={{ 
                             minWidth: '300px', 
                             minHeight: '200px'
                         }}
-                        key={`${settings.colorScheme}-${settings.scalingMode}-${forceRender}`}
+                        key={`${settings.colorScheme}-${settings.scalingMode}-${settings.visualizationType}-${forceRender}`}
                     >
-                        <VectorHeatmapRenderer 
+                        <VectorVisualizationRenderer 
                             vector={vector}
                             showStats={true}
                             colorScheme={settings.colorScheme}
                             scalingMode={settings.scalingMode}
+                            visualizationType={settings.visualizationType}
                         />
                     </div>
                     {renderVectorStats()}
                     {renderColorLegend()}
                     <p className="text-xs text-muted-foreground mt-2">
-                        Hover over cells to see exact values. Colors represent relative intensity.
+                        {settings.visualizationType === 'heatmap' 
+                            ? "Hover over cells to see exact values. Colors represent relative intensity."
+                            : "Hover over bars to see bin details. Bar heights show value frequency distribution."
+                        }
                     </p>
                 </div>
             </DialogContent>
