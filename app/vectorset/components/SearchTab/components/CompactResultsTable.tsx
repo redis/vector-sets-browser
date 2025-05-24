@@ -1,3 +1,4 @@
+import React from "react"
 import { Table, TableBody } from "@/components/ui/table"
 import { VectorTuple } from "@/lib/redis-server/api"
 import { ColumnConfig } from "@/app/vectorset/hooks/useVectorResultsSettings"
@@ -26,7 +27,7 @@ export interface CompactResultsTableProps {
     metadata?: VectorSetMetadata | null
 }
 
-export default function CompactResultsTable({
+const CompactResultsTable = React.memo(function CompactResultsTable({
     filteredAndSortedResults,
     availableColumns,
     filterFields,
@@ -62,7 +63,7 @@ export default function CompactResultsTable({
             <TableBody>
                 {filteredAndSortedResults.map((row, index) => (
                     <CompactResultRow 
-                        key={index}
+                        key={`${row[0]}-${index}`}
                         row={row}
                         index={index}
                         availableColumns={availableColumns}
@@ -80,4 +81,6 @@ export default function CompactResultsTable({
             </TableBody>
         </Table>
     )
-} 
+})
+
+export default CompactResultsTable 

@@ -1,3 +1,4 @@
+import React from "react"
 import { TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { ArrowDownUp, ArrowDownWideNarrow, ArrowUpNarrowWide } from "lucide-react"
 import { ColumnConfig } from "@/app/vectorset/hooks/useVectorResultsSettings"
@@ -47,7 +48,7 @@ interface ResultsTableHeaderProps {
     filteredAndSortedResults: VectorTuple[]
 }
 
-export default function ResultsTableHeader({
+const ResultsTableHeader = React.memo(function ResultsTableHeader({
     availableColumns,
     filterFields,
     sortColumn,
@@ -59,6 +60,9 @@ export default function ResultsTableHeader({
     handleDeselectAll,
     filteredAndSortedResults
 }: ResultsTableHeaderProps) {
+    const isAllSelected = selectedElements.size === filteredAndSortedResults.length &&
+        filteredAndSortedResults.length > 0
+
     return (
         <TableHeader>
             <TableRow>
@@ -68,10 +72,7 @@ export default function ResultsTableHeader({
                         <div className="flex items-center justify-center">
                             <input
                                 type="checkbox"
-                                checked={
-                                    selectedElements.size === filteredAndSortedResults.length &&
-                                    filteredAndSortedResults.length > 0
-                                }
+                                checked={isAllSelected}
                                 onChange={(e) =>
                                     e.target.checked
                                         ? handleSelectAll()
@@ -148,4 +149,6 @@ export default function ResultsTableHeader({
             </TableRow>
         </TableHeader>
     )
-} 
+})
+
+export default ResultsTableHeader 

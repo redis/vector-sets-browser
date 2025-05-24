@@ -24,7 +24,7 @@ interface CompactResultRowProps {
     metadata?: VectorSetMetadata | null
 }
 
-export default function CompactResultRow({
+const CompactResultRow = React.memo(function CompactResultRow({
     row,
     index,
     availableColumns,
@@ -46,10 +46,13 @@ export default function CompactResultRow({
         return String(value)
     }
 
+    const element = row[0]
+    const isSelected = selectedElements.has(element)
+
     return (
         <TableRow
             className={`group ${
-                selectedElements.has(row[0])
+                isSelected
                     ? "bg-blue-50"
                     : ""
             }`}
@@ -60,8 +63,8 @@ export default function CompactResultRow({
                     <div className="flex items-center justify-center">
                         <input
                             type="checkbox"
-                            checked={selectedElements.has(row[0])}
-                            onChange={() => handleSelectToggle(row[0])}
+                            checked={isSelected}
+                            onChange={() => handleSelectToggle(element)}
                             className="h-4 w-4 rounded border-gray-300"
                             onClick={(e) => e.stopPropagation()} // Prevent row click when clicking checkbox
                         />
@@ -76,7 +79,7 @@ export default function CompactResultRow({
                         key={col.name}
                         onClick={
                             selectMode
-                                ? () => handleSelectToggle(row[0])
+                                ? () => handleSelectToggle(element)
                                 : undefined
                         }
                         className={selectMode ? "cursor-pointer" : ""}
@@ -89,7 +92,7 @@ export default function CompactResultRow({
                                                             metadata?.embedding
                                                         )))}
                                     </span>
-                                    <span className="font-medium">{row[0]}</span>
+                                    <span className="font-medium">{element}</span>
                                 </div>
                             ) : typeof row[1] === "number" ? (
                                 <span className="text-muted-foreground border border-gray-200 rounded-full p-1 text-xs">{row[1].toFixed(4)}</span>
@@ -99,7 +102,7 @@ export default function CompactResultRow({
                         ) : (
                             <span className="text-xs">
                                 {formatAttributeValue(
-                                    parsedAttributeCache[row[0]]?.[col.name]
+                                    parsedAttributeCache[element]?.[col.name]
                                 )}
                             </span>
                         )}
@@ -112,7 +115,7 @@ export default function CompactResultRow({
                             <Button
                                 variant="ghost"
                                 size="icon"
-                                onClick={() => handleSearchSimilar(row[0])}
+                                onClick={() => handleSearchSimilar(element)}
                                 className="h-8 w-8"
                                 title="Search similar vectors"
                             >
@@ -133,7 +136,7 @@ export default function CompactResultRow({
                             <Button
                                 variant="ghost"
                                 size="icon"
-                                onClick={(e) => onShowVectorClick(e, row[0])}
+                                onClick={(e) => onShowVectorClick(e, element)}
                                 className="h-8 w-8"
                                 title="Copy vector"
                             >
@@ -154,7 +157,7 @@ export default function CompactResultRow({
                             <Button
                                 variant="ghost"
                                 size="icon"
-                                onClick={() => setEditingAttributes(row[0])}
+                                onClick={() => setEditingAttributes(element)}
                                 className="h-8 w-8"
                                 title="Edit attributes"
                             >
@@ -175,7 +178,7 @@ export default function CompactResultRow({
                             <Button
                                 variant="ghost"
                                 size="icon"
-                                onClick={(e) => onDeleteClick(e, row[0])}
+                                onClick={(e) => onDeleteClick(e, element)}
                                 className="h-8 w-8 text-red-600"
                                 title="Delete vector"
                             >
@@ -199,4 +202,6 @@ export default function CompactResultRow({
             </TableCell>
         </TableRow>
     )
-} 
+})
+
+export default CompactResultRow 

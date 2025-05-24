@@ -1,3 +1,4 @@
+import React from "react"
 import { CompactResultsTableProps } from "./CompactResultsTable"
 import CompactResultsTable from "./CompactResultsTable"
 import DropZone from "./DropZone"
@@ -18,7 +19,7 @@ interface DropzoneResultsTableProps extends CompactResultsTableProps {
     metadata?: VectorSetMetadata | null
 }
 
-export default function DropzoneResultsTable({
+const DropzoneResultsTable = React.memo(function DropzoneResultsTable({
     handleAddVector,
     vectorSetName,
     metadata,
@@ -96,4 +97,6 @@ export default function DropzoneResultsTable({
             </div>
         </DropZone>
     )
-}
+})
+
+export default DropzoneResultsTable

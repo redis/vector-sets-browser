@@ -3,7 +3,7 @@ import {
     useVectorResultsSettings,
 } from "@/app/vectorset/hooks/useVectorResultsSettings"
 import { vgetattr_multi } from "@/lib/redis-server/api"
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState, useCallback } from "react"
 import AttributeColumnsDialog from "./components/AttributeColumnsDialog"
 import DropzoneResultsTable from "./components/DropzoneResultsTable"
 import ExpandedResultsList from "./components/ExpandedResultsList"
@@ -86,11 +86,33 @@ export default function VectorResults({
         new Set()
     )
 
-    // Filter fields state
+    // Add ref to track the last results for comparison
+    const lastResultsRef = useRef<typeof results>([])
+    const lastKeyNameRef = useRef<string>("")
+    
+    // Debouncing ref for attribute fetching
+    const attributeFetchTimeoutRef = useRef<NodeJS.Timeout>()
+
+    // Filter fields state - memoized to prevent recalculation
     const filterFields = useMemo(
         () => extractFilterFields(searchFilter),
         [searchFilter]
     )
+
+    // Memoized filtered and sorted results - moved up before callbacks that use it
+    const filteredAndSortedResults = useMemo(() => {
+        // First filter
+        let processed = results
+        if (filterText.trim()) {
+            const lowerFilter = filterText.toLowerCase()
+            processed = results.filter((row) =>
+                row[0].toLowerCase().includes(lowerFilter)
+            )
+        }
+
+        // Then sort
+        return sortResults(processed, sortColumn, sortDirection)
+    }, [results, filterText, sortColumn, sortDirection])
 
     // Clear selections when the keyName (vector set) changes
     useEffect(() => {
@@ -98,8 +120,8 @@ export default function VectorResults({
         setSelectedElements(new Set())
     }, [keyName])
 
-    // Handle individual selection toggle
-    const handleSelectToggle = (element: string) => {
+    // Memoized callback functions to prevent child re-renders
+    const handleSelectToggle = useCallback((element: string) => {
         setSelectedElements((prev) => {
             const newSet = new Set(prev)
             if (newSet.has(element)) {
@@ -109,63 +131,78 @@ export default function VectorResults({
             }
             return newSet
         })
-    }
+    }, [])
 
     // Handle "Select All" action
-    const handleSelectAll = () => {
-        const allElements = filteredAndSortedResults.map((row) => row[0])
-        setSelectedElements(new Set(allElements))
-    }
+    const handleSelectAll = useCallback(() => {
+        setSelectedElements(prev => {
+            const allElements = filteredAndSortedResults.map((row) => row[0])
+            return new Set(allElements)
+        })
+    }, [filteredAndSortedResults])
 
     // Handle "Deselect All" action
-    const handleDeselectAll = () => {
+    const handleDeselectAll = useCallback(() => {
         setSelectedElements(new Set())
-    }
+    }, [])
 
     // Handle exiting select mode
-    const handleExitSelectMode = () => {
+    const handleExitSelectMode = useCallback(() => {
         setSelectMode(false)
         setSelectedElements(new Set())
-    }
+    }, [])
 
     // Handle bulk delete action
-    const handleBulkDelete = () => {
+    const handleBulkDelete = useCallback(() => {
         if (onBulkDeleteClick && selectedElements.size > 0) {
             onBulkDeleteClick(Array.from(selectedElements))
             setSelectedElements(new Set())
             setSelectMode(false)
         }
-    }
+    }, [onBulkDeleteClick, selectedElements])
 
-    // Reset states when vectorSet changes
+    // Optimized state reset - batch all updates when vectorSet changes
     useEffect(() => {
-        // Reset to default columns
-        setAvailableColumns([
-            {
-                name: "element",
-                visible: getColumnVisibilityRef.current("element", true),
-                type: "system",
-            },
-            {
-                name: "score",
-                visible: getColumnVisibilityRef.current("score", true),
-                type: "system",
-            },
-        ])
+        if (keyName !== lastKeyNameRef.current) {
+            lastKeyNameRef.current = keyName
+            
+            // Batch all state updates together
+            const defaultColumns: ColumnConfig[] = [
+                {
+                    name: "element",
+                    visible: getColumnVisibilityRef.current("element", true),
+                    type: "system",
+                },
+                {
+                    name: "score",
+                    visible: getColumnVisibilityRef.current("score", true),
+                    type: "system",
+                },
+            ]
 
-        // Reset other related states
-        setAttributeCache({})
-        setParsedAttributeCache({})
-        setFilteredFieldValues({})
-        setEditingAttributes(null)
-        setSortColumn("none")
-        setSortDirection("asc")
-        setFilterText("")
-        setIsLoadingAttributes(false)
+            // Clear attribute fetch timeout
+            if (attributeFetchTimeoutRef.current) {
+                clearTimeout(attributeFetchTimeoutRef.current)
+            }
+
+            // Batch all state updates
+            setAvailableColumns(defaultColumns)
+            setAttributeCache({})
+            setParsedAttributeCache({})
+            setFilteredFieldValues({})
+            setEditingAttributes(null)
+            setSortColumn("none")
+            setSortDirection("asc")
+            setFilterText("")
+            setIsLoadingAttributes(false)
+            
+            // Reset results reference
+            lastResultsRef.current = []
+        }
     }, [keyName])
 
-    // Single source of truth for attribute fetching
-    const fetchAttributes = async (elements: string[]) => {
+    // Single source of truth for attribute fetching - memoized
+    const fetchAttributes = useCallback(async (elements: string[]) => {
         try {
             const response = await vgetattr_multi({
                 keyName,
@@ -182,34 +219,61 @@ export default function VectorResults({
             console.error(`Error fetching attributes`, error)
             return null
         }
-    }
+    }, [keyName])
 
-    // Fetch attributes for visible results
+    // Optimized attribute fetching with debouncing and comparison
     useEffect(() => {
-        if (!showAttributes || results.length === 0) return
+        if (!showAttributes || results.length === 0) {
+            if (attributeFetchTimeoutRef.current) {
+                clearTimeout(attributeFetchTimeoutRef.current)
+            }
+            return
+        }
 
-        let isCancelled = false
-        const elements = results.map((row) => row[0])
+        // Check if results actually changed (avoid refetching for same data)
+        const currentElements = results.map(row => row[0]).sort()
+        const lastElements = lastResultsRef.current.map(row => row[0]).sort()
+        
+        const elementsChanged = currentElements.length !== lastElements.length || 
+            currentElements.some((element, index) => element !== lastElements[index])
 
-        const fetchAndProcessAttributes = async () => {
+        if (!elementsChanged) {
+            return // No need to refetch if elements haven't changed
+        }
+
+        lastResultsRef.current = results
+
+        // Clear any pending attribute fetch
+        if (attributeFetchTimeoutRef.current) {
+            clearTimeout(attributeFetchTimeoutRef.current)
+        }
+
+        // Debounce attribute fetching to avoid rapid API calls during search
+        attributeFetchTimeoutRef.current = setTimeout(async () => {
+            let isCancelled = false
+            const elements = results.map((row) => row[0])
+
             setIsLoadingAttributes(true)
             try {
                 const attributes = await fetchAttributes(elements)
 
                 if (isCancelled || !attributes) return
 
-                const newCache = { ...attributeCache }
-                const newParsedCache: Record<string, ParsedAttributes> = {}
-                const allAttributeColumns = new Set<string>()
+                // Batch all state updates together
+                const updates = {
+                    newCache: { ...attributeCache },
+                    newParsedCache: {} as Record<string, ParsedAttributes>,
+                    allAttributeColumns: new Set<string>()
+                }
 
                 elements.forEach((element, i) => {
-                    newCache[element] = attributes[i]
+                    updates.newCache[element] = attributes[i]
                     if (attributes[i]) {
                         try {
                             const parsed = JSON.parse(attributes[i])
-                            newParsedCache[element] = parsed
+                            updates.newParsedCache[element] = parsed
                             Object.keys(parsed).forEach((key) =>
-                                allAttributeColumns.add(key)
+                                updates.allAttributeColumns.add(key)
                             )
                         } catch (error) {
                             console.error(
@@ -221,22 +285,40 @@ export default function VectorResults({
                 })
 
                 if (!isCancelled) {
-                    setAttributeCache(newCache)
-                    setParsedAttributeCache(newParsedCache)
+                    // Batch state updates
+                    setAttributeCache(updates.newCache)
+                    setParsedAttributeCache(updates.newParsedCache)
 
-                    // Update columns in a single operation
+                    // Only update columns if they actually changed
                     setAvailableColumns((prev) => {
                         const systemColumns = prev.filter(
                             (col) => col.type === "system"
                         )
-                        const attributeColumns = Array.from(
-                            allAttributeColumns
-                        ).map((name) => ({
+                        const existingAttributeColumns = new Set(
+                            prev.filter(col => col.type === "attribute").map(col => col.name)
+                        )
+                        
+                        // Only add new columns, don't recreate existing ones
+                        const newAttributeColumns = Array.from(
+                            updates.allAttributeColumns
+                        )
+                        .filter(name => !existingAttributeColumns.has(name))
+                        .map((name) => ({
                             name,
                             visible: getColumnVisibilityRef.current(name, true),
                             type: "attribute" as const,
                         }))
-                        return [...systemColumns, ...attributeColumns]
+
+                        if (newAttributeColumns.length === 0 && 
+                            prev.filter(col => col.type === "attribute").length === updates.allAttributeColumns.size) {
+                            return prev // No changes needed
+                        }
+
+                        const existingAttributeColumnsArray = prev.filter(col => 
+                            col.type === "attribute" && updates.allAttributeColumns.has(col.name)
+                        )
+
+                        return [...systemColumns, ...existingAttributeColumnsArray, ...newAttributeColumns]
                     })
                 }
             } catch (error) {
@@ -246,16 +328,22 @@ export default function VectorResults({
                     setIsLoadingAttributes(false)
                 }
             }
-        }
 
-        fetchAndProcessAttributes()
+            // Cleanup function
+            return () => {
+                isCancelled = true
+            }
+        }, 150) // 150ms debounce
 
+        // Cleanup timeout on unmount or dependency change
         return () => {
-            isCancelled = true
+            if (attributeFetchTimeoutRef.current) {
+                clearTimeout(attributeFetchTimeoutRef.current)
+            }
         }
-    }, [showAttributes, results, keyName])
+    }, [showAttributes, results, keyName, fetchAttributes])
 
-    // Extract field names from searchFilter
+    // Extract field names from searchFilter - memoized
     const filteredFields = useMemo(() => {
         if (!searchFilter) return []
 
@@ -270,22 +358,29 @@ export default function VectorResults({
         )
     }, [searchFilter])
 
-    // Modify the column management effect to be simpler
+    // Optimized column management with fewer updates
     useEffect(() => {
         if (!showAttributes || (showOnlyFilteredAttributes && !searchFilter)) {
-            // Only hide attribute columns, don't remove them
-            setAvailableColumns((prev) =>
-                prev.map((col) => ({
+            // Only update if visibility actually changes
+            setAvailableColumns((prev) => {
+                const hasVisibleAttributes = prev.some(col => 
+                    col.type === "attribute" && col.visible
+                )
+                
+                if (!hasVisibleAttributes) return prev // No changes needed
+                
+                return prev.map((col) => ({
                     ...col,
                     visible: col.type === "system" ? col.visible : false,
                 }))
-            )
+            })
             return
         }
 
         // Show/hide appropriate columns based on filter
         setAvailableColumns((prev) => {
-            return prev.map((col) => {
+            let hasChanges = false
+            const newColumns = prev.map((col) => {
                 if (col.type === "system") return col
 
                 const shouldBeVisible =
@@ -293,11 +388,17 @@ export default function VectorResults({
                     (showOnlyFilteredAttributes &&
                         filteredFields.includes(col.name))
 
+                if (col.visible !== shouldBeVisible) {
+                    hasChanges = true
+                }
+
                 return {
                     ...col,
                     visible: shouldBeVisible,
                 }
             })
+            
+            return hasChanges ? newColumns : prev
         })
     }, [
         showAttributes,
@@ -306,7 +407,7 @@ export default function VectorResults({
         filteredFields,
     ])
 
-    // Fetch field values when filtered fields change
+    // Fetch field values when filtered fields change - optimized
     useEffect(() => {
         if (
             !showAttributes ||
@@ -340,7 +441,7 @@ export default function VectorResults({
     ])
 
     // Handle dialog close with updated attributes
-    const handleAttributesDialogClose = (updatedAttributes?: string) => {
+    const handleAttributesDialogClose = useCallback((updatedAttributes?: string) => {
         if (updatedAttributes && editingAttributes) {
             // If attributes were saved, update our cache directly
             setAttributeCache((prev) => ({
@@ -381,53 +482,46 @@ export default function VectorResults({
 
         // Clear the editing state
         setEditingAttributes(null)
-    }
+    }, [editingAttributes])
 
-    const handleSort = (column: SortColumn) => {
-        if (sortColumn === column) {
-            // Cycle through: asc -> desc -> none
-            if (sortDirection === "asc") {
-                setSortDirection("desc")
-            } else if (sortDirection === "desc") {
-                // Reset to no sorting
-                setSortColumn("none")
+    const handleSort = useCallback((column: SortColumn) => {
+        setSortColumn(prevColumn => {
+            if (prevColumn === column) {
+                // Cycle through: asc -> desc -> none
+                setSortDirection(prevDirection => {
+                    if (prevDirection === "asc") {
+                        return "desc"
+                    } else if (prevDirection === "desc") {
+                        // Reset to no sorting
+                        setSortColumn("none")
+                        return "asc"
+                    }
+                    return "asc"
+                })
+                return prevColumn
+            } else {
+                // Set new column and default to ascending
+                setSortDirection("asc")
+                return column
             }
-        } else {
-            // Set new column and default to ascending
-            setSortColumn(column)
-            setSortDirection("asc")
-        }
-    }
+        })
+    }, [])
 
-    const filteredAndSortedResults = useMemo(() => {
-        // First filter
-        let processed = results
-        if (filterText.trim()) {
-            const lowerFilter = filterText.toLowerCase()
-            processed = results.filter((row) =>
-                row[0].toLowerCase().includes(lowerFilter)
-            )
-        }
-
-        // Then sort
-        return sortResults(processed, sortColumn, sortDirection)
-    }, [results, filterText, sortColumn, sortDirection])
-
-    const handleSearchSimilar = (element: string) => {
+    const handleSearchSimilar = useCallback((element: string) => {
         // Use a combined callback that updates both values at once
         onRowClick(element)
-    }
+    }, [onRowClick])
 
     // Modify the Add Vector button click handler
-    const handleAddVector = async () => {
+    const handleAddVector = useCallback(async () => {
         if (onAddVector) {
             onAddVector()
             // The parent component should handle refreshing the results
         }
-    }
+    }, [onAddVector])
 
     // Update the handler for toggling column visibility
-    const handleToggleColumn = (columnName: string, visible: boolean) => {
+    const handleToggleColumn = useCallback((columnName: string, visible: boolean) => {
         // Update the local state
         setAvailableColumns((prev) =>
             prev.map((c) => (c.name === columnName ? { ...c, visible } : c))
@@ -435,19 +529,23 @@ export default function VectorResults({
 
         // Persist the change to user settings
         updateAttributeColumnVisibility(columnName, visible)
-    }
+    }, [updateAttributeColumnVisibility])
 
-    // Check if the vectorset is empty (only has placeholder)
+    // Check if the vectorset is empty (only has placeholder) - memoized
     const vectorSetIsEmpty = useMemo(() => isEmptyVectorSet(results), [results])
 
-    // Early returns for different states
-    if (!isLoaded || isLoading || isSearching) {
+    // Create a stable search state that only changes when results actually change
+    const hasResults = results.length > 0
+    const isEmptyResults = results.length === 0 && !isLoading
+
+    // Early returns for different states - but avoid complete component replacement during search
+    if (!isLoaded) {
         return (
             <NoResults
                 keyName={keyName}
                 isLoaded={isLoaded}
-                isLoading={isLoading}
-                isSearching={isSearching}
+                isLoading={false}
+                isSearching={false}
                 searchTime={searchTime}
                 searchQuery={searchQuery}
                 searchFilter={searchFilter}
@@ -456,7 +554,7 @@ export default function VectorResults({
         )
     }
 
-    // Check for empty vector set (only has default vector)
+    // Check for empty vector set (only has default vector) - but not during search
     if (vectorSetIsEmpty) {
         return (
             <EmptyVectorSet
@@ -469,13 +567,14 @@ export default function VectorResults({
         )
     }
 
-    if (results.length === 0) {
+    // Show no results only when actually no results
+    if (isEmptyResults) {
         return (
             <NoResults
                 keyName={keyName}
                 isLoaded={isLoaded}
-                isLoading={isLoading}
-                isSearching={isSearching}
+                isLoading={false}
+                isSearching={false}
                 searchTime={searchTime}
                 searchQuery={searchQuery}
                 searchFilter={searchFilter}
@@ -503,7 +602,6 @@ export default function VectorResults({
             <ResultsHeader
                 results={results}
                 searchTime={searchTime}
-                isSearching={isSearching}
                 isLoading={isLoading}
                 searchFilter={searchFilter}
                 searchQuery={searchQuery}
@@ -533,32 +631,31 @@ export default function VectorResults({
                 }
             />
 
+            {/* Remove all loading overlays and conditional rendering based on search state */}
             {isCompact ? (
-                <>
-                    <DropzoneResultsTable
-                        filteredAndSortedResults={filteredAndSortedResults}
-                        availableColumns={availableColumns}
-                        filterFields={filterFields}
-                        parsedAttributeCache={parsedAttributeCache}
-                        sortColumn={sortColumn}
-                        sortDirection={sortDirection}
-                        handleSort={handleSort}
-                        selectMode={selectMode}
-                        selectedElements={selectedElements}
-                        handleSelectToggle={handleSelectToggle}
-                        handleSelectAll={handleSelectAll}
-                        handleDeselectAll={handleDeselectAll}
-                        handleSearchSimilar={handleSearchSimilar}
-                        onShowVectorClick={onShowVectorClick}
-                        setEditingAttributes={setEditingAttributes}
-                        onDeleteClick={onDeleteClick}
-                        vectorSetName={keyName}
-                        handleAddVector={
-                            handleAddVectorWithImage || (async () => {})
-                        }
-                        metadata={metadata}
-                    />
-                </>
+                <DropzoneResultsTable
+                    filteredAndSortedResults={filteredAndSortedResults}
+                    availableColumns={availableColumns}
+                    filterFields={filterFields}
+                    parsedAttributeCache={parsedAttributeCache}
+                    sortColumn={sortColumn}
+                    sortDirection={sortDirection}
+                    handleSort={handleSort}
+                    selectMode={selectMode}
+                    selectedElements={selectedElements}
+                    handleSelectToggle={handleSelectToggle}
+                    handleSelectAll={handleSelectAll}
+                    handleDeselectAll={handleDeselectAll}
+                    handleSearchSimilar={handleSearchSimilar}
+                    onShowVectorClick={onShowVectorClick}
+                    setEditingAttributes={setEditingAttributes}
+                    onDeleteClick={onDeleteClick}
+                    vectorSetName={keyName}
+                    handleAddVector={
+                        handleAddVectorWithImage || (async () => {})
+                    }
+                    metadata={metadata}
+                />
             ) : (
                 <ExpandedResultsList
                     filteredAndSortedResults={filteredAndSortedResults}

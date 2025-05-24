@@ -1,3 +1,4 @@
+import React from "react"
 import SearchTimeIndicator from "@/components/SearchTimeIndicator"
 import { Button } from "@/components/ui/button"
 import {
@@ -15,7 +16,6 @@ import { ColumnConfig } from "@/app/vectorset/hooks/useVectorResultsSettings"
 interface ResultsHeaderProps {
     results: any[]
     searchTime?: string
-    isSearching?: boolean
     isLoading?: boolean
     searchFilter?: string
     searchQuery?: string
@@ -41,10 +41,9 @@ interface ResultsHeaderProps {
     updateAttributeColumnVisibility: (columnName: string, visible: boolean) => void
 }
 
-export default function ResultsHeader({
+const ResultsHeader = React.memo(function ResultsHeader({
     results,
     searchTime,
-    isSearching,
     isLoading,
     searchFilter,
     searchQuery,
@@ -75,14 +74,9 @@ export default function ResultsHeader({
                 {results.length > 0 ? (
                     <div className="flex items-center gap-2">
                         <div>
-                            {(searchTime || isSearching) && (
+                            {searchTime && (
                                 <SearchTimeIndicator
-                                    searchTime={
-                                        searchTime
-                                            ? parseFloat(searchTime)
-                                            : undefined
-                                    }
-                                    isSearching={isSearching}
+                                    searchTime={parseFloat(searchTime)}
                                 />
                             )}
                         </div>
@@ -150,7 +144,6 @@ export default function ResultsHeader({
                         {searchType === "Element" &&
                             (searchQuery === undefined ||
                                 searchQuery === "") &&
-                            !isSearching &&
                             !isLoading && (
                                 <div className="ml-2 text-gray-500 text-sm flex items-center">
                                     Enter an element ID to search
@@ -355,4 +348,6 @@ export default function ResultsHeader({
             </div>
         </div>
     )
-} 
+})
+
+export default ResultsHeader 
