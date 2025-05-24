@@ -144,6 +144,7 @@ export default function VectorHeatmap({
                             >
                                 <option value="heatmap">Heatmap Grid</option>
                                 <option value="distribution">Distribution Graph</option>
+                                <option value="radial">Radial Plot</option>
                             </select>
                         </div>
                         <ColorSchemeSelector
@@ -190,7 +191,9 @@ export default function VectorHeatmap({
                     <p className="text-xs text-muted-foreground mt-2">
                         {settings.visualizationType === 'heatmap' 
                             ? "Hover over cells to see exact values. Colors represent relative intensity."
-                            : "Hover over bars to see bin details. Bar heights show value frequency distribution."
+                            : settings.visualizationType === 'distribution'
+                            ? "Hover over bars to see bin details. Bar heights show value frequency distribution."
+                            : "Hover over points to see dimension values. Radial distance represents magnitude, arranged in a circle."
                         }
                     </p>
                 </div>

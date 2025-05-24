@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 
 export type ColorScheme = 'thermal' | 'viridis' | 'classic'
 export type ScalingMode = 'relative' | 'absolute'
-export type VisualizationType = 'heatmap' | 'distribution'
+export type VisualizationType = 'heatmap' | 'distribution' | 'radial'
 
 interface VectorSettings {
     colorScheme: ColorScheme
@@ -13,7 +13,7 @@ interface VectorSettings {
 const DEFAULT_SETTINGS: VectorSettings = {
     colorScheme: 'thermal',
     scalingMode: 'relative',
-    visualizationType: 'heatmap'
+    visualizationType: 'radial'
 }
 
 const STORAGE_KEY = 'vector-visualization-settings'

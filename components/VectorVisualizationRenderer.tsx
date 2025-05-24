@@ -1,5 +1,6 @@
 import VectorHeatmapRenderer from "./VectorHeatmapRenderer"
 import VectorDistributionRenderer from "./VectorDistributionRenderer"
+import VectorRadialRenderer from "./VectorRadialRenderer"
 
 interface VectorVisualizationRendererProps {
     vector: number[] | null
@@ -8,7 +9,7 @@ interface VectorVisualizationRendererProps {
     showStats?: boolean
     scalingMode?: 'relative' | 'absolute'
     colorScheme?: 'thermal' | 'viridis' | 'classic'
-    visualizationType?: 'heatmap' | 'distribution'
+    visualizationType?: 'heatmap' | 'distribution' | 'radial'
 }
 
 export default function VectorVisualizationRenderer({
@@ -24,6 +25,19 @@ export default function VectorVisualizationRenderer({
     if (visualizationType === 'distribution') {
         return (
             <VectorDistributionRenderer
+                vector={vector}
+                className={className}
+                size={size}
+                showStats={showStats}
+                scalingMode={scalingMode}
+                colorScheme={colorScheme}
+            />
+        )
+    }
+
+    if (visualizationType === 'radial') {
+        return (
+            <VectorRadialRenderer
                 vector={vector}
                 className={className}
                 size={size}
